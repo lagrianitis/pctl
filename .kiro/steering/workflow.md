@@ -14,6 +14,12 @@ Do exactly what was asked, nothing more. Unrequested improvements are not wanted
   document, no exploratory reads beyond the file being changed.
 - **Copy the shape of an existing sibling file** instead of inventing structure. If a
   directory already has files of this kind, match their layout, front-matter and naming.
+- **Text asked for is text delivered.** A request for a commit message, MR/PR description,
+  release note, changelog entry or issue body is a writing task. Read the diff and the
+  relevant template, then write it. Do not check pipeline or job status, do not fetch CI
+  logs, do not open the MR/PR to see whether it is green, and do not report on any of it.
+  Nothing about a pipeline changes what the message should say. If the state of CI
+  genuinely matters, the user will ask about CI.
 
 ## Do not revert manual changes
 

@@ -26,6 +26,28 @@ continue from step 5.
 
 5. Run gh pr create against the already-pushed branch — never push it yourself
 
+## Final PR of a milestone
+
+When the change being committed is the **last PR of a milestone** — its `Target Release`
+is the version about to be cut, and nothing else in the milestone is outstanding — the
+release version is updated on the same branch, in the same commit. Not as a follow-up.
+
+- Bump `[project].version` in `pyproject.toml` to that version, then refresh `uv.lock`
+  per `tech.md` so the lock records the same version. CI verifies the tag against
+  `pyproject.toml`, so a stale version fails the `tag` job.
+- Fill `docs/releases/vX.Y.Z.md` from `docs/templates/release-notes.md`, following
+  `release-notes.md`. The final PR is the point where the real PR and issue numbers for
+  `Related Work` exist, so complete that section rather than leaving placeholders.
+- Flip `Status` in `docs/milestones/vX.Y.Z.md` from 🚧 In Progress to ✅ Complete, with
+  the release link.
+- Note any divergence from the plan in `docs/plans/vX.Y.Z-pr-plan.md` — PRs that merged
+  together, or scope that moved — rather than silently leaving the plan wrong.
+- **Tagging and publishing stay CI's job**, triggered by the release. Do not create a tag
+  by hand, and do not push: the hard limits in `workflow.md` still apply.
+
+If the milestone is not finished by this PR, leave the version alone. A version bump per
+PR is exactly what this rule prevents.
+
 ## Notes
 
 - Use --draft if not ready for review
