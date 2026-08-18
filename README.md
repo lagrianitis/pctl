@@ -202,20 +202,27 @@ src/test/
 │   └── aws/               case
 │       ├── conftest.py      client_error fixture (botocore-shaped)
 │       └── test_dynamodb.py key typing, request kwargs, error mapping
-└── smoke/                 CLI surface only, no provider is reached
-    ├── conftest.py          strips provider credentials from the environment
-    ├── test_cli_surface.py  tree-level: help, version, lazy-import guard
+├── smoke/                 CLI surface only, no provider is reached
+│   ├── conftest.py          strips provider credentials from the environment
+│   ├── test_cli_surface.py  tree-level: help, version, lazy-import guard
+│   ├── azure/             case
+│   │   ├── conftest.py      azure() and groups() invoke helpers
+│   │   ├── test_groups.py   groups service surface
+│   │   └── test_token.py    token and raw actions
+│   └── aws/               case
+│       ├── conftest.py      ddb() invoke helper
+│       └── test_dynamodb.py ddb service surface
+└── e2e/                   the real command path, provider boundary faked
+    ├── conftest.py          no_sleep and seen fixtures
     ├── azure/             case
-    │   ├── conftest.py      azure() and groups() invoke helpers
-    │   ├── test_groups.py   groups service surface
-    │   └── test_token.py    token and raw actions
-    ├── aws/               case
-    │   ├── conftest.py      ddb() invoke helper
-    │   └── test_dynamodb.py ddb service surface
-    ├── harness.py         ─┐
-    ├── azure_graph.py      │ standalone end-to-end scripts, not pytest-collected
-    ├── aws_dynamodb.py     │ (Graph faked with respx, DynamoDB with moto)
-    └── run_all.py         ─┘
+    │   ├── conftest.py      azure_env and the respx router
+    │   ├── test_groups.py   pagination, filters, rendering, resolution
+    │   ├── test_token.py    masking, decoding, the disk cache
+    │   ├── test_failures.py retries and the exit code contract
+    │   └── test_raw.py      the escape hatch
+    └── aws/               case
+        ├── conftest.py      moto-backed table fixture
+        └── test_dynamodb.py parallel scan, query, get, typing
 ```
 
 ## What makes it fast
@@ -266,31 +273,35 @@ src/test/
 ```bash
 uv sync --extra fast --extra azure        # includes the dev dependency group
 uv run ruff check .
-uv run pytest                             # unit + smoke tiers
-uv run python src/test/smoke/run_all.py   # end-to-end scripts
+uv run pytest                             # every tier
 ```
 
 ### Tests
 
-| what       | where                                                  | how it runs                                                                           |
-| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `unit`     | `src/test/unit/`, with `azure/` and `aws/` per case    | pytest, marker `unit`. Pure functions, no I/O, no mocks.                              |
-| `smoke`    | `src/test/smoke/`, with `azure/` and `aws/` per case   | pytest, marker `smoke`. CLI surface: help, aliases, exit codes.                       |
-| end-to-end | `src/test/smoke/{run_all,azure_graph,aws_dynamodb}.py` | standalone scripts, not pytest-collected. Graph faked with respx, DynamoDB with moto. |
+Three tiers, all collected by pytest, so `uv run pytest` really is the whole suite.
+
+| what    | where                                                | how it runs                                                                            |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `unit`  | `src/test/unit/`, with `azure/` and `aws/` per case  | pytest, marker `unit`. Pure functions, no I/O, no mocks.                                |
+| `smoke` | `src/test/smoke/`, with `azure/` and `aws/` per case | pytest, marker `smoke`. CLI surface: help, aliases, exit codes. No provider is reached. |
+| `e2e`   | `src/test/e2e/`, with `azure/` and `aws/` per case   | pytest, marker `e2e`. The real command path, with Graph faked by respx and DynamoDB by moto. |
 
 ```bash
-uv run pytest -m unit                  # 185 tests, ~0.3s
-uv run pytest -m smoke                 # 88 tests, ~0.5s
-uv run pytest src/test/unit/aws        # one case
+uv run pytest -m unit                  # pure functions
+uv run pytest -m smoke                 # CLI surface
+uv run pytest -m e2e                   # the real command path
+uv run pytest src/test/e2e/azure       # one case in one tier
 uv run pytest -k tokencache            # one area
 uv run pytest -n auto                  # across CPUs; pays off as the suite grows
 ```
 
-Nothing here needs credentials, a tenant or an AWS account. The pytest tiers never
-reach a provider, and the end-to-end scripts fake the HTTP and SDK boundary. See
-`src/test/smoke/README.md` for the conventions, including the two easy mistakes:
-read `result.stdout` rather than `result.output`, and decode request URLs before
-matching them.
+Nothing here needs credentials, a tenant or an AWS account. The `unit` and `smoke` tiers
+never reach a provider at all, and `e2e` fakes the HTTP and SDK boundary.
+
+Two conventions worth knowing before adding a test. Read data from `result.stdout` rather
+than `result.output`, because click 8.2+ merges stderr into `output` and this CLI writes
+summaries to stderr. And decode request URLs with `unquote_plus` before matching, because
+httpx percent-encodes OData names like `%24filter` and encodes spaces as `+`.
 
 ### Dependencies
 

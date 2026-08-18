@@ -56,3 +56,46 @@ def _explain(result: Any, want: int) -> str:
             )
         )
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Static sample data for the end-to-end tier
+# ---------------------------------------------------------------------------
+TENANT = "contoso.onmicrosoft.com"
+GRAPH = "https://graph.microsoft.com/v1.0"
+TOKEN_URL = f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/token"
+CLIENT_ID = "00000000-0000-0000-0000-000000000000"
+# Payload decodes to {"app": "pctl"}. The signature is irrelevant: --decode reads
+# claims without verifying, which is the documented behaviour.
+FAKE_JWT = "header.eyJhcHAiOiAicGN0bCJ9.signature"
+FAKE_SECRET = "not-a-real-secret"
+
+
+def graph_group(index: int) -> dict[str, Any]:
+    """One Graph group payload, named `aws-team-<index>` so ordering is assertable."""
+    return {
+        "id": f"id-{index}",
+        "displayName": f"aws-team-{index}",
+        "mail": f"team{index}@{TENANT}",
+        "groupTypes": [],
+        "securityEnabled": True,
+    }
+
+
+def filters(urls: list[str]) -> list[str]:
+    """The decoded `$filter` of every request that carried one.
+
+    URLs must be decoded before matching: httpx percent-encodes the parameter name as
+    `%24filter` and encodes spaces in the expression as `+`.
+    """
+    from urllib.parse import unquote_plus
+
+    decoded = [unquote_plus(url) for url in urls]
+    return [url.split("$filter=")[1].split("&")[0] for url in decoded if "$filter=" in url]
+
+
+TABLE = "pctl-e2e-accounts"
+REGION = "eu-central-1"
+# Even, so `status` splits exactly half ACTIVE and half SUSPENDED and a filter test can
+# assert on the count rather than just the shape.
+ITEM_COUNT = 12

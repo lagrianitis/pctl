@@ -74,7 +74,24 @@ maintenance.
 **Default: no comment.** In particular, avoid:
 
 - Comments that restate the code (`i += 1  # increment i`).
-- Section banners and decorative dividers in new code.
+- Section banners and decorative dividers in new code. Never fence a comment inside rules
+  of `#---------` above and below it:
+
+  ```python
+  # ---------------------------------
+  # Fixtures
+  # ---------------------------------
+  ```
+
+  Write just the comment, on the occasions it earns its place at all:
+
+  ```python
+  # Fixtures
+  ```
+
+  Same for `####` rules, box drawing and bare `#` padding lines. Structure comes from
+  module, class and function boundaries, not from ASCII furniture.
+
 - Docstrings that just echo the function name and signature.
 - Commented-out code. Delete it; git keeps the history.
 - Change-log comments (author, date, "modified by"). That belongs in git.

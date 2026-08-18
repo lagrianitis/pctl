@@ -82,6 +82,7 @@ addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 markers = [
     "unit: pure functions, no I/O and no mocks",
     "smoke: CLI surface only, no provider fakes, must stay under a second",
+    "e2e: the real command path, with only the provider boundary faked",
 ]
 
 

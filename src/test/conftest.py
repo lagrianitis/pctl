@@ -1,9 +1,9 @@
-"""Fixtures shared by the pytest tiers.
+"""Fixtures shared by every tier.
 
 Both fixtures import lazily, so collecting the unit tier costs nothing for tests that
-never touch the CLI. Provider fixtures deliberately do not live here: the pytest
-tiers never reach a provider, and the end-to-end scripts in `smoke/` carry their own
-respx and moto setup.
+never touch the CLI. Provider fakes deliberately do not live here: only the `e2e` tier
+reaches a provider boundary, so its respx and moto setup belongs in `e2e/conftest.py`
+and the per-case conftests beneath it.
 """
 
 from __future__ import annotations
