@@ -8,15 +8,19 @@ Create a well-crafted git commit for the current changes.
 
 ## Process
 
-1. Run `git status` and `git diff --staged` (and `git diff` if nothing staged)
-2. Analyze the changes deeply:
+1. Format first: `prettier --write .`, then `uv run --no-sync ruff format .` — see
+   "Always format before committing" in `workflow.md`
+2. Run `git status` and `git diff --staged` (and `git diff` if nothing staged)
+3. Analyze the changes deeply:
    - What files changed and why?
    - What's the single unifying purpose?
    - What would a future developer need to understand?
-3. THINK HARD: Write a commit message that future you will thank you for
-4. Stage relevant files if needed
-5. Commit with the crafted message
-6. **Stop. Do not push** — see the hard limit in `workflow.md`. Report the branch and
+   - Which files the formatters rewrote, and whether that churn belongs in this commit or
+     a separate `style: ...` one
+4. THINK HARD: Write a commit message that future you will thank you for
+5. Stage relevant files if needed, formatted files included
+6. Commit with the crafted message
+7. **Stop. Do not push** — see the hard limit in `workflow.md`. Report the branch and
    commit hash so the user can push.
 
 ## Commit Message Format
@@ -42,11 +46,13 @@ writing one:
 ## Examples
 
 **Simple:**
+
 ```
 docs: add CLAUDE.md with workflow guidance
 ```
 
 **With body:**
+
 ```
 feat: add three-step workflow commands
 

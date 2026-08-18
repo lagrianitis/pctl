@@ -35,25 +35,25 @@ synchronised and locked through uv, with no exceptions and no second tool alongs
 - CI and containers install with `uv sync --frozen` (or `--no-dev` for app-only images)
   so builds match the lock exactly rather than re-resolving.
 
-| Task | Command |
-| --- | --- |
-| install dev env | `uv sync --extra fast --extra azure` |
-| install app-only | `uv sync --no-dev` |
-| reproducible install | `uv sync --frozen` |
-| add a runtime dep | `uv add <pkg>` |
-| add a test/dev dep | `uv add --group test <pkg>` |
-| refresh the lock | `uv lock` (or `uv lock --upgrade-package <pkg>`) |
-| run anything | `uv run <cmd>` |
+| Task                 | Command                                          |
+| -------------------- | ------------------------------------------------ |
+| install dev env      | `uv sync --extra fast --extra azure`             |
+| install app-only     | `uv sync --no-dev`                               |
+| reproducible install | `uv sync --frozen`                               |
+| add a runtime dep    | `uv add <pkg>`                                   |
+| add a test/dev dep   | `uv add --group test <pkg>`                      |
+| refresh the lock     | `uv lock` (or `uv lock --upgrade-package <pkg>`) |
+| run anything         | `uv run <cmd>`                                   |
 
 ## Dependencies
 
-| Where | What | Ships to an app install? |
-| --- | --- | --- |
-| `[project] dependencies` | `click`, `httpx`, `orjson`, `boto3` | yes |
-| extra `fast` | `uvloop`, `h2` | only with `pctl[fast]` |
-| extra `azure` | `azure-identity` (fallback credential chain) | only with `pctl[azure]` |
-| group `test` | `pytest`, `pytest-xdist`, `pytest-asyncio`, `respx`, `moto[dynamodb]` | no |
-| group `dev` | the `test` group plus `ruff` | no |
+| Where                    | What                                                                  | Ships to an app install? |
+| ------------------------ | --------------------------------------------------------------------- | ------------------------ |
+| `[project] dependencies` | `click`, `httpx`, `orjson`, `boto3`                                   | yes                      |
+| extra `fast`             | `uvloop`, `h2`                                                        | only with `pctl[fast]`   |
+| extra `azure`            | `azure-identity` (fallback credential chain)                          | only with `pctl[azure]`  |
+| group `test`             | `pytest`, `pytest-xdist`, `pytest-asyncio`, `respx`, `moto[dynamodb]` | no                       |
+| group `dev`              | the `test` group plus `ruff`                                          | no                       |
 
 Keep runtime dependencies to those four. Test tooling belongs in **PEP 735
 `[dependency-groups]`**, not in `[project.optional-dependencies]`, so it never lands
@@ -104,7 +104,7 @@ usually a straight rename; `docker-compose` becomes `podman compose`.
 - `ruff`, line length **100**, `target-version = "py314"`.
 - Lint select: `E, F, I, UP, B, SIM, C4, RUF`; ignore `B008` (click decorators
   legitimately call functions in defaults). `IGNORE-*` paths are excluded.
-- Every module gets a docstring that explains *why* it exists, not just what it
+- Every module gets a docstring that explains _why_ it exists, not just what it
   contains. Existing modules explain performance and design tradeoffs inline —
   match that habit.
 - Type-annotate all public functions, including click callbacks.
@@ -163,7 +163,7 @@ functions that tests call themselves.
   pytest. They drive the real CLI through `click.testing.CliRunner` and fake only the
   provider boundary: Graph via `respx`, DynamoDB via `moto`. No credentials, no
   network, no tenant, no AWS account.
-- Smoke checks are *counted*, not asserted, so one failure does not mask the rest.
+- Smoke checks are _counted_, not asserted, so one failure does not mask the rest.
 - Two gotchas when writing smoke checks: read data from `result.stdout` (click 8.2+
   merges stderr into `result.output`, and this CLI writes summaries to stderr), and
   decode request URLs with `unquote_plus` before matching (httpx percent-encodes

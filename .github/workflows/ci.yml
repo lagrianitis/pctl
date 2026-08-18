@@ -1,7 +1,11 @@
 name: CI
 
 on:
+  # Pull requests are the gate: that is where tests must pass, before anything
+  # reaches main. Pushes are scoped to main so a branch push does not also fire a
+  # second run in which `test` reports itself skipped.
   push:
+    branches: [main]
   pull_request:
   release:
     types: [published]
@@ -15,7 +19,7 @@ permissions:
 
 jobs:
   lint:
-    # Every branch, every push, plus pull requests.
+    # Pull requests, plus main after a merge. Not releases.
     if: github.event_name != 'release'
     runs-on: ubuntu-latest
     steps:
@@ -42,7 +46,8 @@ jobs:
         run: uv run --no-sync ruff format --check .
 
   test:
-    # Pull requests only.
+    # Pull requests only, and deliberately so: the point is to catch a failure before
+    # it reaches main, not to discover it on the merge commit or at release time.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
