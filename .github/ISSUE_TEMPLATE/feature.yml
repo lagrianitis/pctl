@@ -1,0 +1,51 @@
+name: Feature
+description: Plan a new feature or milestone task.
+title: "[Area] "
+labels:
+  - feature
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the feature or task.
+    validations:
+      required: true
+
+  - type: textarea
+    id: objectives
+    attributes:
+      label: Objectives
+      description: What should this work achieve?
+      placeholder: |
+        - Objective 1
+        - Objective 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: What files, documents or outputs should be created or changed?
+      placeholder: |
+        - `path/to/file.md`
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: What conditions must be met for this issue to be complete?
+      placeholder: |
+        - [ ] Criteria 1
+        - [ ] Criteria 2
+    validations:
+      required: true
+
+  - type: input
+    id: target-release
+    attributes:
+      label: Target Release
+      placeholder: v0.2.2
