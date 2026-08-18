@@ -213,9 +213,7 @@ def test_clear_on_a_missing_file_is_false_not_an_error(cache: TokenCache) -> Non
     assert cache.clear() is False
 
 
-def test_clear_all_counts_what_it_removed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_clear_all_counts_what_it_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", str(tmp_path / "cache"))
     for name in ("one", "two", "three"):
         TokenCache(cache_key(name)).store(token())

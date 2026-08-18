@@ -60,7 +60,7 @@ class TokenCache:
             return None
         try:
             raw = self.path.read_bytes()
-        except (FileNotFoundError, NotADirectoryError, PermissionError):
+        except FileNotFoundError, NotADirectoryError, PermissionError:
             return None
         try:
             payload = orjson.loads(raw)
@@ -68,17 +68,19 @@ class TokenCache:
                 access_token=str(payload["access_token"]),
                 expires_at=float(payload["expires_at"]),
             )
-        except (orjson.JSONDecodeError, KeyError, TypeError, ValueError):
+        except orjson.JSONDecodeError, KeyError, TypeError, ValueError:
             return None
         return token if token.is_valid() else None
 
     def store(self, token: CachedToken) -> None:
         if not self.enabled:
             return
-        payload = orjson.dumps({
-            "access_token": token.access_token,
-            "expires_at": token.expires_at,
-        })
+        payload = orjson.dumps(
+            {
+                "access_token": token.access_token,
+                "expires_at": token.expires_at,
+            }
+        )
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             # Write via a temp file in the same directory so a concurrent reader
@@ -98,7 +100,7 @@ class TokenCache:
         try:
             self.path.unlink()
             return True
-        except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
+        except FileNotFoundError, NotADirectoryError, PermissionError, OSError:
             return False
 
 
