@@ -92,3 +92,10 @@ def filters(urls: list[str]) -> list[str]:
 
     decoded = [unquote_plus(url) for url in urls]
     return [url.split("$filter=")[1].split("&")[0] for url in decoded if "$filter=" in url]
+
+
+TABLE = "pctl-e2e-accounts"
+REGION = "eu-central-1"
+# Even, so `status` splits exactly half ACTIVE and half SUSPENDED and a filter test can
+# assert on the count rather than just the shape.
+ITEM_COUNT = 12
