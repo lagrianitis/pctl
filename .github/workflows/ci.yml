@@ -27,14 +27,19 @@ jobs:
           enable-cache: true
 
       # Lint needs the dev group (ruff) only, no runtime extras.
+      # --no-install-project skips building pctl itself. ruff does not need the package
+      # importable, and building it would make this job depend on the wheel target and
+      # the readme file resolving, which is not what lint is here to check.
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --no-install-project
 
+      # --no-sync is required, not cosmetic: `uv run` syncs before running, which would
+      # build the project again and undo --no-install-project above.
       - name: Ruff check
-        run: uv run ruff check .
+        run: uv run --no-sync ruff check .
 
       - name: Ruff format check
-        run: uv run ruff format --check .
+        run: uv run --no-sync ruff format --check .
 
   test:
     # Pull requests only.
