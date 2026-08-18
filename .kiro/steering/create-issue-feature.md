@@ -11,9 +11,9 @@ area being the case or component touched, for example `[azure] `, `[aws ddb] `,
 
 The template is committed for both forges:
 
-| Forge | Path | Format |
-| --- | --- | --- |
-| GitHub | `.github/ISSUE_TEMPLATE/feature.yml` | issue form (YAML) |
+| Forge  | Path                                 | Format                        |
+| ------ | ------------------------------------ | ----------------------------- |
+| GitHub | `.github/ISSUE_TEMPLATE/feature.yml` | issue form (YAML)             |
 | GitLab | `.gitlab/issue_templates/Feature.md` | markdown description template |
 
 GitLab has no issue-forms equivalent, so the two cannot be one file. They must stay

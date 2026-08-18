@@ -113,7 +113,7 @@ Each level owns only what its children share:
 ## Conventions to preserve
 
 - **Lazy everything heavy.** `cli.py` imports only click and the stdlib. Import
-  `httpx`, `boto3` and orjson *inside* the command function body, as `scan.py` does.
+  `httpx`, `boto3` and orjson _inside_ the command function body, as `scan.py` does.
   Never add a module-level import of a provider SDK to a path that `--help` touches.
 - **Global state on `AppContext`**, carried on `click.Context.obj`. Option callbacks in
   `options.py` write into it; leaf commands read `app.output`, `app.quiet`,

@@ -119,9 +119,9 @@ DynamoDB-typed JSON is also accepted as-is.
 
 ## Output
 
-| Format   | Streams | Use for                                  |
-| -------- | ------- | ---------------------------------------- |
-| `table`  | no      | reading in a terminal (default)          |
+| Format   | Streams | Use for                                   |
+| -------- | ------- | ----------------------------------------- |
+| `table`  | no      | reading in a terminal (default)           |
 | `json`   | yes     | one document, pretty when stdout is a tty |
 | `ndjson` | yes     | large result sets, piping to `jq`         |
 | `csv`    | yes     | spreadsheets                              |
@@ -238,16 +238,16 @@ src/test/
 
 ## Exit codes
 
-| Code | Meaning                              |
-| ---- | ------------------------------------ |
-| 0    | success                              |
-| 1    | generic failure                      |
-| 2    | usage or configuration error         |
-| 3    | authentication failure               |
-| 4    | not found (group, table or item)     |
-| 5    | upstream error from Graph or AWS     |
-| 130  | interrupted                          |
-| 141  | downstream pipe closed               |
+| Code | Meaning                          |
+| ---- | -------------------------------- |
+| 0    | success                          |
+| 1    | generic failure                  |
+| 2    | usage or configuration error     |
+| 3    | authentication failure           |
+| 4    | not found (group, table or item) |
+| 5    | upstream error from Graph or AWS |
+| 130  | interrupted                      |
+| 141  | downstream pipe closed           |
 
 ## Security notes
 
@@ -272,10 +272,10 @@ uv run python src/test/smoke/run_all.py   # end-to-end scripts
 
 ### Tests
 
-| what | where | how it runs |
-| --- | --- | --- |
-| `unit` | `src/test/unit/`, with `azure/` and `aws/` per case | pytest, marker `unit`. Pure functions, no I/O, no mocks. |
-| `smoke` | `src/test/smoke/`, with `azure/` and `aws/` per case | pytest, marker `smoke`. CLI surface: help, aliases, exit codes. |
+| what       | where                                                  | how it runs                                                                           |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `unit`     | `src/test/unit/`, with `azure/` and `aws/` per case    | pytest, marker `unit`. Pure functions, no I/O, no mocks.                              |
+| `smoke`    | `src/test/smoke/`, with `azure/` and `aws/` per case   | pytest, marker `smoke`. CLI surface: help, aliases, exit codes.                       |
 | end-to-end | `src/test/smoke/{run_all,azure_graph,aws_dynamodb}.py` | standalone scripts, not pytest-collected. Graph faked with respx, DynamoDB with moto. |
 
 ```bash
@@ -294,13 +294,13 @@ matching them.
 
 ### Dependencies
 
-| where | what | reaches an app install? |
-| --- | --- | --- |
-| `[project] dependencies` | click, httpx, orjson, boto3 | yes |
-| `[project.optional-dependencies] fast` | uvloop, h2 | only with `pctl[fast]` |
-| `[project.optional-dependencies] azure` | azure-identity | only with `pctl[azure]` |
-| `[dependency-groups] test` | pytest, pytest-xdist, pytest-asyncio, respx, moto | no |
-| `[dependency-groups] dev` | the `test` group plus ruff | no |
+| where                                   | what                                              | reaches an app install? |
+| --------------------------------------- | ------------------------------------------------- | ----------------------- |
+| `[project] dependencies`                | click, httpx, orjson, boto3                       | yes                     |
+| `[project.optional-dependencies] fast`  | uvloop, h2                                        | only with `pctl[fast]`  |
+| `[project.optional-dependencies] azure` | azure-identity                                    | only with `pctl[azure]` |
+| `[dependency-groups] test`              | pytest, pytest-xdist, pytest-asyncio, respx, moto | no                      |
+| `[dependency-groups] dev`               | the `test` group plus ruff                        | no                      |
 
 Test tooling lives in PEP 735 dependency groups rather than extras, so it is
 installed by `uv sync` but never written into the wheel metadata. Anyone

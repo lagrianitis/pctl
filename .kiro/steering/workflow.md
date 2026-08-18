@@ -59,8 +59,11 @@ it. Do not add such a step, do not install tooling, do not write a wrapper scrip
 
 - Verify by **reading** the file you changed and the templates it must match, not by
   executing anything. See "Definition of done" below.
-- This includes formatters, linters, renderers, schema and markdown validators, link
-  checkers, diagram generators and ad-hoc `python -c` one-liners used as checks.
+- This includes linters, renderers, schema and markdown validators, link checkers, diagram
+  generators and ad-hoc `python -c` one-liners used as checks.
+- **The two write-mode formatters in "Always format before committing" are the single
+  exception**, because writing formatted files is not validating a change. `ruff check`,
+  `pytest` and every other check stay off the table.
 - **Even when you write tests, do not run them.** Writing a test and executing it are
   separate acts; only the first is implied by a request to add tests.
 - **Do not run scripts unless you are explicitly asked to.** No "just checking it
@@ -81,9 +84,9 @@ change is concerned. Allow the `.kiro/steering` listing
   vendored copies.
 - If something the task genuinely needs is ignored, say so and let the user decide. Do not
   un-ignore it, and do not edit `.gitignore` to make room for it.
-**Anything prefixed `IGNORE-` does not exist.** Any file or directory whose name starts
-with `IGNORE-`, and everything beneath it at any depth, is completely out of bounds unless
-the user names it in the request.
+  **Anything prefixed `IGNORE-` does not exist.** Any file or directory whose name starts
+  with `IGNORE-`, and everything beneath it at any depth, is completely out of bounds unless
+  the user names it in the request.
 
 - Do not read, edit, create, delete, move or stage it.
 - Do not search it, and exclude it from every glob and grep. It must not appear in results.
@@ -99,4 +102,29 @@ the user names it in the request.
 
 A change is done when it has been **read back and matches its siblings**: correct path,
 same structure and front-matter as comparable files, placeholders filled, and internal
-references pointing at paths that exist. Nothing is executed to reach that conclusion.
+references pointing at paths that exist. Nothing beyond the two formatters below is
+executed to reach that conclusion.
+
+## Always format before committing
+
+Both formatters run on every change, from the workspace root:
+
+```bash
+prettier --write .              # markdown, YAML, JSON, everything non-Python
+uv run --no-sync ruff format .  # Python
+```
+
+- **Always, not "if it looks unformatted".** Run them after the last edit and before
+  staging, even for a one-line change.
+- `--no-sync` keeps the environment exactly as it is; formatting never re-resolves or
+  installs anything.
+- ruff owns Python, prettier owns the rest. Order matters only in that ruff runs second,
+  so it has the last word on `.py`.
+- **Then check what they touched.** `git status` and `git diff` before staging, so a
+  formatter's reach is a decision rather than a surprise.
+- **Commit the formatted files** alongside the change they belong to, with a message that
+  follows `commit.md` and `git.md`. Formatting churn unrelated to the change goes in its
+  own `style: ...` commit rather than hiding inside a `feat:` diff.
+- The `.gitignore` hard limit still wins: if `prettier --write .` reaches `.venv/` or an
+  `IGNORE-` path, those files are not staged, and say so rather than quietly including
+  them.

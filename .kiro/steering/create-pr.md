@@ -15,11 +15,15 @@ continue from step 5.
 1. Check branch name, recent commits, and changed files
 2. Use your reasoning model: THINK HARD about what this change accomplishes, why it matters, and how to explain it clearly to reviewers
 3. Write a PR title: type: short description
+
 - feat | fix | refactor | docs | test | chore | perf
+
 4. Write a concise body with:
+
 - Summary: What and why (2-3 sentences)
 - Changes: Key modifications (bullet list)
 - Testing: How it was verified
+
 5. Run gh pr create against the already-pushed branch — never push it yourself
 
 ## Notes
@@ -32,9 +36,9 @@ continue from step 5.
 
 The template is committed for both forges and the two copies are identical:
 
-| Forge | Path |
-| --- | --- |
-| GitHub | `.github/PULL_REQUEST_TEMPLATE.md` |
+| Forge  | Path                                         |
+| ------ | -------------------------------------------- |
+| GitHub | `.github/PULL_REQUEST_TEMPLATE.md`           |
 | GitLab | `.gitlab/merge_request_templates/Default.md` |
 
 Read the body from whichever path exists rather than retyping it, and **when you change
