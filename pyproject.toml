@@ -1,0 +1,87 @@
+[project]
+name = "pctl"
+version = "0.1.0"
+description = "Fast platform CLI for AWS, Azure and other SaaS providers"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "AWS Platform" }]
+keywords = ["cli", "platform", "azure", "microsoft-graph", "aws", "dynamodb"]
+
+dependencies = [
+    "click>=8.1",
+    "httpx>=0.27",
+    "orjson>=3.10",
+    "boto3>=1.34",
+]
+
+[project.optional-dependencies]
+# Optional speed-ups: uvloop replaces the asyncio event loop, h2 enables HTTP/2
+# multiplexing against Microsoft Graph. Both are picked up automatically when present.
+fast = [
+    "uvloop>=0.19; sys_platform != 'win32'",
+    "h2>=4.1",
+]
+# Fallback credential chain (az login, managed identity, workload identity).
+# Only needed when you are not using a client secret.
+azure = ["azure-identity>=1.17"]
+
+[project.scripts]
+pctl = "pctl.__main__:main"
+
+# Dependency groups (PEP 735) are development-only: uv installs them with
+# `uv sync`, but they are never written into the wheel's metadata, so anyone who
+# installs pctl as an app gets none of this. Keep test tooling here, not in
+# [project.optional-dependencies].
+[dependency-groups]
+test = [
+    "pytest>=8.0",
+    "pytest-xdist>=3.6",     # -n auto: run tests across CPUs
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",           # mocks httpx, used for Microsoft Graph
+    "moto[dynamodb]>=5.0",   # mocks AWS, used for DynamoDB
+]
+dev = [
+    { include-group = "test" },
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pctl"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+# Tells isort that `pctl` and the test `helpers` module are first-party, so import
+# blocks in tests sort the same way they do in the package.
+src = ["src", "src/test"]
+# Reference material dropped into the workspace, not part of this package.
+extend-exclude = ["IGNORE-*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/test"]
+# Makes `from helpers import ...` work from every tier without __init__.py files.
+pythonpath = ["src/test"]
+asyncio_mode = "auto"
+# `live` is excluded by default so a bare `uv run pytest` never needs credentials.
+# Run it deliberately with `uv run pytest -m live`.
+# importlib import mode lets the same file name exist in more than one tier, so
+# `unit/aws/test_dynamodb.py` and `smoke/aws/test_dynamodb.py` can coexist without
+# __init__.py files in the test tree.
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+# `-n auto` is not enabled by default: it hides live output and complicates
+# debugging. Pass it explicitly for a full run: uv run pytest -n auto
+markers = [
+    "unit: pure functions, no I/O and no mocks",
+    "smoke: CLI surface only, no provider fakes, must stay under a second",
+]
+
+
