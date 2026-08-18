@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    # Every branch, every push, plus pull requests.
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Lint needs the dev group (ruff) only, no runtime extras.
+      # --no-install-project skips building pctl itself. ruff does not need the package
+      # importable, and building it would make this job depend on the wheel target and
+      # the readme file resolving, which is not what lint is here to check.
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project
+
+      # --no-sync is required, not cosmetic: `uv run` syncs before running, which would
+      # build the project again and undo --no-install-project above.
+      - name: Ruff check
+        run: uv run --no-sync ruff check .
+
+      - name: Ruff format check
+        run: uv run --no-sync ruff format --check .
+
+  test:
+    # Pull requests only.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # --frozen installs exactly what uv.lock pins instead of re-resolving.
+      - name: Install dependencies
+        run: uv sync --frozen --extra fast --extra azure
+
+      - name: Tests
+        run: uv run pytest -n auto
+
+  tag:
+    # Published releases only: version check and tagging happen nowhere else.
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Full history and tags: the uniqueness check reads refs/tags.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      # pyproject.toml is the single source of truth for the version.
+      # --no-project keeps this off the project environment: tomllib is stdlib.
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          version="$(uv run --no-project python -c \
+            'import tomllib,pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}" >> "$GITHUB_OUTPUT"
+          echo "pyproject version: ${version}"
+
+      # A GitHub release carries its own tag name; it must match pyproject.
+      - name: Check release tag matches pyproject version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EXPECTED_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [ "$RELEASE_TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not match pyproject version tag '$EXPECTED_TAG'." \
+                 "Bump [project].version in pyproject.toml or retag the release."
+            exit 1
+          fi
+
+      # Reject a version that has already shipped. An existing tag on the same
+      # commit is the release event creating it, so that case is not a reuse.
+      - name: Check version is not already released
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          existing="$(git rev-parse -q --verify "refs/tags/${TAG}^{commit}" || true)"
+          if [ -n "$existing" ] && [ "$existing" != "$GITHUB_SHA" ]; then
+            echo "::error::Version ${TAG} is already released at ${existing}." \
+                 "Bump [project].version in pyproject.toml."
+            exit 1
+          fi
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already points at this commit, nothing to create."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
