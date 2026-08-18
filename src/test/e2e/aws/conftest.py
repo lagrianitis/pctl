@@ -98,9 +98,16 @@ def empty_table(aws_env: None) -> Iterator[str]:
 
 @pytest.fixture
 def ddb(runner: Any, cli: Any) -> Any:
-    """Invoke `pctl aws ddb ...`, saving the case and service on every call."""
+    """Invoke `pctl aws ddb ...`, saving the case and service on every call.
 
-    def invoke(*args: str) -> Any:
-        return runner.invoke(cli, ["aws", "ddb", *args], prog_name="pctl")
+    Pass the output format as `output=`, not as a positional `-o`. Global options are
+    declared on the root group and on leaf commands, but not on the intermediate `ddb`
+    group, so `pctl aws ddb -o ndjson tables` is a usage error while
+    `pctl -o ndjson aws ddb tables` is not. This keyword puts it in the root position.
+    """
+
+    def invoke(*args: str, output: str | None = None) -> Any:
+        root = ["-o", output] if output else []
+        return runner.invoke(cli, [*root, "aws", "ddb", *args], prog_name="pctl")
 
     return invoke
