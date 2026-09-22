@@ -75,6 +75,51 @@ async def resolve_one(
     return matches[0]
 
 
+def looks_like_email(value: str) -> bool:
+    """True when the value should be matched against a user's email, not their name.
+
+    An `@` is enough: Entra ID display names do not contain one, and both the fields
+    this then searches are addresses.
+    """
+    return "@" in value.strip()
+
+
+async def _resolve_user_by_email(client: GraphClient, email: str) -> dict[str, Any]:
+    """Resolve a user by userPrincipalName or mail.
+
+    Both are checked because they routinely differ: a tenant may have a UPN of
+    `lef@company.onmicrosoft.com` while mail is `lef@company.com`, and a user typing an
+    address means whichever one they know.
+
+    Matching is always exact here. There is no sensible prefix match on an address, and
+    this path grants access, so guessing is not an option.
+    """
+    from ..graph import escape_odata
+
+    literal = escape_odata(email.strip())
+    matches = [
+        item
+        async for item in client.list_collection(
+            "users",
+            select=("id", "displayName", "userPrincipalName", "mail"),
+            filter_expr=f"userPrincipalName eq '{literal}' or mail eq '{literal}'",
+            limit=2,
+        )
+    ]
+    if not matches:
+        raise NotFoundError(
+            f"No user has userPrincipalName or mail equal to: {email}. "
+            "Check the address, or pass the object ID."
+        )
+    if len(matches) > 1:
+        raise ConfigError(
+            f"{len(matches)} users match the address '{email}'. "
+            "Pass the object ID instead, so the wrong one cannot be chosen."
+        )
+    matches[0]["_resolved"] = "users"
+    return matches[0]
+
+
 def looks_like_object_id(value: str) -> bool:
     """True when the value is already a directory object GUID.
 
@@ -92,7 +137,14 @@ async def resolve_owner(
     mode: str = "exact",
     owner_type: str = "auto",
 ) -> dict[str, Any]:
-    """Resolve an owner argument to a directory object, by GUID or display name.
+    """Resolve an owner argument to a directory object.
+
+    Three forms are accepted, distinguished without a flag:
+
+    - a directory object GUID, used as-is
+    - an email address (anything containing `@`), matched against a user's
+      userPrincipalName or mail
+    - a display name, matched against users and then service principals
 
     Only users and service principals can own a service principal, so groups are not
     searched: resolving one would yield a valid-looking GUID that Graph then rejects.
@@ -111,6 +163,14 @@ async def resolve_owner(
     }
     if owner_type not in collections:
         raise ValueError(f"unknown owner type: {owner_type}")
+
+    if looks_like_email(owner):
+        if owner_type == "sp":
+            raise ConfigError(
+                f"'{owner}' looks like an email address, but --owner-type sp searches "
+                "service principals, which have none. Drop --owner-type or use 'user'."
+            )
+        return await _resolve_user_by_email(client, owner)
 
     for collection in collections[owner_type]:
         matches = await client.find_by_display_name(
@@ -135,6 +195,49 @@ async def resolve_owner(
         f"No {searched} entry matched: {owner}. Only users and service principals can "
         "own a service principal, so groups are not searched."
     )
+
+
+def collect_owners(owners: tuple[str, ...], emails: str | None) -> list[str]:
+    """Combine positional owners with a comma-separated `--emails` value.
+
+    Order is preserved and duplicates dropped, so naming the same person twice costs one
+    lookup rather than two and cannot produce two conflicting result rows.
+    """
+    collected = [owner.strip() for owner in owners if owner.strip()]
+    if emails:
+        collected.extend(part.strip() for part in emails.split(",") if part.strip())
+    seen: dict[str, None] = {}
+    for candidate in collected:
+        seen.setdefault(candidate, None)
+    return list(seen)
+
+
+async def resolve_owners(
+    client: GraphClient,
+    wanted: list[str],
+    *,
+    mode: str = "exact",
+    owner_type: str = "auto",
+) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
+    """Resolve several owner arguments concurrently.
+
+    Returns the resolved objects and a list of `(argument, reason)` failures. Failures
+    are collected rather than raised on the first one: with several owners, reporting
+    them one run at a time would be tedious, and the caller decides whether a failure is
+    fatal.
+    """
+    import asyncio
+
+    async def one(candidate: str) -> dict[str, Any] | tuple[str, str]:
+        try:
+            return await resolve_owner(client, candidate, mode=mode, owner_type=owner_type)
+        except (NotFoundError, ConfigError) as exc:
+            return candidate, str(exc)
+
+    results = await asyncio.gather(*[one(candidate) for candidate in wanted])
+    resolved = [item for item in results if isinstance(item, dict)]
+    failed = [item for item in results if isinstance(item, tuple)]
+    return resolved, failed
 
 
 def owner_label(owner: dict[str, Any]) -> str:

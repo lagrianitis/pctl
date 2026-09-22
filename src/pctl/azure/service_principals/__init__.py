@@ -18,13 +18,16 @@ from .common import (
     MATCH_MODES,
     OWNER_TYPES,
     PRINCIPAL_MATCH_MODES,
+    collect_owners,
     filter_by_principal,
     label_roles,
+    looks_like_email,
     looks_like_object_id,
     match_option,
     owner_label,
     resolve_one,
     resolve_owner,
+    resolve_owners,
 )
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
@@ -65,12 +68,15 @@ __all__ = [
     "MATCH_MODES",
     "OWNER_TYPES",
     "PRINCIPAL_MATCH_MODES",
+    "collect_owners",
     "filter_by_principal",
     "label_roles",
+    "looks_like_email",
     "looks_like_object_id",
     "match_option",
     "owner_label",
     "resolve_one",
     "resolve_owner",
+    "resolve_owners",
     "service_principals",
 ]
