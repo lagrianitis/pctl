@@ -13,8 +13,6 @@ import pytest
 from pctl.azure.service_principals.common import (
     filter_by_principal,
     label_roles,
-    looks_like_email,
-    looks_like_object_id,
     owner_label,
 )
 
@@ -146,39 +144,6 @@ def test_labelling_mutates_in_place_and_returns_nothing() -> None:
 
 
 # ---------------------------------------------------------------------------
-# looks_like_object_id
-# ---------------------------------------------------------------------------
-def test_a_canonical_guid_is_recognised() -> None:
-    assert looks_like_object_id("e6901838-637f-4bc7-b843-a8a7725a4872")
-
-
-def test_an_uppercase_guid_is_recognised() -> None:
-    """Portal copy-paste is often uppercase."""
-    assert looks_like_object_id("E6901838-637F-4BC7-B843-A8A7725A4872")
-
-
-def test_surrounding_whitespace_is_tolerated() -> None:
-    assert looks_like_object_id("  e6901838-637f-4bc7-b843-a8a7725a4872  ")
-
-
-def test_a_display_name_is_not_an_object_id() -> None:
-    assert not looks_like_object_id("Ann Example")
-
-
-def test_a_name_that_merely_contains_a_guid_is_not_one() -> None:
-    """fullmatch, not search: a name with a GUID in it must still be resolved."""
-    assert not looks_like_object_id("app e6901838-637f-4bc7-b843-a8a7725a4872 prod")
-
-
-def test_a_truncated_guid_is_not_an_object_id() -> None:
-    assert not looks_like_object_id("e6901838-637f-4bc7-b843")
-
-
-def test_an_empty_string_is_not_an_object_id() -> None:
-    assert not looks_like_object_id("")
-
-
-# ---------------------------------------------------------------------------
 # owner_label
 # ---------------------------------------------------------------------------
 def test_a_resolved_owner_is_labelled_with_name_and_id() -> None:
@@ -201,27 +166,3 @@ def test_the_upn_stands_in_when_there_is_no_display_name() -> None:
 
 def test_the_id_stands_in_when_there_is_no_name_at_all() -> None:
     assert owner_label({"id": "u1", "_resolved": "users"}) == "u1 (u1)"
-
-
-# ---------------------------------------------------------------------------
-# looks_like_email
-# ---------------------------------------------------------------------------
-def test_an_address_is_recognised() -> None:
-    assert looks_like_email("lef@company.com")
-
-
-def test_an_onmicrosoft_upn_is_recognised() -> None:
-    """UPN and mail routinely differ, and either may be what the user knows."""
-    assert looks_like_email("lef@company.onmicrosoft.com")
-
-
-def test_a_display_name_is_not_an_address() -> None:
-    assert not looks_like_email("Lefteris Agrianitis")
-
-
-def test_an_object_id_is_not_an_address() -> None:
-    assert not looks_like_email("e6901838-637f-4bc7-b843-a8a7725a4872")
-
-
-def test_surrounding_whitespace_does_not_hide_an_address() -> None:
-    assert looks_like_email("  lef@company.com  ")

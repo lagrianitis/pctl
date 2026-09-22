@@ -33,6 +33,8 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "groups", "list"],
     ["azure", "groups", "get"],
     ["azure", "groups", "members"],
+    ["azure", "users"],
+    ["azure", "users", "get"],
     ["azure", "sp"],
     ["azure", "sp", "list"],
     ["azure", "sp", "get"],
