@@ -148,22 +148,43 @@ than the read permission everything else uses.
 
 ```bash
 pctl azure sp owners "$APP"
+
+# one owner, or several, positionally or comma-separated
+pctl azure sp add-owner    "$APP" ann@company.com
+pctl azure sp add-owner    "$APP" ann@company.com bob@company.com
+pctl azure sp add-owner    "$APP" --emails ann@company.com,bob@company.com
+pctl azure sp remove-owner "$APP" --emails ann@company.com,bob@company.com
+
+# a display name, an object ID, or a service principal
 pctl azure sp add-owner    "$APP" "Ann Example"
-pctl azure sp remove-owner "$APP" "Ann Example"
 pctl azure sp add-owner    "$APP" e6901838-637f-4bc7-b843-a8a7725a4872
 pctl azure sp add-owner    "$APP" platform-automation --owner-type sp
 ```
 
-Both writes are **idempotent**: the current owners are read first, and adding an existing
-owner or removing an absent one is reported as information on exit 0 rather than an
-error. Re-running from a pipeline is safe and will not create a duplicate.
+Each owner can be an **email address**, a **display name**, or a **directory object ID**,
+distinguished without a flag. An address is matched against both `userPrincipalName` and
+`mail`, since those routinely differ — a tenant may have `lef@company.onmicrosoft.com` as
+the UPN and `lef@company.com` as the mail, and you should be able to use either. A GUID is
+used as-is. A display name is resolved against users and then service principals, the only
+object types that
+[can own a service principal](https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-owners)
+— groups cannot, so they are not searched.
 
-The owner argument takes a display name or a directory object ID. A GUID is used as-is;
-anything else is resolved against users and then service principals, which are the only
-object types that [can own a service principal](https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-owners)
-— groups cannot, so they are not searched. Resolution is `exact` by default and an
-ambiguous name is refused rather than guessed, because a wrong match here grants or
-revokes real access. Use `--owner-type` to disambiguate a name that exists in both
+Both writes are **idempotent**: the current owners are read once, and adding an existing
+owner or removing an absent one is reported as information rather than an error. Re-running
+from a pipeline is safe and will not create a duplicate. Each owner gets its own result row
+with a `status` of `added`, `already-owner`, `removed` or `not-an-owner`, so a batch tells
+you exactly what happened:
+
+```bash
+pctl -o ndjson azure sp add-owner "$APP" --emails ann@company.com,bob@company.com \
+  | jq -r '[.owner, .status] | @tsv'
+```
+
+Resolution is `exact` by default and an ambiguous name is refused rather than guessed,
+because a wrong match here grants or revokes real access. An owner that cannot be resolved
+does not block the others: the rest are still applied, and the command exits 4 unless
+`--ignore-missing` is passed. Use `--owner-type` to disambiguate a name that exists in both
 collections.
 
 `remove-owner` warns when the removal leaves fewer than two owners, which is Microsoft's
