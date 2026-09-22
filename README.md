@@ -46,13 +46,23 @@ Graph application permissions needed, all admin-consented:
 | --- | --- |
 | `Group.Read.All` | `groups list`, `get`, `members` |
 | `User.Read.All` | `users get`, group members, and owners by name or address |
-| `Application.Read.All` | `sp list`, `get`, `assignments`, `owners` |
-| `Application.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only |
+| `Application.Read.All` **or** `Directory.Read.All` | `sp list`, `get`, `assignments`, `owners` |
+| `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only |
 
-Everything except the last two commands is read-only, so grant
-`Application.ReadWrite.All` only where owner management is actually needed. A missing
-permission surfaces as exit 5 with `Authorization_RequestDenied`. Without a client
-secret, pctl falls back to
+Everything except the last two commands is read-only, so grant a write permission only
+where owner management is actually needed. `Directory.Read.All` covers all the reads on its
+own if your app already has it.
+
+A missing permission surfaces as **exit 5** with `Insufficient privileges to complete the
+operation`. Check what the token actually carries rather than what the portal lists, since
+a token issued before consent was granted will not have the new role:
+
+```bash
+pctl azure token --decode -o json | jq -r '.claims.roles[]'
+pctl azure token --clear-cache      # after granting consent, or the old token is reused
+```
+
+Without a client secret, pctl falls back to
 `azure-identity`'s `DefaultAzureCredential` when installed (`--extra azure`),
 which picks up `az login`, managed identity and workload identity.
 
