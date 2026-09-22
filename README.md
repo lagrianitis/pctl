@@ -40,8 +40,10 @@ export AZURE_CLIENT_ID=...
 export AZURE_CLIENT_SECRET=...      # prefer injecting this from a secret manager
 ```
 
-Graph application permissions needed: `Group.Read.All`, plus `User.Read.All` if
-you resolve members. Without a client secret, pctl falls back to
+Graph application permissions needed, all admin-consented: `Group.Read.All` for
+the `groups` service, `User.Read.All` to resolve members, and
+`Application.Read.All` for the `sp` service. A missing permission surfaces as
+exit 5 with `Authorization_RequestDenied`. Without a client secret, pctl falls back to
 `azure-identity`'s `DefaultAzureCredential` when installed (`--extra azure`),
 which picks up `az login`, managed identity and workload identity.
 
