@@ -16,11 +16,15 @@ from ...lazy import PctlGroup
 from .common import (
     DEFAULT_LIST_COLUMNS,
     MATCH_MODES,
+    OWNER_TYPES,
     PRINCIPAL_MATCH_MODES,
     filter_by_principal,
     label_roles,
+    looks_like_object_id,
     match_option,
+    owner_label,
     resolve_one,
+    resolve_owner,
 )
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
@@ -36,6 +40,18 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.service_principals.assignments:command",
         "List app role assignments for an Enterprise Application.",
     ),
+    "owners": (
+        "pctl.azure.service_principals.owners:command",
+        "List the owners of an Enterprise Application.",
+    ),
+    "add-owner": (
+        "pctl.azure.service_principals.add_owner:command",
+        "Add an owner, if it is not one already.",
+    ),
+    "remove-owner": (
+        "pctl.azure.service_principals.remove_owner:command",
+        "Remove an owner, if it is one.",
+    ),
 }
 
 
@@ -47,10 +63,14 @@ def service_principals() -> None:
 __all__ = [
     "DEFAULT_LIST_COLUMNS",
     "MATCH_MODES",
+    "OWNER_TYPES",
     "PRINCIPAL_MATCH_MODES",
     "filter_by_principal",
     "label_roles",
+    "looks_like_object_id",
     "match_option",
+    "owner_label",
     "resolve_one",
+    "resolve_owner",
     "service_principals",
 ]

@@ -8,14 +8,20 @@ are the package namespace.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 import click
 
-from ...errors import NotFoundError
+from ...errors import ConfigError, NotFoundError
 
 if TYPE_CHECKING:
     from ..graph import GraphClient
+
+_OBJECT_ID = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
+OWNER_TYPES = ["auto", "user", "sp"]
 
 MATCH_MODES = ["exact", "prefix", "search"]
 # Deliberately not the same vocabulary as MATCH_MODES above. `search` means Graph's
@@ -67,6 +73,76 @@ async def resolve_one(
             fg="yellow",
         )
     return matches[0]
+
+
+def looks_like_object_id(value: str) -> bool:
+    """True when the value is already a directory object GUID.
+
+    Lets the owner arguments take either a display name or an object ID without a flag
+    to say which. A GUID is unambiguous: no Entra ID display name is a bare GUID in
+    canonical form, so guessing here cannot misfire.
+    """
+    return bool(_OBJECT_ID.fullmatch(value.strip()))
+
+
+async def resolve_owner(
+    client: GraphClient,
+    owner: str,
+    *,
+    mode: str = "exact",
+    owner_type: str = "auto",
+) -> dict[str, Any]:
+    """Resolve an owner argument to a directory object, by GUID or display name.
+
+    Only users and service principals can own a service principal, so groups are not
+    searched: resolving one would yield a valid-looking GUID that Graph then rejects.
+
+    `owner_type` of `auto` tries users first, since a human owner is the common case,
+    and falls back to service principals. Pass `user` or `sp` to skip the fallback when
+    a name exists in both collections.
+    """
+    if looks_like_object_id(owner):
+        return {"id": owner.strip(), "displayName": owner.strip(), "_resolved": "object-id"}
+
+    collections = {
+        "auto": ("users", "servicePrincipals"),
+        "user": ("users",),
+        "sp": ("servicePrincipals",),
+    }
+    if owner_type not in collections:
+        raise ValueError(f"unknown owner type: {owner_type}")
+
+    for collection in collections[owner_type]:
+        matches = await client.find_by_display_name(
+            collection,
+            owner,
+            mode=mode,
+            select=("id", "displayName", "userPrincipalName"),
+            limit=2,
+        )
+        if not matches:
+            continue
+        if len(matches) > 1:
+            raise ConfigError(
+                f"{len(matches)} objects in {collection} match '{owner}'. "
+                "Pass the object ID instead, so the wrong one cannot be chosen."
+            )
+        matches[0]["_resolved"] = collection
+        return matches[0]
+
+    searched = " or ".join(collections[owner_type])
+    raise NotFoundError(
+        f"No {searched} entry matched: {owner}. Only users and service principals can "
+        "own a service principal, so groups are not searched."
+    )
+
+
+def owner_label(owner: dict[str, Any]) -> str:
+    """A short, unambiguous description of a resolved owner, for log and info lines."""
+    name = owner.get("displayName") or owner.get("userPrincipalName") or owner["id"]
+    if owner.get("_resolved") == "object-id":
+        return f"object {owner['id']}"
+    return f"{name} ({owner['id']})"
 
 
 def filter_by_principal(

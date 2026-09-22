@@ -57,6 +57,12 @@ DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
     "appRoleAssignmentRequired",
     "tags",
 )
+DEFAULT_OWNER_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "userPrincipalName",
+    "mail",
+)
 # appRoleAssignment does not support $select, so this is the render order rather than a
 # server-side projection. Graph returns the whole object either way.
 DEFAULT_ASSIGNMENT_COLUMNS: tuple[str, ...] = (
@@ -228,8 +234,15 @@ class GraphClient:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> httpx.Response:
-        """Send an authorized request, retrying throttling and transient failures."""
+        """Send an authorized request, retrying throttling and transient failures.
+
+        Retrying the writes this client makes is safe. Adding an owner is a reference
+        POST that Graph rejects as a duplicate rather than applying twice, and removing
+        one is a DELETE on a specific reference, so a retry after a timeout cannot
+        produce a second owner or remove an unintended one.
+        """
         target = url if url.startswith("http") else f"{self.config.base_url}/{url.lstrip('/')}"
         last_error: str = ""
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -239,6 +252,7 @@ class GraphClient:
                         method,
                         target,
                         params=params,
+                        json=json,
                         headers=await self._authorized_headers(headers),
                     )
                 except (httpx.TimeoutException, httpx.TransportError) as exc:
@@ -550,6 +564,54 @@ class GraphClient:
                 f"servicePrincipals/{sp_id}/{relation}", params=params, limit=limit
             )
         ]
+
+    # -- service principal owners -----------------------------------------
+    def owners(
+        self,
+        sp_id: str,
+        *,
+        select: Sequence[str] | None = DEFAULT_OWNER_SELECT,
+        limit: int | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream the owners of a service principal.
+
+        Owners are users or other service principals, so the response is a mixed
+        collection of directory objects. `@odata.type` is requested implicitly by Graph
+        and is the only reliable way to tell them apart.
+        """
+        params: dict[str, Any] = {"$top": GRAPH_MAX_PAGE_SIZE}
+        if select:
+            params["$select"] = ",".join(select)
+        return self.paginate(f"servicePrincipals/{sp_id}/owners", params=params, limit=limit)
+
+    def directory_object_ref(self, object_id: str) -> str:
+        """The `@odata.id` a reference write expects.
+
+        Built from the configured base URL rather than hardcoded, so pointing the client
+        at a different Graph endpoint keeps the body consistent with the request.
+        """
+        return f"{self.config.base_url}/directoryObjects/{object_id}"
+
+    async def add_owner(self, sp_id: str, object_id: str) -> None:
+        """Add a directory object as an owner of a service principal.
+
+        Graph returns 204 with no body. Callers are expected to have checked the current
+        owners first: this does not swallow a duplicate, because a 400 here means the
+        caller's view of the owners was stale and that is worth surfacing.
+        """
+        await self.request(
+            "POST",
+            f"servicePrincipals/{sp_id}/owners/$ref",
+            json={"@odata.id": self.directory_object_ref(object_id)},
+        )
+
+    async def remove_owner(self, sp_id: str, object_id: str) -> None:
+        """Remove an owner from a service principal.
+
+        Note the `/$ref` suffix: without it Graph deletes the owning *object* rather than
+        the ownership link, which for a user means deleting the user.
+        """
+        await self.request("DELETE", f"servicePrincipals/{sp_id}/owners/{object_id}/$ref")
 
     async def app_role_names(self, sp_id: str) -> dict[str, str]:
         """Map appRoleId to its display name, for labelling assignments.
