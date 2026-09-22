@@ -27,8 +27,49 @@ def sp(azure: Callable[..., Any]) -> Callable[..., Any]:
 
 def test_the_service_help_lists_its_actions(sp: Callable[..., Any]) -> None:
     stdout = ok(sp("--help")).stdout
-    for action in ("list", "get", "assignments"):
+    for action in ("list", "get", "assignments", "owners", "add-owner", "remove-owner"):
         assert action in stdout
+
+
+# ---------------------------------------------------------------------------
+# owners and the two writes
+# ---------------------------------------------------------------------------
+def test_add_owner_help_names_the_write_permission(sp: Callable[..., Any]) -> None:
+    """These are the only commands that change anything, so say what they need."""
+    assert "ReadWrite" in ok(sp("add-owner", "--help")).stdout
+
+
+def test_remove_owner_help_names_the_write_permission(sp: Callable[..., Any]) -> None:
+    assert "ReadWrite" in ok(sp("remove-owner", "--help")).stdout
+
+
+def test_add_owner_help_documents_idempotency(sp: Callable[..., Any]) -> None:
+    assert "Idempotent" in ok(sp("add-owner", "--help")).stdout
+
+
+def test_remove_owner_help_documents_idempotency(sp: Callable[..., Any]) -> None:
+    assert "Idempotent" in ok(sp("remove-owner", "--help")).stdout
+
+
+def test_owner_resolution_defaults_to_exact(sp: Callable[..., Any]) -> None:
+    """A loose match on a write could name the wrong person."""
+    assert "--owner-match" in ok(sp("add-owner", "--help")).stdout
+
+
+def test_add_owner_needs_both_the_app_and_the_owner(sp: Callable[..., Any]) -> None:
+    failed(sp("add-owner", "just-the-app"), 2)
+
+
+def test_remove_owner_needs_both_the_app_and_the_owner(sp: Callable[..., Any]) -> None:
+    failed(sp("remove-owner", "just-the-app"), 2)
+
+
+def test_owners_needs_an_app_name(sp: Callable[..., Any]) -> None:
+    failed(sp("owners"), 2)
+
+
+def test_an_unknown_owner_type_is_rejected(sp: Callable[..., Any]) -> None:
+    failed(sp("add-owner", "app", "owner", "--owner-type", "group"), 2)
 
 
 def test_the_help_explains_the_portal_name(sp: Callable[..., Any]) -> None:
