@@ -33,6 +33,10 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "groups", "list"],
     ["azure", "groups", "get"],
     ["azure", "groups", "members"],
+    ["azure", "sp"],
+    ["azure", "sp", "list"],
+    ["azure", "sp", "get"],
+    ["azure", "sp", "assignments"],
     ["aws"],
     ["aws", "ddb"],
     ["aws", "ddb", "tables"],
@@ -46,7 +50,14 @@ COMMAND_PATHS: list[list[str]] = [
 # Paths that must not drag a provider SDK into the interpreter when only asking for
 # help. `aws ddb scan` is included deliberately: it imports the transport module for
 # MAX_SEGMENTS, which must itself keep boto3 out of module scope.
-LAZY_PATHS = [[], ["azure"], ["azure", "groups", "list"], ["aws", "ddb"], ["aws", "ddb", "scan"]]
+LAZY_PATHS = [
+    [],
+    ["azure"],
+    ["azure", "groups", "list"],
+    ["azure", "sp", "assignments"],
+    ["aws", "ddb"],
+    ["aws", "ddb", "scan"],
+]
 PROVIDER_MODULES = ("boto3", "botocore", "httpx", "uvloop", "h2")
 
 
