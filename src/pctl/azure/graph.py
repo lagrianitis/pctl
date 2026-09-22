@@ -275,10 +275,19 @@ class GraphClient:
             if response.status_code == 401:
                 # Token may have been revoked or the cached copy is stale.
                 if attempt == 1:
-                    self._log("got 401, discarding cached token and retrying")
+                    self._log(f"401 from {method} {target}, discarding cached token and retrying")
                     self.clear_cached_token()
                     continue
-                raise AuthError(f"Graph rejected the token: {_describe(response)}")
+                # Name the request. A command may make several before failing, and
+                # "Graph rejected the token" on its own does not say which one did.
+                # Graph uses 401 for an invalid or expired token and 403 for a missing
+                # permission, so a persistent 401 is not a consent problem.
+                raise AuthError(
+                    f"Graph rejected the token for {method} {target}: {_describe(response)}\n"
+                    "A fresh token was already tried. Graph returns 401 for an invalid or "
+                    "expired token and 403 for a missing permission, so check the tenant, "
+                    "client ID and secret rather than the app's API permissions."
+                )
 
             if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
                 retry_after = response.headers.get("Retry-After")
@@ -291,8 +300,10 @@ class GraphClient:
 
             if response.status_code >= 400:
                 raise UpstreamError(
-                    f"Graph returned {response.status_code} for {target}: {_describe(response)}"
+                    f"Graph returned {response.status_code} for {method} {target}: "
+                    f"{_describe(response)}"
                 )
+            self._log(f"{response.status_code} {method} {target}")
             return response
 
         raise UpstreamError(
