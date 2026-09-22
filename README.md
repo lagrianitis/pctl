@@ -45,7 +45,7 @@ Graph application permissions needed, all admin-consented:
 | permission | needed for |
 | --- | --- |
 | `Group.Read.All` | `groups list`, `get`, `members` |
-| `User.Read.All` | resolving group members, and owners by display name |
+| `User.Read.All` | `users get`, group members, and owners by name or address |
 | `Application.Read.All` | `sp list`, `get`, `assignments`, `owners` |
 | `Application.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only |
 
@@ -102,6 +102,26 @@ concurrently.
 
 Match modes: `exact` (default, `displayName eq`), `prefix` (`startswith`),
 `search` (Graph full-text, matches substrings).
+
+### Users
+
+`get` resolves a person to their directory object from whatever you happen to know:
+an email address, a display name, or an object ID. Which form you passed is inferred,
+so there is no flag to set.
+
+```bash
+pctl azure users get ann@company.com
+pctl azure users get "Ann Example" -o json
+pctl azure users get e6901838-637f-4bc7-b843-a8a7725a4872
+pctl azure users get ann@company.com bob@company.com -o ndjson
+pctl azure users get -f people.txt --ignore-missing
+```
+
+An address is matched against both `userPrincipalName` and `mail`, since those routinely
+differ. An object ID addresses `/users/{id}` directly, with no query. A display name uses
+`--match`, and an ambiguous name is **refused** rather than guessed — two people can share
+one, and you are about to act on the answer. Several identifiers resolve concurrently, and
+one that matches nothing does not block the others.
 
 ### Service principals (Enterprise Applications)
 
@@ -264,9 +284,14 @@ src/pctl/
 ├── secrets.py             Azure credentials from AWS Secrets Manager
 ├── azure/                 case
 │   ├── __init__.py          `azure` group + graph_client() shared by all actions
+│   ├── common.py            directory lookups shared by `users` and `sp`
 │   ├── graph.py             Graph transport: token, retries, pagination
 │   ├── token.py             action (case-level, no service)
 │   ├── raw.py               action (case-level, no service)
+│   ├── users/             service
+│   │   ├── __init__.py      `users` group
+│   │   ├── common.py        default columns, match_option
+│   │   └── get.py           action
 │   ├── groups/            service
 │   │   ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
 │   │   ├── list.py          action
@@ -314,7 +339,9 @@ src/test/
 │   ├── test_tokencache.py   expiry, permissions, corrupt files
 │   ├── azure/             case
 │   │   ├── conftest.py      graph_client fixture
-│   │   └── test_graph.py    OData escaping, advanced-query headers
+│   │   ├── test_common.py   identifier form detection
+│   │   ├── test_graph.py    OData escaping, advanced-query headers
+│   │   └── test_service_principals.py  principal filtering, role labelling
 │   └── aws/               case
 │       ├── conftest.py      client_error fixture (botocore-shaped)
 │       └── test_dynamodb.py key typing, request kwargs, error mapping
@@ -325,6 +352,7 @@ src/test/
 │   │   ├── conftest.py      azure() and groups() invoke helpers
 │   │   ├── test_groups.py   groups service surface
 │   │   ├── test_service_principals.py  sp service surface
+│   │   ├── test_users.py    users service surface
 │   │   └── test_token.py    token and raw actions
 │   └── aws/               case
 │       ├── conftest.py      ddb() invoke helper
@@ -336,6 +364,7 @@ src/test/
     │   ├── test_groups.py   pagination, filters, rendering, resolution
     │   ├── test_service_principals.py  assignment direction, role labelling
     │   ├── test_sp_owners.py  the writes: idempotency, $ref bodies
+    │   ├── test_users.py    identifier forms, ambiguity refusal
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch
