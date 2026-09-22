@@ -40,10 +40,19 @@ export AZURE_CLIENT_ID=...
 export AZURE_CLIENT_SECRET=...      # prefer injecting this from a secret manager
 ```
 
-Graph application permissions needed, all admin-consented: `Group.Read.All` for
-the `groups` service, `User.Read.All` to resolve members, and
-`Application.Read.All` for the `sp` service. A missing permission surfaces as
-exit 5 with `Authorization_RequestDenied`. Without a client secret, pctl falls back to
+Graph application permissions needed, all admin-consented:
+
+| permission | needed for |
+| --- | --- |
+| `Group.Read.All` | `groups list`, `get`, `members` |
+| `User.Read.All` | resolving group members, and owners by display name |
+| `Application.Read.All` | `sp list`, `get`, `assignments`, `owners` |
+| `Application.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only |
+
+Everything except the last two commands is read-only, so grant
+`Application.ReadWrite.All` only where owner management is actually needed. A missing
+permission surfaces as exit 5 with `Authorization_RequestDenied`. Without a client
+secret, pctl falls back to
 `azure-identity`'s `DefaultAzureCredential` when installed (`--extra azure`),
 which picks up `az login`, managed identity and workload identity.
 
@@ -131,6 +140,35 @@ pctl -q azure sp assignments "$APP" --principal "$GROUP" >/dev/null 2>&1
 case $? in 0) echo assigned ;; 4) echo "not assigned" ;; *) echo "check failed" ;; esac
 ```
 
+#### Owners
+
+`owners` lists them; `add-owner` and `remove-owner` change them. These are the only
+commands in `pctl` that write anything, and they need `Application.ReadWrite.All` rather
+than the read permission everything else uses.
+
+```bash
+pctl azure sp owners "$APP"
+pctl azure sp add-owner    "$APP" "Ann Example"
+pctl azure sp remove-owner "$APP" "Ann Example"
+pctl azure sp add-owner    "$APP" e6901838-637f-4bc7-b843-a8a7725a4872
+pctl azure sp add-owner    "$APP" platform-automation --owner-type sp
+```
+
+Both writes are **idempotent**: the current owners are read first, and adding an existing
+owner or removing an absent one is reported as information on exit 0 rather than an
+error. Re-running from a pipeline is safe and will not create a duplicate.
+
+The owner argument takes a display name or a directory object ID. A GUID is used as-is;
+anything else is resolved against users and then service principals, which are the only
+object types that [can own a service principal](https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-owners)
+— groups cannot, so they are not searched. Resolution is `exact` by default and an
+ambiguous name is refused rather than guessed, because a wrong match here grants or
+revokes real access. Use `--owner-type` to disambiguate a name that exists in both
+collections.
+
+`remove-owner` warns when the removal leaves fewer than two owners, which is Microsoft's
+recommended minimum, but does not refuse.
+
 Two things worth knowing before relying on this. The `--principal` filter runs
 client-side, because Graph does not support `$filter` on `principalDisplayName` for this
 relation, so every page is fetched regardless and `--principal` narrows what is rendered
@@ -214,10 +252,13 @@ src/pctl/
 │   │   ├── get.py           action
 │   │   └── members.py       action
 │   └── service_principals/ service (exposed as `sp`)
-│       ├── __init__.py      `sp` group + match_option, resolve_one, filter_by_principal
+│       ├── __init__.py      `sp` group + match_option, resolve_one, resolve_owner
 │       ├── list.py          action
 │       ├── get.py           action
-│       └── assignments.py   action
+│       ├── assignments.py   action
+│       ├── owners.py        action
+│       ├── add_owner.py     action (write)
+│       └── remove_owner.py  action (write)
 └── aws/                   case
     ├── __init__.py          `aws` group
     └── dynamodb/          service (exposed as `ddb`)
@@ -273,6 +314,7 @@ src/test/
     │   ├── conftest.py      azure_env and the respx router
     │   ├── test_groups.py   pagination, filters, rendering, resolution
     │   ├── test_service_principals.py  assignment direction, role labelling
+    │   ├── test_sp_owners.py  the writes: idempotency, $ref bodies
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch
