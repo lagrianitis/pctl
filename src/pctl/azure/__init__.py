@@ -24,6 +24,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "groups": ("pctl.azure.groups:groups", "List and inspect Entra ID groups."),
+    "users": ("pctl.azure.users:users", "Look up Entra ID users."),
     "sp": (
         "pctl.azure.service_principals:service_principals",
         "Service principals, known in the portal as Enterprise Applications.",
@@ -46,7 +47,7 @@ ALIASES = {"enterprise-apps": "sp", "service-principals": "sp"}
 )
 @click.pass_context
 def azure(ctx: click.Context) -> None:
-    """Microsoft Graph: tokens, groups and service principals.
+    """Microsoft Graph: tokens, groups, users and service principals.
 
     \b
     Credentials resolve in this order:
