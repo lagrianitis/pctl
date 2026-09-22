@@ -57,6 +57,16 @@ DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
     "appRoleAssignmentRequired",
     "tags",
 )
+DEFAULT_USER_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "userPrincipalName",
+    "mail",
+    "jobTitle",
+    "department",
+    "officeLocation",
+    "accountEnabled",
+)
 DEFAULT_OWNER_SELECT: tuple[str, ...] = (
     "id",
     "displayName",
@@ -529,6 +539,38 @@ class GraphClient:
         """Resolve a display name to zero or more service principals."""
         return await self.find_by_display_name(
             "servicePrincipals", display_name, mode=mode, select=select, limit=limit
+        )
+
+    # -- users ------------------------------------------------------------
+    async def get_user(
+        self, user_id: str, *, select: Sequence[str] | None = DEFAULT_USER_SELECT
+    ) -> dict[str, Any]:
+        """One user by object ID or userPrincipalName.
+
+        Graph accepts either in the path, so a UPN needs no lookup first.
+        """
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"users/{user_id}", params=params)
+
+    def list_users(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_USER_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream users, or those matching a filter or search."""
+        return self.list_collection(
+            "users",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
         )
 
     async def get_service_principal(

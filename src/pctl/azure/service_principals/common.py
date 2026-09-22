@@ -8,19 +8,16 @@ are the package namespace.
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Any
 
 import click
 
 from ...errors import ConfigError, NotFoundError
+from ..common import find_users_by_address, looks_like_email, looks_like_object_id
 
 if TYPE_CHECKING:
     from ..graph import GraphClient
 
-_OBJECT_ID = re.compile(
-    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
-)
 OWNER_TYPES = ["auto", "user", "sp"]
 
 MATCH_MODES = ["exact", "prefix", "search"]
@@ -75,37 +72,16 @@ async def resolve_one(
     return matches[0]
 
 
-def looks_like_email(value: str) -> bool:
-    """True when the value should be matched against a user's email, not their name.
-
-    An `@` is enough: Entra ID display names do not contain one, and both the fields
-    this then searches are addresses.
-    """
-    return "@" in value.strip()
-
-
 async def _resolve_user_by_email(client: GraphClient, email: str) -> dict[str, Any]:
-    """Resolve a user by userPrincipalName or mail.
+    """Resolve exactly one user by address, for use as an owner.
 
-    Both are checked because they routinely differ: a tenant may have a UPN of
-    `lef@company.onmicrosoft.com` while mail is `lef@company.com`, and a user typing an
-    address means whichever one they know.
-
-    Matching is always exact here. There is no sensible prefix match on an address, and
-    this path grants access, so guessing is not an option.
+    Thin wrapper over the case-level lookup: what is specific here is that an ambiguous
+    result must be refused rather than warned about, because the caller is about to grant
+    or revoke access with it.
     """
-    from ..graph import escape_odata
-
-    literal = escape_odata(email.strip())
-    matches = [
-        item
-        async for item in client.list_collection(
-            "users",
-            select=("id", "displayName", "userPrincipalName", "mail"),
-            filter_expr=f"userPrincipalName eq '{literal}' or mail eq '{literal}'",
-            limit=2,
-        )
-    ]
+    matches = await find_users_by_address(
+        client, email, select=("id", "displayName", "userPrincipalName", "mail")
+    )
     if not matches:
         raise NotFoundError(
             f"No user has userPrincipalName or mail equal to: {email}. "
@@ -118,16 +94,6 @@ async def _resolve_user_by_email(client: GraphClient, email: str) -> dict[str, A
         )
     matches[0]["_resolved"] = "users"
     return matches[0]
-
-
-def looks_like_object_id(value: str) -> bool:
-    """True when the value is already a directory object GUID.
-
-    Lets the owner arguments take either a display name or an object ID without a flag
-    to say which. A GUID is unambiguous: no Entra ID display name is a bare GUID in
-    canonical form, so guessing here cannot misfire.
-    """
-    return bool(_OBJECT_ID.fullmatch(value.strip()))
 
 
 async def resolve_owner(
