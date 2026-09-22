@@ -48,6 +48,24 @@ DEFAULT_MEMBER_SELECT: tuple[str, ...] = (
     "userPrincipalName",
     "mail",
 )
+DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "appId",
+    "servicePrincipalType",
+    "accountEnabled",
+    "appRoleAssignmentRequired",
+    "tags",
+)
+# appRoleAssignment does not support $select, so this is the render order rather than a
+# server-side projection. Graph returns the whole object either way.
+DEFAULT_ASSIGNMENT_COLUMNS: tuple[str, ...] = (
+    "principalDisplayName",
+    "principalType",
+    "appRoleId",
+    "createdDateTime",
+    "id",
+)
 
 # `$search`, `$count` and `endsWith` filters require the advanced query API.
 ADVANCED_QUERY_HEADERS = {"ConsistencyLevel": "eventual"}
@@ -346,17 +364,23 @@ class GraphClient:
             params["$count"] = "true"
         return params, headers
 
-    def list_groups(
+    # -- collections ------------------------------------------------------
+    # `groups` and `servicePrincipals` are both OData collections of directory
+    # objects, so listing, counting and display-name lookup differ only in the path
+    # and the default $select. These three take the collection; the named methods
+    # below are the readable spellings callers actually use.
+    def list_collection(
         self,
+        collection: str,
         *,
-        select: Sequence[str] | None = DEFAULT_GROUP_SELECT,
+        select: Sequence[str] | None = None,
         filter_expr: str | None = None,
         search: str | None = None,
         order_by: str | None = None,
         limit: int | None = None,
         page_size: int = GRAPH_MAX_PAGE_SIZE,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Stream every group in the tenant (or those matching a filter/search)."""
+        """Stream every item in an OData collection, following pagination."""
         params, headers = self._list_params(
             select=select,
             filter_expr=filter_expr,
@@ -365,25 +389,26 @@ class GraphClient:
             page_size=page_size,
             count=False,
         )
-        return self.paginate("groups", params=params, headers=headers, limit=limit)
+        return self.paginate(collection, params=params, headers=headers, limit=limit)
 
-    async def count_groups(self, *, filter_expr: str | None = None) -> int:
+    async def count_collection(self, collection: str, *, filter_expr: str | None = None) -> int:
         """Ask Graph for a count without transferring the objects."""
         params: dict[str, Any] = {"$count": "true", "$top": 1, "$select": "id"}
         if filter_expr:
             params["$filter"] = filter_expr
-        payload = await self.get_json("groups", params=params, headers=ADVANCED_QUERY_HEADERS)
+        payload = await self.get_json(collection, params=params, headers=ADVANCED_QUERY_HEADERS)
         return int(payload.get("@odata.count", 0))
 
-    async def find_groups_by_display_name(
+    async def find_by_display_name(
         self,
+        collection: str,
         display_name: str,
         *,
         mode: str = "exact",
         select: Sequence[str] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Resolve a display name to zero or more groups.
+        """Resolve a display name to zero or more items in a collection.
 
         `mode` is one of `exact` (`displayName eq`), `prefix` (`startswith`) or
         `search` (Graph full-text `$search`, which also matches substrings).
@@ -411,8 +436,138 @@ class GraphClient:
         )
         return [
             item
-            async for item in self.paginate("groups", params=params, headers=headers, limit=limit)
+            async for item in self.paginate(collection, params=params, headers=headers, limit=limit)
         ]
+
+    # -- groups -----------------------------------------------------------
+    def list_groups(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_GROUP_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream every group in the tenant (or those matching a filter/search)."""
+        return self.list_collection(
+            "groups",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_groups(self, *, filter_expr: str | None = None) -> int:
+        """Ask Graph for a group count without transferring the objects."""
+        return await self.count_collection("groups", filter_expr=filter_expr)
+
+    async def find_groups_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name to zero or more groups."""
+        return await self.find_by_display_name(
+            "groups", display_name, mode=mode, select=select, limit=limit
+        )
+
+    # -- service principals (Enterprise Applications) ---------------------
+    def list_service_principals(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_SERVICE_PRINCIPAL_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream service principals, which the portal calls Enterprise Applications."""
+        return self.list_collection(
+            "servicePrincipals",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_service_principals(self, *, filter_expr: str | None = None) -> int:
+        """Ask Graph for a service principal count without transferring the objects."""
+        return await self.count_collection("servicePrincipals", filter_expr=filter_expr)
+
+    async def find_service_principals_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name to zero or more service principals."""
+        return await self.find_by_display_name(
+            "servicePrincipals", display_name, mode=mode, select=select, limit=limit
+        )
+
+    async def get_service_principal(
+        self, sp_id: str, *, select: Sequence[str] | None = None
+    ) -> dict[str, Any]:
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"servicePrincipals/{sp_id}", params=params)
+
+    async def app_role_assignments(
+        self,
+        sp_id: str,
+        *,
+        outbound: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """App role assignments for a service principal.
+
+        Two different questions share one object type, so the direction matters:
+
+        - `appRoleAssignedTo` (default) answers "who has access to this Enterprise
+          Application", and `principalDisplayName` is the assigned user or group.
+        - `appRoleAssignments` (`outbound=True`) answers "what is this service
+          principal itself assigned to", and `principalDisplayName` is the service
+          principal.
+
+        No `$select`: Graph rejects it on these relations, and the objects are small.
+        """
+        relation = "appRoleAssignments" if outbound else "appRoleAssignedTo"
+        params: dict[str, Any] = {"$top": GRAPH_MAX_PAGE_SIZE}
+        return [
+            item
+            async for item in self.paginate(
+                f"servicePrincipals/{sp_id}/{relation}", params=params, limit=limit
+            )
+        ]
+
+    async def app_role_names(self, sp_id: str) -> dict[str, str]:
+        """Map appRoleId to its display name, for labelling assignments.
+
+        The roles live on the service principal itself, so one extra request turns
+        every opaque GUID in an assignment into something readable.
+        """
+        payload = await self.get_json(f"servicePrincipals/{sp_id}", params={"$select": "appRoles"})
+        roles = payload.get("appRoles") or []
+        names = {
+            role["id"]: role.get("displayName") or role.get("value") or role["id"]
+            for role in roles
+            if isinstance(role, dict) and role.get("id")
+        }
+        # The all-zero GUID is Graph's stand-in for "default access", which is what an
+        # assignment carries when the app exposes no roles of its own.
+        names.setdefault("00000000-0000-0000-0000-000000000000", "Default Access")
+        return names
 
     async def get_group(
         self, group_id: str, *, select: Sequence[str] | None = None
