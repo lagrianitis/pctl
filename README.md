@@ -107,19 +107,16 @@ pctl azure sp get "incident.io" --assignments -o json
 ```
 
 `assignments` answers "who has access to this app", reading `appRoleAssignedTo`. Each
-row gains an `appRoleName`, because `appRoleId` on its own is an opaque GUID.
+row gains an `appRoleName`, because `appRoleId` on its own is an opaque GUID. With no
+`--principal` every assignment is returned; `--principal` narrows it and
+`--principal-match` decides how.
 
 ```bash
-pctl azure sp assignments "Company Incident.io SCIM"
-pctl azure sp assignments "Company Incident.io SCIM" --principal "AWS Platform Admins"
-pctl azure sp assignments "Company Incident.io SCIM" --outbound   # the reverse question
-```
+APP="Company Incident.io SCIM"
 
-With no `--principal`, every assignment is returned. `--principal` narrows it, and
-`--principal-match` decides how:
-
-```bash
-pctl azure sp assignments "$APP" --principal "AWS Platform Admins"              # exact, default
+pctl azure sp assignments "$APP"                                   # everyone
+pctl azure sp assignments "$APP" --outbound                        # the reverse question
+pctl azure sp assignments "$APP" --principal "AWS Platform Admins" # exact, the default
 pctl azure sp assignments "$APP" --principal aws-     --principal-match prefix
 pctl azure sp assignments "$APP" --principal platform --principal-match contains
 ```
@@ -134,12 +131,15 @@ pctl -q azure sp assignments "$APP" --principal "$GROUP" >/dev/null 2>&1
 case $? in 0) echo assigned ;; 4) echo "not assigned" ;; *) echo "check failed" ;; esac
 ```
 
-The filter runs client-side, because Graph does not support `$filter` on
-`principalDisplayName` for this relation. Every page is fetched either way, so this only
-narrows what is rendered.
+Two things worth knowing before relying on this. The `--principal` filter runs
+client-side, because Graph does not support `$filter` on `principalDisplayName` for this
+relation, so every page is fetched regardless and `--principal` narrows what is rendered
+rather than what is transferred. And `sp get` and `sp assignments` default to
+`--match search` for resolving the *application* name, rather than the `exact` that
+`groups` uses, because Enterprise Application names are long and rarely typed exactly.
 
-`sp get` and `sp assignments` default to `--match search` rather than `exact`, because
-Enterprise Application names are long and rarely typed exactly.
+Note the two are independent: `--match` finds the app, `--principal-match` filters its
+assignments.
 
 ### Escape hatch
 
