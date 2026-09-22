@@ -13,6 +13,7 @@ import pytest
 from pctl.azure.service_principals.common import (
     filter_by_principal,
     label_roles,
+    looks_like_email,
     looks_like_object_id,
     owner_label,
 )
@@ -200,3 +201,27 @@ def test_the_upn_stands_in_when_there_is_no_display_name() -> None:
 
 def test_the_id_stands_in_when_there_is_no_name_at_all() -> None:
     assert owner_label({"id": "u1", "_resolved": "users"}) == "u1 (u1)"
+
+
+# ---------------------------------------------------------------------------
+# looks_like_email
+# ---------------------------------------------------------------------------
+def test_an_address_is_recognised() -> None:
+    assert looks_like_email("lef@company.com")
+
+
+def test_an_onmicrosoft_upn_is_recognised() -> None:
+    """UPN and mail routinely differ, and either may be what the user knows."""
+    assert looks_like_email("lef@company.onmicrosoft.com")
+
+
+def test_a_display_name_is_not_an_address() -> None:
+    assert not looks_like_email("Lefteris Agrianitis")
+
+
+def test_an_object_id_is_not_an_address() -> None:
+    assert not looks_like_email("e6901838-637f-4bc7-b843-a8a7725a4872")
+
+
+def test_surrounding_whitespace_does_not_hide_an_address() -> None:
+    assert looks_like_email("  lef@company.com  ")
