@@ -16,6 +16,7 @@ from ...lazy import PctlGroup
 from .common import (
     DEFAULT_LIST_COLUMNS,
     MATCH_MODES,
+    PRINCIPAL_MATCH_MODES,
     filter_by_principal,
     label_roles,
     match_option,
@@ -46,6 +47,7 @@ def service_principals() -> None:
 __all__ = [
     "DEFAULT_LIST_COLUMNS",
     "MATCH_MODES",
+    "PRINCIPAL_MATCH_MODES",
     "filter_by_principal",
     "label_roles",
     "match_option",

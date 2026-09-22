@@ -235,6 +235,82 @@ def test_principal_matching_is_case_insensitive(runner: Any, cli: Any, scim_app:
     assert len(lines(result.stdout)) == 1
 
 
+def test_principal_match_prefix_returns_every_match(runner: Any, cli: Any, scim_app: Any) -> None:
+    """A prefix is for exploring: "who from the AWS estate has access to this app"."""
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "sp",
+                "assignments",
+                "incident",
+                "--principal",
+                "aws",
+                "--principal-match",
+                "prefix",
+            ],
+        )
+    )
+
+    names = [json.loads(line)["principalDisplayName"] for line in lines(result.stdout)]
+    assert names == ["AWS Platform Admins"]
+
+
+def test_principal_match_contains_finds_a_mid_string_match(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "sp",
+                "assignments",
+                "incident",
+                "--principal",
+                "platform",
+                "--principal-match",
+                "contains",
+            ],
+        )
+    )
+
+    assert len(lines(result.stdout)) == 1
+
+
+def test_a_prefix_that_matches_nothing_still_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "sp",
+                "assignments",
+                "incident",
+                "--principal",
+                "gcp-",
+                "--principal-match",
+                "prefix",
+            ],
+        ),
+        4,
+    )
+
+    assert "prefix" in result.output
+
+
+def test_no_principal_returns_every_assignment(runner: Any, cli: Any, scim_app: Any) -> None:
+    """The default: no filter, so both assignments come back."""
+    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident"]))
+
+    assert len(lines(result.stdout)) == 2
+
+
 def test_a_principal_with_no_assignment_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
     """Scriptable: absence of an expected assignment is a failure, not an empty list."""
     result = failed(

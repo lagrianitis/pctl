@@ -65,6 +65,17 @@ def test_assignments_help_documents_both_directions(sp: Callable[..., Any]) -> N
     assert "--principal" in stdout
 
 
+def test_assignments_help_documents_the_principal_match_modes(sp: Callable[..., Any]) -> None:
+    stdout = ok(sp("assignments", "--help")).stdout
+    for mode in ("exact", "prefix", "contains"):
+        assert mode in stdout
+
+
+def test_an_unknown_principal_match_mode_is_rejected(sp: Callable[..., Any]) -> None:
+    """Rejected at parse time, so a typo cannot silently widen an access check."""
+    failed(sp("assignments", "app", "--principal", "x", "--principal-match", "search"), 2)
+
+
 def test_list_help_documents_app_id_lookup(sp: Callable[..., Any]) -> None:
     assert "--app-id" in ok(sp("list", "--help")).stdout
 

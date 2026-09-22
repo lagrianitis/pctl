@@ -115,9 +115,28 @@ pctl azure sp assignments "Company Incident.io SCIM" --principal "AWS Platform A
 pctl azure sp assignments "Company Incident.io SCIM" --outbound   # the reverse question
 ```
 
-`--principal` filters client-side, because Graph does not support `$filter` on
-`principalDisplayName` for this relation. It matches the whole name, case-insensitively,
-and exits 4 when nothing matches, so an access check can be scripted.
+With no `--principal`, every assignment is returned. `--principal` narrows it, and
+`--principal-match` decides how:
+
+```bash
+pctl azure sp assignments "$APP" --principal "AWS Platform Admins"              # exact, default
+pctl azure sp assignments "$APP" --principal aws-     --principal-match prefix
+pctl azure sp assignments "$APP" --principal platform --principal-match contains
+```
+
+`exact` is the default because the usual job is an access check, where a coincidental
+substring would report access that a specific group may not have. Widen it when
+exploring. All three ignore case, and the command exits 4 when nothing matches, so a
+check can be scripted on the exit code:
+
+```bash
+pctl -q azure sp assignments "$APP" --principal "$GROUP" >/dev/null 2>&1
+case $? in 0) echo assigned ;; 4) echo "not assigned" ;; *) echo "check failed" ;; esac
+```
+
+The filter runs client-side, because Graph does not support `$filter` on
+`principalDisplayName` for this relation. Every page is fetched either way, so this only
+narrows what is rendered.
 
 `sp get` and `sp assignments` default to `--match search` rather than `exact`, because
 Enterprise Application names are long and rarely typed exactly.

@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     from ..graph import GraphClient
 
 MATCH_MODES = ["exact", "prefix", "search"]
+# Deliberately not the same vocabulary as MATCH_MODES above. `search` means Graph's
+# server-side $search everywhere else in this CLI, and this filter runs locally, so
+# calling the substring mode `contains` avoids implying a round trip that never happens.
+PRINCIPAL_MATCH_MODES = ["exact", "prefix", "contains"]
 DEFAULT_LIST_COLUMNS = ["displayName", "appId", "servicePrincipalType", "id"]
 
 
@@ -66,9 +70,19 @@ async def resolve_one(
 
 
 def filter_by_principal(
-    assignments: list[dict[str, Any]], principal: str | None
+    assignments: list[dict[str, Any]],
+    principal: str | None,
+    *,
+    mode: str = "exact",
 ) -> list[dict[str, Any]]:
     """Keep assignments whose principalDisplayName matches, case-insensitively.
+
+    No `principal` means no filtering, so every assignment is returned.
+
+    `mode` is `exact` (the whole name), `prefix` (`startswith`) or `contains`
+    (substring). `exact` is the default because the common use is an access check, and
+    a loose match there would answer a question nobody asked: `Platform` matching
+    `AWS Platform Admins` would report access that a specific group may not have.
 
     Filtered here rather than server-side because Graph does not support `$filter` on
     `principalDisplayName` for these relations. The whole collection is paged either
@@ -77,11 +91,20 @@ def filter_by_principal(
     if not principal:
         return assignments
     wanted = principal.casefold()
-    return [
-        item
-        for item in assignments
-        if (item.get("principalDisplayName") or "").casefold() == wanted
-    ]
+
+    def matches(item: dict[str, Any]) -> bool:
+        actual = (item.get("principalDisplayName") or "").casefold()
+        match mode:
+            case "exact":
+                return actual == wanted
+            case "prefix":
+                return actual.startswith(wanted)
+            case "contains":
+                return wanted in actual
+            case _:
+                raise ValueError(f"unknown principal match mode: {mode}")
+
+    return [item for item in assignments if matches(item)]
 
 
 def label_roles(assignments: list[dict[str, Any]], role_names: dict[str, str]) -> None:

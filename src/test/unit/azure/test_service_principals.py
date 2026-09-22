@@ -43,9 +43,54 @@ def test_matching_ignores_case() -> None:
     assert filter_by_principal(items, "aws platform admins") == items
 
 
-def test_a_partial_name_does_not_match() -> None:
-    """Deliberately exact: a substring match would silently widen an access check."""
+def test_a_partial_name_does_not_match_by_default() -> None:
+    """Exact is the default: a substring match would silently widen an access check."""
     assert filter_by_principal([_assignment("AWS Platform Admins")], "Platform") == []
+
+
+# ---------------------------------------------------------------------------
+# filter_by_principal: match modes
+# ---------------------------------------------------------------------------
+def test_prefix_mode_matches_the_start_of_the_name() -> None:
+    items = [_assignment("aws-platform"), _assignment("aws-billing"), _assignment("gcp-platform")]
+
+    matched = filter_by_principal(items, "aws-", mode="prefix")
+
+    assert [item["principalDisplayName"] for item in matched] == ["aws-platform", "aws-billing"]
+
+
+def test_prefix_mode_does_not_match_mid_string() -> None:
+    assert (
+        filter_by_principal([_assignment("AWS Platform Admins")], "Platform", mode="prefix") == []
+    )
+
+
+def test_contains_mode_matches_anywhere_in_the_name() -> None:
+    items = [_assignment("AWS Platform Admins"), _assignment("GCP Platform"), _assignment("Other")]
+
+    matched = filter_by_principal(items, "platform", mode="contains")
+
+    assert len(matched) == 2
+
+
+def test_prefix_mode_ignores_case() -> None:
+    assert filter_by_principal([_assignment("AWS Platform")], "aws", mode="prefix") != []
+
+
+def test_contains_mode_ignores_case() -> None:
+    assert filter_by_principal([_assignment("AWS Platform")], "PLATFORM", mode="contains") != []
+
+
+def test_an_unknown_mode_is_an_error_not_a_silent_pass() -> None:
+    """A typo in the mode must not quietly return everything."""
+    with pytest.raises(ValueError, match="unknown principal match mode"):
+        filter_by_principal([_assignment("Ann")], "Ann", mode="fuzzy")
+
+
+def test_no_principal_skips_matching_entirely_whatever_the_mode() -> None:
+    items = [_assignment("Ann")]
+
+    assert filter_by_principal(items, None, mode="fuzzy") == items
 
 
 def test_a_missing_principal_display_name_is_skipped_not_crashed() -> None:
