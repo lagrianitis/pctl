@@ -24,20 +24,29 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "groups": ("pctl.azure.groups:groups", "List and inspect Entra ID groups."),
+    "sp": (
+        "pctl.azure.service_principals:service_principals",
+        "Service principals, known in the portal as Enterprise Applications.",
+    ),
     "token": ("pctl.azure.token:command", "Acquire an access token for Microsoft Graph."),
     "raw": ("pctl.azure.raw:command", "Call any Graph path, with auth and pagination handled."),
 }
+
+# The portal says Enterprise Application, Graph says servicePrincipal. Accept both, so
+# nobody has to remember which name this tool chose.
+ALIASES = {"enterprise-apps": "sp", "service-principals": "sp"}
 
 
 @click.group(
     name="azure",
     cls=PctlGroup,
     lazy_subcommands=LAZY_SUBCOMMANDS,
+    aliases=ALIASES,
     context_settings=CONTEXT_SETTINGS,
 )
 @click.pass_context
 def azure(ctx: click.Context) -> None:
-    """Microsoft Graph: tokens and groups.
+    """Microsoft Graph: tokens, groups and service principals.
 
     \b
     Credentials resolve in this order:
@@ -66,4 +75,4 @@ def graph_client(app: AppContext) -> GraphClient:
     )
 
 
-__all__ = ["CONTEXT_SETTINGS", "azure", "graph_client"]
+__all__ = ["ALIASES", "CONTEXT_SETTINGS", "azure", "graph_client"]
