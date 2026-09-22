@@ -92,6 +92,34 @@ concurrently.
 Match modes: `exact` (default, `displayName eq`), `prefix` (`startswith`),
 `search` (Graph full-text, matches substrings).
 
+### Service principals (Enterprise Applications)
+
+Graph calls them service principals, the portal calls them Enterprise Applications.
+`pctl azure enterprise-apps` and `pctl azure service-principals` both reach `sp`.
+
+```bash
+pctl azure sp list --search "incident.io"
+pctl azure sp list --app-id 00000003-0000-0000-c000-000000000000
+pctl azure sp get "Company Incident.io SCIM"
+pctl azure sp get "incident.io" --assignments -o json
+```
+
+`assignments` answers "who has access to this app", reading `appRoleAssignedTo`. Each
+row gains an `appRoleName`, because `appRoleId` on its own is an opaque GUID.
+
+```bash
+pctl azure sp assignments "Company Incident.io SCIM"
+pctl azure sp assignments "Company Incident.io SCIM" --principal "AWS Platform Admins"
+pctl azure sp assignments "Company Incident.io SCIM" --outbound   # the reverse question
+```
+
+`--principal` filters client-side, because Graph does not support `$filter` on
+`principalDisplayName` for this relation. It matches the whole name, case-insensitively,
+and exits 4 when nothing matches, so an access check can be scripted.
+
+`sp get` and `sp assignments` default to `--match search` rather than `exact`, because
+Enterprise Application names are long and rarely typed exactly.
+
 ### Escape hatch
 
 ```bash
@@ -159,11 +187,16 @@ src/pctl/
 │   ├── graph.py             Graph transport: token, retries, pagination
 │   ├── token.py             action (case-level, no service)
 │   ├── raw.py               action (case-level, no service)
-│   └── groups/            service
-│       ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
+│   ├── groups/            service
+│   │   ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
+│   │   ├── list.py          action
+│   │   ├── get.py           action
+│   │   └── members.py       action
+│   └── service_principals/ service (exposed as `sp`)
+│       ├── __init__.py      `sp` group + match_option, resolve_one, filter_by_principal
 │       ├── list.py          action
 │       ├── get.py           action
-│       └── members.py       action
+│       └── assignments.py   action
 └── aws/                   case
     ├── __init__.py          `aws` group
     └── dynamodb/          service (exposed as `ddb`)
@@ -208,6 +241,7 @@ src/test/
 │   ├── azure/             case
 │   │   ├── conftest.py      azure() and groups() invoke helpers
 │   │   ├── test_groups.py   groups service surface
+│   │   ├── test_service_principals.py  sp service surface
 │   │   └── test_token.py    token and raw actions
 │   └── aws/               case
 │       ├── conftest.py      ddb() invoke helper
@@ -217,6 +251,7 @@ src/test/
     ├── azure/             case
     │   ├── conftest.py      azure_env and the respx router
     │   ├── test_groups.py   pagination, filters, rendering, resolution
+    │   ├── test_service_principals.py  assignment direction, role labelling
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch

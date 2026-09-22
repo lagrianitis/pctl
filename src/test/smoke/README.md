@@ -13,6 +13,7 @@ smoke/
 ├── azure/
 │   ├── conftest.py        azure() and groups() invoke helpers
 │   ├── test_groups.py     pctl azure groups ...
+│   ├── test_service_principals.py   pctl azure sp ...
 │   └── test_token.py      pctl azure token / raw
 └── aws/
     ├── conftest.py        ddb() invoke helper
