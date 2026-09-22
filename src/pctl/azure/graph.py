@@ -299,10 +299,19 @@ class GraphClient:
                 continue
 
             if response.status_code >= 400:
-                raise UpstreamError(
+                message = (
                     f"Graph returned {response.status_code} for {method} {target}: "
                     f"{_describe(response)}"
                 )
+                if response.status_code == 403:
+                    message += (
+                        "\nThis is a consent problem, not an authentication one. Grant the "
+                        "app registration the required application permission and admin-"
+                        "consent it.\nThen discard the cached token with `pctl azure token "
+                        "--clear-cache`: a token issued before consent does not carry the "
+                        "new role, and this one is cached for up to an hour."
+                    )
+                raise UpstreamError(message)
             self._log(f"{response.status_code} {method} {target}")
             return response
 
