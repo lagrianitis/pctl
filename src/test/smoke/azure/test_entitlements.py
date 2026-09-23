@@ -97,7 +97,7 @@ def test_get_package_offers_the_policy_expansion(eam: Callable[..., Any]) -> Non
 
 
 def test_search_is_not_a_valid_match_mode(eam: Callable[..., Any]) -> None:
-    failed(eam("get-package", "anything", "--match", "search"), 2)
+    failed(eam("get-package", "--access-package", "x", "--match", "search"), 2)
 
 
 def test_get_package_without_an_identifier_is_a_usage_error(eam: Callable[..., Any]) -> None:
@@ -159,11 +159,20 @@ def test_add_assignment_needs_a_package(eam: Callable[..., Any]) -> None:
 
 
 def test_add_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
-    failed(eam("add-assignment", "some-package"), 2)
+    failed(eam("add-assignment", "--access-package", "some-package"), 2)
+
+
+def test_add_assignment_needs_the_package_flag(eam: Callable[..., Any]) -> None:
+    """The package is a named flag, so it cannot be confused with a target."""
+    failed(eam("add-assignment", "ann@example.com"), 2)
 
 
 def test_remove_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
-    failed(eam("remove-assignment", "some-package"), 2)
+    failed(eam("remove-assignment", "--access-package", "some-package"), 2)
+
+
+def test_remove_assignment_needs_the_package_flag(eam: Callable[..., Any]) -> None:
+    failed(eam("remove-assignment", "ann@example.com"), 2)
 
 
 def test_both_writes_offer_wait(eam: Callable[..., Any]) -> None:
@@ -189,4 +198,4 @@ def test_get_request_needs_an_id(eam: Callable[..., Any]) -> None:
 
 
 def test_a_zero_wait_timeout_is_rejected(eam: Callable[..., Any]) -> None:
-    failed(eam("add-assignment", "pkg", "a@b.com", "--wait-timeout", "0"), 2)
+    failed(eam("add-assignment", "--access-package", "p", "a@b.com", "--wait-timeout", "0"), 2)

@@ -185,7 +185,18 @@ def test_the_default_columns_are_package_shaped(runner: Any, cli: Any, governanc
 def test_get_package_by_name(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
         ok(
-            runner.invoke(cli, ["-o", "json", "azure", "eam", "get-package", "AWS Platform Access"])
+            runner.invoke(
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-package",
+                    "--access-package",
+                    "AWS Platform Access",
+                ],
+            )
         ).stdout
     )
 
@@ -196,7 +207,11 @@ def test_get_package_by_id_addresses_it_directly(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-package", PACKAGE_ID])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-package", "--access-package", PACKAGE_ID]
+            )
+        ).stdout
     )
 
     assert payload["displayName"] == "AWS Platform Access"
@@ -208,7 +223,11 @@ def test_get_package_by_id_still_returns_exactly_one(
 ) -> None:
     """An ID is not a pattern, so it can only ever match one thing."""
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-package", PACKAGE_ID])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-package", "--access-package", PACKAGE_ID]
+            )
+        ).stdout
     )
 
     assert isinstance(payload, dict)
@@ -219,7 +238,15 @@ def test_with_policies_expands_the_policies(
 ) -> None:
     ok(
         runner.invoke(
-            cli, ["azure", "eam", "get-package", "AWS Platform Access", "--with-policies"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "get-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--with-policies",
+            ],
         )
     )
 
@@ -230,7 +257,18 @@ def test_a_contains_pattern_returns_every_match(runner: Any, cli: Any, governanc
     """A pattern matching several packages is the normal case, not an error."""
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "eam", "get-package", "AWS", "--match", "contains"]
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "get-package",
+                "--access-package",
+                "AWS",
+                "--match",
+                "contains",
+            ],
         )
     )
 
@@ -241,7 +279,18 @@ def test_a_contains_pattern_returns_every_match(runner: Any, cli: Any, governanc
 def test_a_prefix_pattern_returns_every_match(runner: Any, cli: Any, governance: Any) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "eam", "get-package", "AWS ", "--match", "prefix"]
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "get-package",
+                "--access-package",
+                "AWS ",
+                "--match",
+                "prefix",
+            ],
         )
     )
 
@@ -252,7 +301,18 @@ def test_several_matches_render_as_an_array(runner: Any, cli: Any, governance: A
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-package", "AWS", "--match", "contains"]
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-package",
+                    "--access-package",
+                    "AWS",
+                    "--match",
+                    "contains",
+                ],
             )
         ).stdout
     )
@@ -267,7 +327,17 @@ def test_a_single_match_renders_as_an_object(runner: Any, cli: Any, governance: 
         ok(
             runner.invoke(
                 cli,
-                ["-o", "json", "azure", "eam", "get-package", "Incident", "--match", "contains"],
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-package",
+                    "--access-package",
+                    "Incident",
+                    "--match",
+                    "contains",
+                ],
             )
         ).stdout
     )
@@ -278,7 +348,10 @@ def test_a_single_match_renders_as_an_object(runner: Any, cli: Any, governance: 
 
 def test_an_unknown_package_exits_4(runner: Any, cli: Any, governance: Any) -> None:
     result = failed(
-        runner.invoke(cli, ["azure", "eam", "get-package", "nope", "--match", "contains"]), 4
+        runner.invoke(
+            cli, ["azure", "eam", "get-package", "--access-package", "nope", "--match", "contains"]
+        ),
+        4,
     )
 
     assert "nope" in result.output
@@ -288,7 +361,9 @@ def test_the_not_found_message_suggests_the_pattern_modes(
     runner: Any, cli: Any, governance: Any
 ) -> None:
     """Exact is the default, and the pattern modes are what usually rescue it."""
-    result = failed(runner.invoke(cli, ["azure", "eam", "get-package", "Platform"]), 4)
+    result = failed(
+        runner.invoke(cli, ["azure", "eam", "get-package", "--access-package", "Platform"]), 4
+    )
 
     assert "--match prefix" in result.output
     assert "--match contains" in result.output
@@ -313,7 +388,11 @@ def test_the_catalog_columns_differ_from_the_package_ones(
 
 def test_get_catalog_by_name(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-catalog", "AWS Platform"])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-catalog", "--catalog", "AWS Platform"]
+            )
+        ).stdout
     )
 
     assert payload["id"] == CATALOG_ID
@@ -321,7 +400,11 @@ def test_get_catalog_by_name(runner: Any, cli: Any, governance: Any) -> None:
 
 def test_get_catalog_by_id(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-catalog", CATALOG_ID])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-catalog", "--catalog", CATALOG_ID]
+            )
+        ).stdout
     )
 
     assert payload["displayName"] == "AWS Platform"
@@ -652,6 +735,7 @@ def test_adding_by_email_posts_an_admin_add_request(runner: Any, cli: Any, writa
                 "azure",
                 "eam",
                 "add-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "dave@example.com",
             ],
@@ -666,7 +750,15 @@ def test_the_add_body_uses_the_v1_shape(runner: Any, cli: Any, writable: Any) ->
     """v1.0 wants adminAdd and `assignment`; beta's AdminAdd/accessPackageAssignment fails."""
     ok(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
         )
     )
 
@@ -689,6 +781,7 @@ def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writa
                 "azure",
                 "eam",
                 "add-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "ann@example.com",
             ],
@@ -702,7 +795,15 @@ def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writa
 def test_an_existing_assignment_says_so_on_stderr(runner: Any, cli: Any, writable: Any) -> None:
     result = ok(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "ann@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "ann@example.com",
+            ],
         )
     )
 
@@ -715,7 +816,15 @@ def test_expired_assignments_do_not_block_a_fresh_add(
     """An expired assignment is not access, so the state filter must exclude it."""
     ok(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
         )
     )
 
@@ -735,6 +844,7 @@ def test_several_emails_are_assigned_in_one_call(runner: Any, cli: Any, writable
                 "azure",
                 "eam",
                 "add-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "--emails",
                 "dave@example.com,ann@example.com",
@@ -754,7 +864,15 @@ def test_an_unresolvable_email_exits_4_without_writing(
 ) -> None:
     result = failed(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "nobody@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "nobody@example.com",
+            ],
         ),
         4,
     )
@@ -776,6 +894,7 @@ def test_removing_posts_an_admin_remove_naming_the_assignment(
                 "azure",
                 "eam",
                 "remove-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "ann@example.com",
             ],
@@ -797,6 +916,7 @@ def test_removing_someone_unassigned_writes_nothing(runner: Any, cli: Any, writa
                 "azure",
                 "eam",
                 "remove-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "dave@example.com",
             ],
@@ -813,7 +933,15 @@ def test_remove_needs_no_policy_lookup(
     """Only adminAdd names a policy, so removal must not pay for that request."""
     ok(
         runner.invoke(
-            cli, ["azure", "eam", "remove-assignment", "AWS Platform Access", "ann@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "remove-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "ann@example.com",
+            ],
         )
     )
 
@@ -843,7 +971,15 @@ def test_without_wait_the_command_does_not_poll(runner: Any, cli: Any, settling:
     """The default stays fast; confirming is opt-in."""
     ok(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
         )
     )
 
@@ -855,7 +991,15 @@ def test_without_wait_the_output_says_it_is_not_applied_yet(
 ) -> None:
     result = ok(
         runner.invoke(
-            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
         )
     )
 
@@ -872,6 +1016,7 @@ def test_wait_polls_until_delivered(runner: Any, cli: Any, settling: Any, no_sle
                 "azure",
                 "eam",
                 "add-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "dave@example.com",
                 "--wait",
@@ -889,7 +1034,15 @@ def test_wait_reports_the_applied_state(
     result = ok(
         runner.invoke(
             cli,
-            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+                "--wait",
+            ],
         )
     )
 
@@ -907,7 +1060,15 @@ def test_a_denied_request_exits_5(runner: Any, cli: Any, writable: Any, no_sleep
     result = failed(
         runner.invoke(
             cli,
-            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+                "--wait",
+            ],
         ),
         5,
     )
@@ -927,7 +1088,15 @@ def test_a_partially_delivered_request_suggests_reprocessing(
     result = failed(
         runner.invoke(
             cli,
-            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "--access-package",
+                "AWS Platform Access",
+                "dave@example.com",
+                "--wait",
+            ],
         ),
         5,
     )
@@ -952,6 +1121,7 @@ def test_a_stalled_request_times_out_rather_than_hanging(
                 "azure",
                 "eam",
                 "add-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "dave@example.com",
                 "--wait",
@@ -978,6 +1148,7 @@ def test_removal_can_also_be_confirmed(
                 "azure",
                 "eam",
                 "remove-assignment",
+                "--access-package",
                 "AWS Platform Access",
                 "ann@example.com",
                 "--wait",
@@ -1008,7 +1179,11 @@ def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable
     )
 
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-request", "req-1"])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-request", "--request-id", "req-1"]
+            )
+        ).stdout
     )
 
     assert payload["outcome"] == "done"
@@ -1022,7 +1197,7 @@ def test_get_request_exits_5_for_a_failed_request(runner: Any, cli: Any, writabl
         return_value=httpx.Response(200, json={"id": "req-1", "state": "deliveryFailed"})
     )
 
-    failed(runner.invoke(cli, ["azure", "eam", "get-request", "req-1"]), 5)
+    failed(runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]), 5)
 
 
 def test_get_request_exits_0_for_a_pending_request(runner: Any, cli: Any, writable: Any) -> None:
@@ -1033,7 +1208,7 @@ def test_get_request_exits_0_for_a_pending_request(runner: Any, cli: Any, writab
         return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
     )
 
-    result = ok(runner.invoke(cli, ["azure", "eam", "get-request", "req-1"]))
+    result = ok(runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]))
 
     assert "has not settled" in result.stderr
 
@@ -1047,4 +1222,9 @@ def test_fail_on_pending_turns_a_pending_request_into_an_error(
         return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
     )
 
-    failed(runner.invoke(cli, ["azure", "eam", "get-request", "req-1", "--fail-on-pending"]), 5)
+    failed(
+        runner.invoke(
+            cli, ["azure", "eam", "get-request", "--request-id", "req-1", "--fail-on-pending"]
+        ),
+        5,
+    )

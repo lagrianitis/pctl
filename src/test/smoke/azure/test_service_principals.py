@@ -56,12 +56,21 @@ def test_owner_resolution_defaults_to_exact(sp: Callable[..., Any]) -> None:
     assert "--owner-match" in ok(sp("add-owner", "--help")).stdout
 
 
-def test_add_owner_needs_both_the_app_and_the_owner(sp: Callable[..., Any]) -> None:
-    failed(sp("add-owner", "just-the-app"), 2)
+def test_add_owner_needs_the_app_flag(sp: Callable[..., Any]) -> None:
+    """The scope is a named flag, so a bare positional cannot be mistaken for it."""
+    failed(sp("add-owner", "someone@example.com"), 2)
 
 
-def test_remove_owner_needs_both_the_app_and_the_owner(sp: Callable[..., Any]) -> None:
-    failed(sp("remove-owner", "just-the-app"), 2)
+def test_remove_owner_needs_the_app_flag(sp: Callable[..., Any]) -> None:
+    failed(sp("remove-owner", "someone@example.com"), 2)
+
+
+def test_add_owner_needs_at_least_one_owner(sp: Callable[..., Any]) -> None:
+    failed(sp("add-owner", "--app", "some-app"), 2)
+
+
+def test_remove_owner_needs_at_least_one_owner(sp: Callable[..., Any]) -> None:
+    failed(sp("remove-owner", "--app", "some-app"), 2)
 
 
 def test_owners_needs_an_app_name(sp: Callable[..., Any]) -> None:
@@ -69,7 +78,7 @@ def test_owners_needs_an_app_name(sp: Callable[..., Any]) -> None:
 
 
 def test_an_unknown_owner_type_is_rejected(sp: Callable[..., Any]) -> None:
-    failed(sp("add-owner", "app", "owner", "--owner-type", "group"), 2)
+    failed(sp("add-owner", "--app", "a", "owner", "--owner-type", "group"), 2)
 
 
 def test_the_help_explains_the_portal_name(sp: Callable[..., Any]) -> None:
@@ -114,7 +123,7 @@ def test_assignments_help_documents_the_principal_match_modes(sp: Callable[..., 
 
 def test_an_unknown_principal_match_mode_is_rejected(sp: Callable[..., Any]) -> None:
     """Rejected at parse time, so a typo cannot silently widen an access check."""
-    failed(sp("assignments", "app", "--principal", "x", "--principal-match", "search"), 2)
+    failed(sp("assignments", "--app", "a", "--principal", "x", "--principal-match", "search"), 2)
 
 
 def test_list_help_documents_app_id_lookup(sp: Callable[..., Any]) -> None:

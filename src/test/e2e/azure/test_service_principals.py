@@ -152,7 +152,9 @@ def test_ignore_missing_downgrades_a_miss_to_success(runner: Any, cli: Any, scim
 # ---------------------------------------------------------------------------
 def test_assignments_defaults_to_who_has_access(runner: Any, cli: Any, scim_app: Any) -> None:
     """appRoleAssignedTo, not appRoleAssignments: the question users actually ask."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+    )
 
     names = [json.loads(line)["principalDisplayName"] for line in lines(result.stdout)]
     assert names == ["AWS Platform Admins", "Ann Example"]
@@ -160,7 +162,9 @@ def test_assignments_defaults_to_who_has_access(runner: Any, cli: Any, scim_app:
 
 def test_outbound_inverts_the_direction(runner: Any, cli: Any, scim_app: Any) -> None:
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident", "--outbound"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident", "--outbound"]
+        )
     )
 
     rows = [json.loads(line) for line in lines(result.stdout)]
@@ -169,7 +173,9 @@ def test_outbound_inverts_the_direction(runner: Any, cli: Any, scim_app: Any) ->
 
 def test_the_role_guid_is_resolved_to_a_name(runner: Any, cli: Any, scim_app: Any) -> None:
     """An assignment carries appRoleId, which is unreadable without the app's roles."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+    )
 
     rows = [json.loads(line) for line in lines(result.stdout)]
     assert rows[0]["appRoleName"] == "User"
@@ -177,7 +183,9 @@ def test_the_role_guid_is_resolved_to_a_name(runner: Any, cli: Any, scim_app: An
 
 def test_the_all_zero_guid_becomes_default_access(runner: Any, cli: Any, scim_app: Any) -> None:
     """Graph's stand-in for an app that exposes no roles of its own."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+    )
 
     rows = [json.loads(line) for line in lines(result.stdout)]
     assert rows[1]["appRoleName"] == "Default Access"
@@ -186,7 +194,8 @@ def test_the_all_zero_guid_becomes_default_access(runner: Any, cli: Any, scim_ap
 def test_no_role_names_skips_the_extra_request(runner: Any, cli: Any, scim_app: Any) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident", "--no-role-names"]
+            cli,
+            ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident", "--no-role-names"],
         )
     )
 
@@ -203,6 +212,7 @@ def test_principal_filters_to_one_assignment(runner: Any, cli: Any, scim_app: An
                 "azure",
                 "sp",
                 "assignments",
+                "--app",
                 "incident",
                 "--principal",
                 "AWS Platform Admins",
@@ -225,6 +235,7 @@ def test_principal_matching_is_case_insensitive(runner: Any, cli: Any, scim_app:
                 "azure",
                 "sp",
                 "assignments",
+                "--app",
                 "incident",
                 "--principal",
                 "aws platform admins",
@@ -246,6 +257,7 @@ def test_principal_match_prefix_returns_every_match(runner: Any, cli: Any, scim_
                 "azure",
                 "sp",
                 "assignments",
+                "--app",
                 "incident",
                 "--principal",
                 "aws",
@@ -271,6 +283,7 @@ def test_principal_match_contains_finds_a_mid_string_match(
                 "azure",
                 "sp",
                 "assignments",
+                "--app",
                 "incident",
                 "--principal",
                 "platform",
@@ -291,6 +304,7 @@ def test_a_prefix_that_matches_nothing_still_exits_4(runner: Any, cli: Any, scim
                 "azure",
                 "sp",
                 "assignments",
+                "--app",
                 "incident",
                 "--principal",
                 "gcp-",
@@ -306,7 +320,9 @@ def test_a_prefix_that_matches_nothing_still_exits_4(runner: Any, cli: Any, scim
 
 def test_no_principal_returns_every_assignment(runner: Any, cli: Any, scim_app: Any) -> None:
     """The default: no filter, so both assignments come back."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "incident"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+    )
 
     assert len(lines(result.stdout)) == 2
 
@@ -314,7 +330,10 @@ def test_no_principal_returns_every_assignment(runner: Any, cli: Any, scim_app: 
 def test_a_principal_with_no_assignment_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
     """Scriptable: absence of an expected assignment is a failure, not an empty list."""
     result = failed(
-        runner.invoke(cli, ["azure", "sp", "assignments", "incident", "--principal", "Nobody"]), 4
+        runner.invoke(
+            cli, ["azure", "sp", "assignments", "--app", "incident", "--principal", "Nobody"]
+        ),
+        4,
     )
 
     assert "Nobody" in result.output
