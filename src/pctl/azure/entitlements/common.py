@@ -27,6 +27,23 @@ MATCH_MODES = ["exact", "prefix", "contains"]
 
 PACKAGE_COLUMNS = ["displayName", "isHidden", "id"]
 CATALOG_COLUMNS = ["displayName", "catalogType", "state", "id"]
+ASSIGNMENT_COLUMNS = [
+    "targetDisplayName",
+    "targetEmail",
+    "accessPackageName",
+    "state",
+    "id",
+]
+
+# Graph's accessPackageAssignment states. Case matters in the $filter, so these are the
+# exact spellings rather than lowercase choices normalised later.
+ASSIGNMENT_STATES = [
+    "Delivering",
+    "PartiallyDelivered",
+    "Delivered",
+    "Expired",
+    "DeliveryFailed",
+]
 
 
 def match_option(func: Any) -> Any:
@@ -53,31 +70,65 @@ def contains_filter(items: list[dict[str, Any]], needle: str | None) -> list[dic
     return [item for item in items if wanted in (item.get("displayName") or "").casefold()]
 
 
-async def resolve_catalog_id(client: GraphClient, catalog: str) -> str:
-    """Turn a catalog display name or ID into an ID, for use in a `catalog/id` filter.
+async def resolve_governance_id(
+    client: GraphClient, collection: str, identifier: str, *, noun: str
+) -> str:
+    """Turn a display name or ID into an ID, for use in a relationship filter.
 
     An ID is returned untouched. A name is resolved exactly, then by substring if that
-    finds nothing, because catalog names are typed from memory and a single unambiguous
+    finds nothing, because these names are typed from memory and a single unambiguous
     substring match is almost certainly what was meant.
+
+    Unlike `find_matching`, more than one result is refused. The answer becomes a scope in
+    someone else's filter, and silently scoping a query to whichever match came first
+    would give a confidently wrong result rather than an error.
     """
-    if looks_like_object_id(catalog):
-        return catalog.strip()
+    if looks_like_object_id(identifier):
+        return identifier.strip()
 
     matches = await client.find_governance_by_display_name(
-        "catalogs", catalog, mode="exact", select=("id", "displayName"), limit=2
+        collection, identifier, mode="exact", select=("id", "displayName"), limit=2
     )
     if not matches:
         everything = [
-            item async for item in client.list_governance("catalogs", select=("id", "displayName"))
+            item async for item in client.list_governance(collection, select=("id", "displayName"))
         ]
-        matches = contains_filter(everything, catalog)
+        matches = contains_filter(everything, identifier)
     if not matches:
-        raise NotFoundError(f"No catalog matched: {catalog}")
+        raise NotFoundError(f"No {noun} matched: {identifier}")
     if len(matches) > 1:
+        names = ", ".join(str(item.get("displayName")) for item in matches[:5])
         raise ConfigError(
-            f"{len(matches)} catalogs match '{catalog}'. Pass the catalog ID instead."
+            f"{len(matches)} {noun}s match '{identifier}' ({names}). Pass the ID instead."
         )
     return str(matches[0]["id"])
+
+
+async def resolve_catalog_id(client: GraphClient, catalog: str) -> str:
+    """Turn a catalog display name or ID into an ID, for a `catalog/id` filter."""
+    return await resolve_governance_id(client, "catalogs", catalog, noun="catalog")
+
+
+async def resolve_package_id(client: GraphClient, package: str) -> str:
+    """Turn an access package display name or ID into an ID, for `accessPackage/id`."""
+    return await resolve_governance_id(client, "accessPackages", package, noun="access package")
+
+
+def flatten_assignment(item: dict[str, Any]) -> dict[str, Any]:
+    """Lift the nested target and accessPackage names to the top level, in place.
+
+    An assignment's interesting fields live one level down, under `target` and
+    `accessPackage`, which a table or CSV column cannot address. The nested objects are
+    left intact for json and ndjson consumers; these are additions, not replacements.
+    """
+    target = item.get("target") or {}
+    package = item.get("accessPackage") or {}
+    item["targetDisplayName"] = target.get("displayName")
+    item["targetEmail"] = target.get("email") or target.get("principalName")
+    item["targetId"] = target.get("objectId") or target.get("id")
+    item["accessPackageName"] = package.get("displayName")
+    item["accessPackageId"] = package.get("id")
+    return item
 
 
 async def find_matching(

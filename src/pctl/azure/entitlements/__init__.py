@@ -18,7 +18,14 @@ from __future__ import annotations
 import click
 
 from ...lazy import PctlGroup
-from .common import CATALOG_COLUMNS, MATCH_MODES, PACKAGE_COLUMNS, match_option
+from .common import (
+    ASSIGNMENT_COLUMNS,
+    ASSIGNMENT_STATES,
+    CATALOG_COLUMNS,
+    MATCH_MODES,
+    PACKAGE_COLUMNS,
+    match_option,
+)
 
 # Verb-noun actions rather than a nested `packages list`: the command shape is
 # case -> service -> action with no fourth level, and an action that silently switches
@@ -41,6 +48,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.entitlements.get_catalog:command",
         "Show a catalog by name or ID.",
     ),
+    "list-assignments": (
+        "pctl.azure.entitlements.list_assignments:command",
+        "List who is assigned to an access package.",
+    ),
 }
 
 
@@ -50,6 +61,8 @@ def entitlements() -> None:
 
 
 __all__ = [
+    "ASSIGNMENT_COLUMNS",
+    "ASSIGNMENT_STATES",
     "CATALOG_COLUMNS",
     "MATCH_MODES",
     "PACKAGE_COLUMNS",
