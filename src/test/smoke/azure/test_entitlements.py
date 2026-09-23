@@ -164,3 +164,29 @@ def test_add_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> No
 
 def test_remove_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
     failed(eam("remove-assignment", "some-package"), 2)
+
+
+def test_both_writes_offer_wait(eam: Callable[..., Any]) -> None:
+    """The only way to know a write applied, so it belongs in both help screens."""
+    for action in ("add-assignment", "remove-assignment"):
+        stdout = ok(eam(action, "--help")).stdout
+        assert "--wait" in stdout
+        assert "--wait-timeout" in stdout
+
+
+def test_get_request_is_listed(eam: Callable[..., Any]) -> None:
+    assert "get-request" in ok(eam("--help")).stdout
+
+
+def test_get_request_help_explains_the_outcome_classification(eam: Callable[..., Any]) -> None:
+    stdout = ok(eam("get-request", "--help")).stdout
+    for word in ("delivered", "pending", "outcome"):
+        assert word in stdout
+
+
+def test_get_request_needs_an_id(eam: Callable[..., Any]) -> None:
+    failed(eam("get-request"), 2)
+
+
+def test_a_zero_wait_timeout_is_rejected(eam: Callable[..., Any]) -> None:
+    failed(eam("add-assignment", "pkg", "a@b.com", "--wait-timeout", "0"), 2)

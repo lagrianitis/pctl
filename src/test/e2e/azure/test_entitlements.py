@@ -818,3 +818,233 @@ def test_remove_needs_no_policy_lookup(
     )
 
     assert not any("assignmentPolicies" in url for url in seen)
+
+
+# ---------------------------------------------------------------------------
+# --wait: confirming a write actually applied
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def settling(writable: Any) -> Any:
+    """A request that reports `delivering` once and then `delivered`."""
+    import httpx
+
+    states = iter(["delivering", "delivered"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"id": "req-1", "state": next(states, "delivered"), "requestType": "adminAdd"}
+        )
+
+    writable.get(f"{EAM}/assignmentRequests/req-1", name="poll").mock(side_effect=handler)
+    return writable
+
+
+def test_without_wait_the_command_does_not_poll(runner: Any, cli: Any, settling: Any) -> None:
+    """The default stays fast; confirming is opt-in."""
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+        )
+    )
+
+    assert settling["poll"].call_count == 0
+
+
+def test_without_wait_the_output_says_it_is_not_applied_yet(
+    runner: Any, cli: Any, settling: Any
+) -> None:
+    result = ok(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+        )
+    )
+
+    assert "not applied yet" in result.stderr
+
+
+def test_wait_polls_until_delivered(runner: Any, cli: Any, settling: Any, no_sleep: None) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "add-assignment",
+                "AWS Platform Access",
+                "dave@example.com",
+                "--wait",
+            ],
+        )
+    )
+
+    assert settling["poll"].call_count == 2
+    assert json.loads(lines(result.stdout)[0])["outcome"] == "done"
+
+
+def test_wait_reports_the_applied_state(
+    runner: Any, cli: Any, settling: Any, no_sleep: None
+) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+        )
+    )
+
+    assert "applied" in result.stderr
+
+
+def test_a_denied_request_exits_5(runner: Any, cli: Any, writable: Any, no_sleep: None) -> None:
+    """A submitted request is not a granted one, and a pipeline must see the difference."""
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "denied"})
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+        ),
+        5,
+    )
+
+    assert "did not apply" in result.output
+
+
+def test_a_partially_delivered_request_suggests_reprocessing(
+    runner: Any, cli: Any, writable: Any, no_sleep: None
+) -> None:
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "partiallyDelivered"})
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com", "--wait"],
+        ),
+        5,
+    )
+
+    assert "reprocess" in result.output
+
+
+def test_a_stalled_request_times_out_rather_than_hanging(
+    runner: Any, cli: Any, writable: Any, no_sleep: None
+) -> None:
+    """A request can sit in delivering indefinitely, so waiting must be bounded."""
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "add-assignment",
+                "AWS Platform Access",
+                "dave@example.com",
+                "--wait",
+                "--wait-timeout",
+                "1",
+            ],
+        ),
+        5,
+    )
+
+    assert "still delivering" in result.output
+    assert "get-request" in result.output
+
+
+def test_removal_can_also_be_confirmed(
+    runner: Any, cli: Any, settling: Any, no_sleep: None
+) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "remove-assignment",
+                "AWS Platform Access",
+                "ann@example.com",
+                "--wait",
+            ],
+        )
+    )
+
+    assert json.loads(lines(result.stdout)[0])["outcome"] == "done"
+
+
+# ---------------------------------------------------------------------------
+# get-request
+# ---------------------------------------------------------------------------
+def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable: Any) -> None:
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "req-1",
+                "state": "delivered",
+                "requestType": "adminAdd",
+                "target": {"displayName": "Dave Example"},
+                "accessPackage": {"displayName": "AWS Platform Access"},
+            },
+        )
+    )
+
+    payload = json.loads(
+        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-request", "req-1"])).stdout
+    )
+
+    assert payload["outcome"] == "done"
+    assert payload["targetDisplayName"] == "Dave Example"
+
+
+def test_get_request_exits_5_for_a_failed_request(runner: Any, cli: Any, writable: Any) -> None:
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "deliveryFailed"})
+    )
+
+    failed(runner.invoke(cli, ["azure", "eam", "get-request", "req-1"]), 5)
+
+
+def test_get_request_exits_0_for_a_pending_request(runner: Any, cli: Any, writable: Any) -> None:
+    """Pending is not failure: the answer is "not yet", and that is worth exit 0."""
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
+    )
+
+    result = ok(runner.invoke(cli, ["azure", "eam", "get-request", "req-1"]))
+
+    assert "has not settled" in result.stderr
+
+
+def test_fail_on_pending_turns_a_pending_request_into_an_error(
+    runner: Any, cli: Any, writable: Any
+) -> None:
+    import httpx
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(
+        return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
+    )
+
+    failed(runner.invoke(cli, ["azure", "eam", "get-request", "req-1", "--fail-on-pending"]), 5)

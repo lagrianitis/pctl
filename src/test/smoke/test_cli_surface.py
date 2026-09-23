@@ -46,6 +46,7 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "eam", "list-assignments"],
     ["azure", "eam", "add-assignment"],
     ["azure", "eam", "remove-assignment"],
+    ["azure", "eam", "get-request"],
     ["azure", "sp"],
     ["azure", "sp", "list"],
     ["azure", "sp", "get"],
