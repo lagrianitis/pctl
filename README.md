@@ -44,6 +44,7 @@ Graph application permissions needed, all admin-consented:
 
 | permission | needed for |
 | --- | --- |
+| `EntitlementManagement.Read.All` | the `eam` service |
 | `Group.Read.All` | `groups list`, `get`, `members` |
 | `User.Read.All` | `users get`, group members, and owners by name or address |
 | `Application.Read.All` **or** `Directory.Read.All` | `apps list`, `get`; `sp list`, `get`, `assignments`, `owners` |
@@ -132,6 +133,76 @@ differ. An object ID addresses `/users/{id}` directly, with no query. A display 
 `--match`, and an ambiguous name is **refused** rather than guessed — two people can share
 one, and you are about to act on the answer. Several identifiers resolve concurrently, and
 one that matches nothing does not block the others.
+
+### Entitlement management
+
+Read-only. Access packages are bundles of resources governed by policies, held in
+containers called catalogs. `pctl azure entitlement-management` and
+`pctl azure access-packages` both reach `eam`.
+
+```bash
+pctl azure eam list-catalogs                      # usually the first call
+pctl azure eam list-packages --starts-with "AWS "
+pctl azure eam list-packages --contains incident -o json
+pctl azure eam get-package "AWS Platform Access" --with-policies -o json
+pctl azure eam get-catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
+```
+
+**These collections have a narrower OData surface than the rest of Graph.** `$select`,
+`$filter` and `$expand` work; `$search` and `$count` are
+[not supported](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-list-accesspackages).
+So there is no `--search` here and no `--count-only`, and the match modes differ:
+
+| option | where it runs |
+| --- | --- |
+| `--name`, `--starts-with`, `--filter` | server-side `$filter` |
+| `--contains`, `--match contains` | **locally**, after fetching the collection |
+
+`--contains` exists because Graph has no substring operator on these collections. Every
+page is fetched regardless, so it narrows what is rendered rather than what is
+transferred, and `-n/--limit` is applied after the filter so a cap cannot drop real
+matches.
+
+`--with-policies` expands `assignmentPolicies`, which is where approval and expiry rules
+live.
+
+### Entitlement management
+
+Read-only. Access packages are bundles of resources governed by policies, held in
+containers called catalogs. `pctl azure entitlement-management` and
+`pctl azure access-packages` both reach `eam`.
+
+```bash
+pctl azure eam list-catalogs                          # usually the first call
+pctl azure eam get-catalog "AWS Platform"             # by name or by ID
+pctl azure eam list-packages --catalog "AWS Platform" # scope by catalog name
+pctl azure eam list-packages --contains incident -o json
+pctl azure eam get-package "AWS Platform Access" --with-policies -o json
+```
+
+`get-catalog` and `get-package` take a display name or an object ID, and `--catalog`
+accepts a catalog name and resolves it to the ID the filter needs. That costs one extra
+request, which is the point of the option.
+
+**These collections have a narrower OData surface than the rest of Graph.** `$select`,
+`$filter` and `$expand` work; `$search` and `$count` are
+[not supported](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-list-accesspackages).
+So there is no `--search` and no `--count-only` here, and the match options split by where
+they run:
+
+| option | where it runs |
+| --- | --- |
+| `--name`, `--starts-with`, `--filter`, `--catalog` | server-side `$filter` |
+| `--contains`, `--match contains` | **locally**, after fetching the collection |
+
+`--contains` exists because Graph has no substring operator on these collections. Every
+page is fetched regardless, so it narrows what is rendered rather than what is
+transferred, and `-n/--limit` applies after the filter so a cap cannot drop real matches.
+
+A raw `--filter` takes precedence over `--catalog`, `--name` and `--starts-with`: someone
+who wrote OData by hand means it.
+
+`--with-policies` expands `assignmentPolicies`, where approval and expiry rules live.
 
 ### App registrations
 
@@ -333,6 +404,18 @@ src/pctl/
 │   │   ├── __init__.py      `users` group
 │   │   ├── common.py        default columns, match_option
 │   │   └── get.py           action
+│   ├── entitlements/      service (exposed as `eam`)
+│   │   ├── __init__.py      `eam` group
+│   │   ├── common.py        match modes, local contains filter, filter builder
+│   │   ├── runner.py        list/get bodies shared by both collections
+│   │   ├── list_packages.py · get_package.py     actions
+│   │   └── list_catalogs.py · get_catalog.py     actions
+│   ├── entitlements/      service (exposed as `eam`)
+│   │   ├── __init__.py      `eam` group
+│   │   ├── common.py        match modes, local contains filter, catalog resolution
+│   │   ├── runner.py        list/get bodies shared by both collections
+│   │   ├── list_packages.py · get_package.py    actions
+│   │   └── list_catalogs.py · get_catalog.py    actions
 │   ├── applications/      service (exposed as `apps`)
 │   │   ├── __init__.py      `apps` group
 │   │   ├── common.py        resolve_application: appId before object ID
@@ -400,6 +483,7 @@ src/test/
 │   │   ├── test_service_principals.py  sp service surface
 │   │   ├── test_users.py    users service surface
 │   │   ├── test_applications.py  apps service surface
+│   │   ├── test_entitlements.py  eam service surface
 │   │   └── test_token.py    token and raw actions
 │   └── aws/               case
 │       ├── conftest.py      ddb() invoke helper
@@ -413,6 +497,7 @@ src/test/
     │   ├── test_sp_owners.py  the writes: idempotency, $ref bodies
     │   ├── test_users.py    identifier forms, ambiguity refusal
     │   ├── test_applications.py  appId vs object ID, the sp join
+    │   ├── test_entitlements.py  the narrower OData surface, local filtering
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch
