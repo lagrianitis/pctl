@@ -46,7 +46,7 @@ Graph application permissions needed, all admin-consented:
 | --- | --- |
 | `Group.Read.All` | `groups list`, `get`, `members` |
 | `User.Read.All` | `users get`, group members, and owners by name or address |
-| `Application.Read.All` **or** `Directory.Read.All` | `sp list`, `get`, `assignments`, `owners` |
+| `Application.Read.All` **or** `Directory.Read.All` | `apps list`, `get`; `sp list`, `get`, `assignments`, `owners` |
 | `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only |
 
 Everything except the last two commands is read-only, so grant a write permission only
@@ -132,6 +132,37 @@ differ. An object ID addresses `/users/{id}` directly, with no query. A display 
 `--match`, and an ambiguous name is **refused** rather than guessed — two people can share
 one, and you are about to act on the answer. Several identifiers resolve concurrently, and
 one that matches nothing does not block the others.
+
+### App registrations
+
+Read-only. The portal calls these **App registrations**; their tenant-local instances are
+**Enterprise applications**, which live under `sp` below. `pctl azure app-registrations`
+and `pctl azure applications` both reach `apps`.
+
+```bash
+pctl azure apps list --search "incident.io"
+pctl azure apps get "Company Incident.io SCIM"
+pctl azure apps get 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
+pctl azure apps get "Company Incident.io SCIM" --with-sp -o json
+```
+
+**An application has two GUIDs and they are not interchangeable.** `appId` is the
+Application (client) ID, shared with its service principal. `id` is its own directory
+object, and differs from the service principal's `id`. Using one where the other belongs is
+the usual cause of a confident "no such object". A bare GUID is tried as an `appId` first,
+since that is what the portal shows prominently, then as an object ID.
+
+`--with-sp` follows the `appId` join and attaches the service principal, which is how you
+get from a registration to the Enterprise Application it appears as:
+
+```bash
+pctl -o json azure apps get "$APP" --with-sp | jq '{appId, id, spId: .servicePrincipalId}'
+```
+
+A registration with no service principal is reported on stderr — that means registered here
+but not instantiated here, which is a real state and a confusing one. Conversely a
+third-party app you use but did not register has a service principal and no local
+application, so it appears under `sp list` and not here.
 
 ### Service principals (Enterprise Applications)
 
@@ -302,6 +333,11 @@ src/pctl/
 │   │   ├── __init__.py      `users` group
 │   │   ├── common.py        default columns, match_option
 │   │   └── get.py           action
+│   ├── applications/      service (exposed as `apps`)
+│   │   ├── __init__.py      `apps` group
+│   │   ├── common.py        resolve_application: appId before object ID
+│   │   ├── list.py          action
+│   │   └── get.py           action
 │   ├── groups/            service
 │   │   ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
 │   │   ├── list.py          action
@@ -363,6 +399,7 @@ src/test/
 │   │   ├── test_groups.py   groups service surface
 │   │   ├── test_service_principals.py  sp service surface
 │   │   ├── test_users.py    users service surface
+│   │   ├── test_applications.py  apps service surface
 │   │   └── test_token.py    token and raw actions
 │   └── aws/               case
 │       ├── conftest.py      ddb() invoke helper
@@ -375,6 +412,7 @@ src/test/
     │   ├── test_service_principals.py  assignment direction, role labelling
     │   ├── test_sp_owners.py  the writes: idempotency, $ref bodies
     │   ├── test_users.py    identifier forms, ambiguity refusal
+    │   ├── test_applications.py  appId vs object ID, the sp join
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch
