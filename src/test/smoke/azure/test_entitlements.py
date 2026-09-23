@@ -27,8 +27,31 @@ def eam(azure: Callable[..., Any]) -> Callable[..., Any]:
 
 def test_the_service_help_lists_its_actions(eam: Callable[..., Any]) -> None:
     stdout = ok(eam("--help")).stdout
-    for action in ("list-packages", "get-package", "list-catalogs", "get-catalog"):
+    for action in (
+        "list-packages",
+        "get-package",
+        "list-catalogs",
+        "get-catalog",
+        "list-assignments",
+    ):
         assert action in stdout
+
+
+def test_assignments_help_documents_the_package_scope(eam: Callable[..., Any]) -> None:
+    stdout = ok(eam("list-assignments", "--help")).stdout
+    assert "--access-package" in stdout
+    assert "--state" in stdout
+
+
+def test_assignments_help_lists_the_graph_states(eam: Callable[..., Any]) -> None:
+    """Capitalised exactly as Graph expects, since the filter is case-sensitive."""
+    stdout = ok(eam("list-assignments", "--help")).stdout
+    for state in ("Delivered", "Expired", "DeliveryFailed"):
+        assert state in stdout
+
+
+def test_a_lowercase_state_is_rejected(eam: Callable[..., Any]) -> None:
+    failed(eam("list-assignments", "--state", "delivered"), 2)
 
 
 def test_the_case_help_lists_the_service(azure: Callable[..., Any]) -> None:

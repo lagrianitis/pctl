@@ -397,3 +397,194 @@ def test_an_unknown_catalog_exits_4(runner: Any, cli: Any, governance: Any) -> N
     )
 
     assert "no-such-catalog" in result.output
+
+
+# ---------------------------------------------------------------------------
+# list-assignments
+# ---------------------------------------------------------------------------
+ASSIGNMENTS = [
+    {
+        "id": "asg1",
+        "state": "Delivered",
+        "target": {"objectId": "u1", "displayName": "Ann Example", "email": "ann@example.com"},
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
+    },
+    {
+        "id": "asg2",
+        "state": "Delivered",
+        "target": {"objectId": "u2", "displayName": "Bob Example", "email": "bob@example.com"},
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
+    },
+    {
+        "id": "asg3",
+        "state": "Expired",
+        "target": {"objectId": "u3", "displayName": "Carol Example", "email": "carol@example.com"},
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
+    },
+]
+
+
+@pytest.fixture
+def assignments(governance: Any, seen: list[str]) -> Any:
+    """The assignments collection, filtered by whatever $filter arrives."""
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        url = unquote_plus(str(request.url))
+        items = ASSIGNMENTS
+        if "state eq 'Delivered'" in url:
+            items = [item for item in items if item["state"] == "Delivered"]
+        elif "state eq 'Expired'" in url:
+            items = [item for item in items if item["state"] == "Expired"]
+        return httpx.Response(200, json={"value": items})
+
+    governance.get(f"{EAM}/assignments").mock(side_effect=handler)
+    return governance
+
+
+def test_the_package_name_becomes_an_access_package_filter(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    """The name is resolved first, because the filter needs the package's id."""
+    ok(
+        runner.invoke(
+            cli,
+            ["azure", "eam", "list-assignments", "--access-package", "AWS Platform Access"],
+        )
+    )
+
+    assert f"accessPackage/id eq '{PACKAGE_ID}'" in filters(seen)
+
+
+def test_package_and_state_combine_into_one_filter(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    """This is the request the feature was specified against."""
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "list-assignments",
+                "--access-package",
+                PACKAGE_ID,
+                "--state",
+                "Delivered",
+            ],
+        )
+    )
+
+    assert f"accessPackage/id eq '{PACKAGE_ID}' and state eq 'Delivered'" in filters(seen)
+
+
+def test_a_package_id_skips_the_lookup(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    ok(runner.invoke(cli, ["azure", "eam", "list-assignments", "--access-package", PACKAGE_ID]))
+
+    assert filters(seen) == [f"accessPackage/id eq '{PACKAGE_ID}'"]
+
+
+def test_the_state_filter_narrows_server_side(runner: Any, cli: Any, assignments: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--state", "Delivered"]
+        )
+    )
+
+    states = {json.loads(line)["state"] for line in lines(result.stdout)}
+    assert states == {"Delivered"}
+    assert len(lines(result.stdout)) == 2
+
+
+def test_target_and_package_are_expanded_by_default(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    """Without the expansion an assignment is two GUIDs and a state."""
+    ok(runner.invoke(cli, ["azure", "eam", "list-assignments"]))
+
+    assert "$expand=target,accessPackage" in unquote_plus(seen[-1])
+
+
+def test_no_expand_drops_the_expansion(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    ok(runner.invoke(cli, ["azure", "eam", "list-assignments", "--no-expand"]))
+
+    assert "$expand" not in unquote_plus(seen[-1])
+
+
+def test_the_nested_names_are_lifted_to_the_top_level(
+    runner: Any, cli: Any, assignments: Any
+) -> None:
+    """A table column cannot address target.displayName, so it is copied up."""
+    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"]))
+
+    first = json.loads(lines(result.stdout)[0])
+    assert first["targetDisplayName"] == "Ann Example"
+    assert first["targetEmail"] == "ann@example.com"
+    assert first["accessPackageName"] == "AWS Platform Access"
+
+
+def test_the_nested_objects_survive_flattening(runner: Any, cli: Any, assignments: Any) -> None:
+    """The additions must not replace what json consumers already rely on."""
+    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"]))
+
+    first = json.loads(lines(result.stdout)[0])
+    assert first["target"]["objectId"] == "u1"
+    assert first["accessPackage"]["id"] == PACKAGE_ID
+
+
+def test_the_default_columns_are_assignment_shaped(runner: Any, cli: Any, assignments: Any) -> None:
+    result = ok(runner.invoke(cli, ["-o", "csv", "azure", "eam", "list-assignments"]))
+
+    assert lines(result.stdout)[0] == "targetDisplayName,targetEmail,accessPackageName,state,id"
+
+
+def test_target_filters_locally_on_name(runner: Any, cli: Any, assignments: Any) -> None:
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "Ann"])
+    )
+
+    assert len(lines(result.stdout)) == 1
+
+
+def test_target_also_matches_an_email(runner: Any, cli: Any, assignments: Any) -> None:
+    """A person is as likely to be looked up by address as by name."""
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "bob@"])
+    )
+
+    assert json.loads(lines(result.stdout)[0])["targetDisplayName"] == "Bob Example"
+
+
+def test_a_raw_filter_replaces_the_shortcuts(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "list-assignments",
+                "--access-package",
+                PACKAGE_ID,
+                "--filter",
+                "state eq 'Expired'",
+            ],
+        )
+    )
+
+    assert filters(seen) == ["state eq 'Expired'"]
+
+
+def test_an_invalid_state_is_rejected_before_any_request(
+    runner: Any, cli: Any, assignments: Any, seen: list[str]
+) -> None:
+    """Graph's states are capitalised exactly, so a typo must fail at parse time."""
+    failed(runner.invoke(cli, ["azure", "eam", "list-assignments", "--state", "delivered"]), 2)
+
+    assert seen == []
