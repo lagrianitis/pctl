@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 
 from ...options import azure_options, columns_option, output_options
-from .common import match_option
+from .common import PACKAGE_COLUMNS, match_option
 from .runner import run_get
 
 
@@ -29,16 +29,20 @@ def command(
     with_policies: bool,
     select: str | None,
 ) -> None:
-    """Show an access package, by display name or object ID.
+    """Show access packages matching a name, or one by object ID.
 
-    --match is exact by default. `prefix` is server-side; `contains` fetches the
+    --match exact (the default) and prefix are server-side; contains fetches the
     collection and filters locally, because Graph offers no substring operator here.
 
-    --with-policies expands assignmentPolicies, which is where the approval and
-    expiry rules live. Without it you get the package alone.
+    prefix and contains are patterns, so they return every match rather than refusing an
+    ambiguous one. A single result is emitted as an object and several as an array, the
+    same shape `groups get` uses, so jq needs no index for the common case.
+
+    --with-policies expands assignmentPolicies, where the approval and expiry rules live.
 
     \b
       pctl azure eam get-package "AWS Platform Access"
+      pctl azure eam get-package AWS --match prefix -o ndjson
       pctl azure eam get-package incident --match contains
       pctl azure eam get-package "AWS Platform Access" --with-policies -o json
       pctl azure eam get-package a914b616-e04e-476b-aa37-91038f0b165b
@@ -52,6 +56,7 @@ def command(
         identifier=identifier,
         match_mode=match_mode,
         default_select=DEFAULT_ACCESS_PACKAGE_SELECT,
+        default_columns=PACKAGE_COLUMNS,
         select=select,
         expand=("assignmentPolicies",) if with_policies else None,
     )

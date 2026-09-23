@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 
 from ...options import azure_options, columns_option, output_options
-from .common import match_option
+from .common import CATALOG_COLUMNS, match_option
 from .runner import run_get
 
 
@@ -23,11 +23,15 @@ def command(
     match_mode: str,
     select: str | None,
 ) -> None:
-    """Show an access package catalog, by display name or object ID.
+    """Show catalogs matching a name, or one by object ID.
+
+    As with get-package, prefix and contains are patterns and return every match. A
+    single result is an object, several are an array.
 
     \b
       pctl azure eam get-catalog "AWS Platform"
       pctl azure eam get-catalog aws --match contains -o json
+      pctl azure eam get-catalog AWS --match prefix -o ndjson
       pctl azure eam get-catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
     """
     from ..graph import DEFAULT_CATALOG_SELECT
@@ -39,5 +43,6 @@ def command(
         identifier=identifier,
         match_mode=match_mode,
         default_select=DEFAULT_CATALOG_SELECT,
+        default_columns=CATALOG_COLUMNS,
         select=select,
     )

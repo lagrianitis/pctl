@@ -15,7 +15,7 @@ from ...config import AppContext
 from ...options import split_columns
 from ...output import Renderer, summarise
 from .. import graph_client
-from .common import build_filter, contains_filter, resolve_catalog_id, resolve_one
+from .common import build_filter, contains_filter, find_matching, resolve_catalog_id
 
 
 def run_list(
@@ -84,18 +84,24 @@ def run_get(
     identifier: str,
     match_mode: str,
     default_select: tuple[str, ...],
+    default_columns: list[str],
     select: str | None,
     expand: tuple[str, ...] | None = None,
 ) -> None:
-    """Show one object from an entitlement management collection."""
+    """Show every object matching an ID or a display name pattern.
+
+    Renders a single match as an object and several as an array, the same shape
+    `groups get` uses, so `jq` needs no index for the common case.
+    """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
     fields = tuple(split_columns(select) or default_select)
+    columns = app.columns or (list(fields) if select else default_columns)
 
-    async def _run() -> dict[str, Any]:
+    async def _run() -> list[dict[str, Any]]:
         async with graph_client(app) as client:
-            found = await resolve_one(
+            found = await find_matching(
                 client,
                 collection,
                 identifier,
@@ -104,9 +110,11 @@ def run_get(
                 select=fields,
                 expand=expand,
             )
-            app.log(f"resolved '{identifier}' to {found.get('displayName')} ({found.get('id')})")
+            app.log(f"'{identifier}' matched {len(found)} {noun}(s) with match={match_mode}")
             return found
 
     found = run(_run())
-    with Renderer(app.output, columns=app.columns, single=True) as renderer:
-        renderer.write(found)
+    with Renderer(app.output, columns=columns, single=len(found) == 1) as renderer:
+        renderer.write_all(found)
+    if len(found) > 1:
+        summarise(len(found), noun, quiet=app.quiet)

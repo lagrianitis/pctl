@@ -80,7 +80,7 @@ async def resolve_catalog_id(client: GraphClient, catalog: str) -> str:
     return str(matches[0]["id"])
 
 
-async def resolve_one(
+async def find_matching(
     client: GraphClient,
     collection: str,
     identifier: str,
@@ -89,21 +89,24 @@ async def resolve_one(
     mode: str = "exact",
     select: tuple[str, ...] | None = None,
     expand: tuple[str, ...] | None = None,
-) -> dict[str, Any]:
-    """Resolve one entitlement management object by ID or display name.
+) -> list[dict[str, Any]]:
+    """Every entitlement management object matching an ID or a display name pattern.
 
-    An object ID is used directly. A display name uses `eq` or `startswith` server-side,
-    or fetches and filters locally for `contains`, since Graph offers no substring
-    operator here.
+    An object ID returns exactly one. A display name uses `eq` or `startswith`
+    server-side, or fetches and filters locally for `contains`, since Graph offers no
+    substring operator here.
 
-    An ambiguous name is refused rather than resolved to the first match: catalogs and
-    packages are routinely named in families, so "the first one" is rarely the intended
-    one.
+    Several matches are returned rather than refused. `prefix` and `contains` are pattern
+    modes, and a pattern matching more than one thing is the normal case, not an error:
+    "show me the AWS packages" is a question with several answers. Callers that need
+    exactly one object, such as the `--catalog` filter, use `resolve_catalog_id`.
     """
     if looks_like_object_id(identifier):
-        return await client.get_governance(
-            collection, identifier.strip(), select=select, expand=expand
-        )
+        return [
+            await client.get_governance(
+                collection, identifier.strip(), select=select, expand=expand
+            )
+        ]
 
     if mode == "contains":
         everything = [
@@ -112,18 +115,13 @@ async def resolve_one(
         matches = contains_filter(everything, identifier)
     else:
         matches = await client.find_governance_by_display_name(
-            collection, identifier, mode=mode, select=select, expand=expand, limit=2
+            collection, identifier, mode=mode, select=select, expand=expand, limit=None
         )
 
     if not matches:
-        hint = "" if mode == "contains" else " Try --match contains."
-        raise NotFoundError(f"No {noun} matched display name: {identifier}.{hint}")
-    if len(matches) > 1:
-        raise ConfigError(
-            f"{len(matches)} {noun}s match '{identifier}'. "
-            "Pass the object ID instead, so the wrong one cannot be chosen."
-        )
-    return matches[0]
+        hint = "" if mode == "contains" else " Try --match prefix or --match contains."
+        raise NotFoundError(f"No {noun} matched: {identifier}.{hint}")
+    return matches
 
 
 def list_options(func: Any) -> Any:
