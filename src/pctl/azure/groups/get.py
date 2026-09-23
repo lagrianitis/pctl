@@ -22,7 +22,13 @@ from .common import add_relations, match_option
 
 
 @click.command(name="get")
-@click.argument("names", nargs=-1)
+@click.option(
+    "--name",
+    "names",
+    multiple=True,
+    metavar="NAME",
+    help="Group display name. Repeat for several.",
+)
 @azure_options
 @click.option(
     "-f",
@@ -34,13 +40,17 @@ from .common import add_relations, match_option
 @click.option("--members", is_flag=True, help="Include direct members.")
 @click.option("--owners", is_flag=True, help="Include owners.")
 @click.option("--transitive", is_flag=True, help="Include transitive (nested) members.")
-@click.option("--counts", is_flag=True, help="Include member/owner counts without listing them.")
+@click.option(
+    "--counts", is_flag=True, help="Include member/owner counts without listing them."
+)
 @click.option(
     "--member-limit",
     type=click.IntRange(min=1),
     help="Cap the number of members/owners fetched per group.",
 )
-@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields for the group.")
+@click.option(
+    "--select", metavar="FIELDS", help="Comma-separated Graph fields for the group."
+)
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -64,21 +74,23 @@ def command(
 ) -> None:
     """Show details for one or more groups, looked up by display name.
 
-    Names can be positional or read from a file, and all of them are resolved
-    concurrently.
+    Repeat --name for several groups, or read them from a file; either way they are all
+    resolved concurrently.
 
     \b
-      pctl azure groups get "AWS Platform Admins"
-      pctl azure groups get "Team A" "Team B" --members --owners -o json
+      pctl azure groups get --name "AWS Platform Admins"
+      pctl azure groups get --name "Team A" --name "Team B" --members --owners -o json
       pctl azure groups get -f groups.txt --counts -o csv
-      pctl azure groups get platform --match search
+      pctl azure groups get --name platform --match search
     """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
     wanted = read_names(names, from_file)
     if not wanted:
-        raise click.UsageError("Provide at least one group display name, or use --from-file.")
+        raise click.UsageError(
+            "Provide at least one group display name with --name, or use --from-file."
+        )
 
     group_fields = split_columns(select)
     table_columns = app.columns or _columns(members, owners, transitive, counts)
@@ -89,7 +101,9 @@ def command(
             app.log(f"resolving {len(wanted)} display name(s) with match={match_mode}")
             resolved = await asyncio.gather(
                 *[
-                    client.find_groups_by_display_name(name, mode=match_mode, select=group_fields)
+                    client.find_groups_by_display_name(
+                        name, mode=match_mode, select=group_fields
+                    )
                     for name in wanted
                 ]
             )
@@ -124,7 +138,9 @@ def command(
 
     found, missing = run(_run())
 
-    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
+    with Renderer(
+        app.output, columns=table_columns, single=len(found) == 1
+    ) as renderer:
         renderer.write_all(found)
 
     for name in missing:

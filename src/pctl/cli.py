@@ -45,7 +45,9 @@ CONTEXT_SETTINGS = {
     metavar="FORMAT",
     help="Output format for every command.",
 )
-@click.option("-q", "--quiet", is_flag=True, help="Suppress result summaries on stderr.")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress result summaries on stderr."
+)
 @click.option("-v", "--verbose", is_flag=True, help="Log progress to stderr.")
 @click.option(
     "--timeout",
@@ -79,9 +81,9 @@ def cli(
       pctl azure token                          acquire a Graph token (cached)
       pctl azure groups list                    every group, paginated
       pctl azure groups list --starts-with aws- filter server-side
-      pctl azure groups get "Team A" "Team B"   details by display name
-      pctl aws ddb scan my-table -n 20          items from a table
-      pctl aws ddb query my-table --key "pk = :pk" --values '{":pk":"a"}'
+      pctl azure groups get --name "Team A"     details by display name
+      pctl aws ddb scan --table my-table -n 20  items from a table
+      pctl aws ddb query --table my-table --key "pk = :pk" --values '{":pk":"a"}'
 
     \b
     Output:
@@ -102,11 +104,16 @@ def cli(
 
 
 @cli.command("completion")
-@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
+@click.option(
+    "--shell",
+    type=click.Choice(["bash", "zsh", "fish"]),
+    required=True,
+    help="Which shell to print instructions for.",
+)
 def completion(shell: str) -> None:
     """Print shell completion setup instructions.
 
-    Example: pctl completion zsh
+    Example: pctl completion --shell zsh
     """
     variable = "_PCTL_COMPLETE"
     snippets = {

@@ -30,16 +30,22 @@ def test_tables_lists_the_table(ddb: Any, ddb_table: str) -> None:
     assert json.loads(lines(result.stdout)[0])["table"] == ddb_table
 
 
-def test_describe_returns_the_raw_describe_table_payload(ddb: Any, ddb_table: str) -> None:
+def test_describe_returns_the_raw_describe_table_payload(
+    ddb: Any, ddb_table: str
+) -> None:
     """`-o json` is an escape hatch: pass the API response through unreshaped."""
-    payload = json.loads(ok(ddb("describe", ddb_table, output="json")).stdout)
+    payload = json.loads(
+        ok(ddb("describe", "--table", ddb_table, output="json")).stdout
+    )
 
     assert payload["TableName"] == ddb_table
     assert "KeySchema" in payload
 
 
-def test_describe_summarises_the_key_schema_for_humans(ddb: Any, ddb_table: str) -> None:
-    result = ok(ddb("describe", ddb_table))
+def test_describe_summarises_the_key_schema_for_humans(
+    ddb: Any, ddb_table: str
+) -> None:
+    result = ok(ddb("describe", "--table", ddb_table))
 
     assert "pk:HASH" in result.stdout
     assert "sk:RANGE" in result.stdout
@@ -48,9 +54,11 @@ def test_describe_summarises_the_key_schema_for_humans(ddb: Any, ddb_table: str)
 # ---------------------------------------------------------------------------
 # scan
 # ---------------------------------------------------------------------------
-def test_a_parallel_scan_returns_every_item_exactly_once(ddb: Any, ddb_table: str) -> None:
+def test_a_parallel_scan_returns_every_item_exactly_once(
+    ddb: Any, ddb_table: str
+) -> None:
     """Segments must partition the table, not overlap or drop rows."""
-    result = ok(ddb("scan", ddb_table, "--segments", "4", output="ndjson"))
+    result = ok(ddb("scan", "--table", ddb_table, "--segments", "4", output="ndjson"))
 
     items = [json.loads(line) for line in lines(result.stdout)]
     assert len(items) == ITEM_COUNT
@@ -59,7 +67,7 @@ def test_a_parallel_scan_returns_every_item_exactly_once(ddb: Any, ddb_table: st
 
 def test_dynamodb_types_deserialise_to_plain_json(ddb: Any, ddb_table: str) -> None:
     """A Decimal, a list and a map are the three that are easy to get wrong."""
-    result = ok(ddb("scan", ddb_table, "-n", "1", output="ndjson"))
+    result = ok(ddb("scan", "--table", ddb_table, "-n", "1", output="ndjson"))
 
     item = json.loads(lines(result.stdout)[0])
     assert item["budget"] == 1234.5
@@ -69,7 +77,7 @@ def test_dynamodb_types_deserialise_to_plain_json(ddb: Any, ddb_table: str) -> N
 
 
 def test_limit_stops_after_n_items(ddb: Any, ddb_table: str) -> None:
-    result = ok(ddb("scan", ddb_table, "-n", "3", output="ndjson"))
+    result = ok(ddb("scan", "--table", ddb_table, "-n", "3", output="ndjson"))
 
     assert len(lines(result.stdout)) == 3
 
@@ -78,6 +86,7 @@ def test_a_filter_expression_is_applied_server_side(ddb: Any, ddb_table: str) ->
     result = ok(
         ddb(
             "scan",
+            "--table",
             ddb_table,
             "--filter",
             "#s = :s",
@@ -99,6 +108,7 @@ def test_a_projection_limits_the_attributes_returned(ddb: Any, ddb_table: str) -
     result = ok(
         ddb(
             "scan",
+            "--table",
             ddb_table,
             "--projection",
             "pk,#s",
@@ -114,7 +124,7 @@ def test_a_projection_limits_the_attributes_returned(ddb: Any, ddb_table: str) -
 
 
 def test_an_empty_table_produces_no_rows(ddb: Any, empty_table: str) -> None:
-    result = ok(ddb("scan", empty_table, output="ndjson"))
+    result = ok(ddb("scan", "--table", empty_table, output="ndjson"))
 
     assert lines(result.stdout) == []
 
@@ -125,7 +135,14 @@ def test_an_empty_table_produces_no_rows(ddb: Any, empty_table: str) -> None:
 def test_query_by_partition_key_returns_the_match(ddb: Any, ddb_table: str) -> None:
     result = ok(
         ddb(
-            "query", ddb_table, "--key", "pk = :pk", "--values", '{":pk":"acct#007"}', output="json"
+            "query",
+            "--table",
+            ddb_table,
+            "--key",
+            "pk = :pk",
+            "--values",
+            '{":pk":"acct#007"}',
+            output="json",
         )
     )
 
@@ -138,6 +155,7 @@ def test_query_supports_begins_with_on_the_sort_key(ddb: Any, ddb_table: str) ->
     ok(
         ddb(
             "query",
+            "--table",
             ddb_table,
             "--key",
             "pk = :pk AND begins_with(sk, :s)",
@@ -150,7 +168,16 @@ def test_query_supports_begins_with_on_the_sort_key(ddb: Any, ddb_table: str) ->
 
 def test_get_accepts_a_plain_json_key(ddb: Any, ddb_table: str) -> None:
     """Typing a key in DynamoDB's wire format by hand is the thing to avoid."""
-    result = ok(ddb("get", ddb_table, '{"pk":"acct#003","sk":"profile"}', output="json"))
+    result = ok(
+        ddb(
+            "get",
+            "--table",
+            ddb_table,
+            "--key",
+            '{"pk":"acct#003","sk":"profile"}',
+            output="json",
+        )
+    )
 
     assert json.loads(result.stdout)["pk"] == "acct#003"
 
@@ -158,7 +185,14 @@ def test_get_accepts_a_plain_json_key(ddb: Any, ddb_table: str) -> None:
 def test_get_also_accepts_a_dynamodb_typed_key(ddb: Any, ddb_table: str) -> None:
     """Typed JSON passes through, so output from another tool can be piped back in."""
     result = ok(
-        ddb("get", ddb_table, '{"pk":{"S":"acct#004"},"sk":{"S":"profile"}}', output="json")
+        ddb(
+            "get",
+            "--table",
+            ddb_table,
+            "--key",
+            '{"pk":{"S":"acct#004"},"sk":{"S":"profile"}}',
+            output="json",
+        )
     )
 
     assert json.loads(result.stdout)["pk"] == "acct#004"
@@ -168,7 +202,18 @@ def test_get_also_accepts_a_dynamodb_typed_key(ddb: Any, ddb_table: str) -> None
 # rendering
 # ---------------------------------------------------------------------------
 def test_csv_header_and_rows_honour_columns(ddb: Any, ddb_table: str) -> None:
-    result = ok(ddb("scan", ddb_table, "-c", "pk,status,budget", "-n", "2", output="csv"))
+    result = ok(
+        ddb(
+            "scan",
+            "--table",
+            ddb_table,
+            "-c",
+            "pk,status,budget",
+            "-n",
+            "2",
+            output="csv",
+        )
+    )
 
     rows = lines(result.stdout)
     assert rows[0] == "pk,status,budget"
@@ -176,7 +221,7 @@ def test_csv_header_and_rows_honour_columns(ddb: Any, ddb_table: str) -> None:
 
 
 def test_table_output_has_a_header_and_a_rule(ddb: Any, ddb_table: str) -> None:
-    result = ok(ddb("scan", ddb_table, "-c", "pk,status", "-n", "2"))
+    result = ok(ddb("scan", "--table", ddb_table, "-c", "pk,status", "-n", "2"))
 
     rows = lines(result.stdout)
     assert rows[0].split() == ["pk", "status"]
@@ -186,10 +231,27 @@ def test_table_output_has_a_header_and_a_rule(ddb: Any, ddb_table: str) -> None:
 # ---------------------------------------------------------------------------
 # aliases and prefixes, end to end rather than help-only
 # ---------------------------------------------------------------------------
-def test_the_dynamodb_service_name_resolves(runner: Any, cli: Any, ddb_table: str) -> None:
+def test_the_dynamodb_service_name_resolves(
+    runner: Any, cli: Any, ddb_table: str
+) -> None:
     """`ddb` is the exposed name, but the package is `dynamodb` and both must work."""
-    ok(runner.invoke(cli, ["-o", "ndjson", "aws", "dynamodb", "scan", ddb_table, "-n", "1"]))
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "aws",
+                "dynamodb",
+                "scan",
+                "--table",
+                ddb_table,
+                "-n",
+                "1",
+            ],
+        )
+    )
 
 
 def test_an_unambiguous_action_prefix_resolves(ddb: Any, ddb_table: str) -> None:
-    ok(ddb("sc", ddb_table, "-n", "1", output="ndjson"))
+    ok(ddb("sc", "--table", ddb_table, "-n", "1", output="ndjson"))

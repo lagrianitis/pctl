@@ -29,13 +29,19 @@ from .common import (
     metavar="NAME|ID",
     help="The Enterprise Application to add owners to. Display name or ID.",
 )
-@click.argument("owners", nargs=-1)
+@click.option(
+    "--owner",
+    "owners",
+    multiple=True,
+    metavar="EMAIL|NAME|ID",
+    help="Owner to add. Repeat for several.",
+)
 @azure_options
 @match_option
 @click.option(
     "--emails",
     metavar="A@B,C@D",
-    help="Comma-separated owner addresses, added to any given positionally.",
+    help="Comma-separated owner addresses, added to any given with --owner.",
 )
 @click.option(
     "--owner-type",
@@ -83,18 +89,19 @@ def command(
     default, because a prefix match on a write could name the wrong person.
 
     \b
-      pctl azure sp add-owner --app "Company Incident.io SCIM" ann@company.com
-      pctl azure sp add-owner --app SCIM ann@company.com bob@company.com
+      pctl azure sp add-owner --app "Company Incident.io SCIM" --owner ann@company.com
+      pctl azure sp add-owner --app SCIM --owner ann@company.com --owner bob@company.com
       pctl azure sp add-owner --app SCIM --emails ann@company.com,bob@company.com
-      pctl azure sp add-owner --app SCIM "Ann Example" e6901838-637f-4bc7-b843-a8a7725a4872
-      pctl azure sp add-owner --app SCIM platform-automation --owner-type sp
+      pctl azure sp add-owner --app SCIM --owner "Ann Example"
+      pctl azure sp add-owner --app SCIM --owner e6901838-637f-4bc7-b843-a8a7725a4872
+      pctl azure sp add-owner --app SCIM --owner platform-automation --owner-type sp
     """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
     wanted = collect_owners(owners, emails)
     if not wanted:
-        raise click.UsageError("Provide at least one owner, positionally or with --emails.")
+        raise click.UsageError("Provide at least one owner with --owner or --emails.")
 
     async def _run() -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
         async with graph_client(app) as client:
@@ -110,7 +117,9 @@ def command(
 
             to_add = [owner for owner in resolved if owner["id"] not in existing]
             if to_add:
-                await asyncio.gather(*[client.add_owner(sp_id, owner["id"]) for owner in to_add])
+                await asyncio.gather(
+                    *[client.add_owner(sp_id, owner["id"]) for owner in to_add]
+                )
 
             added = {owner["id"] for owner in to_add}
             records = [
@@ -126,7 +135,9 @@ def command(
 
     records, failed = run(_run())
 
-    with Renderer(app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]) as out:
+    with Renderer(
+        app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]
+    ) as out:
         out.write_all(records)
 
     added = [record for record in records if record["status"] == "added"]

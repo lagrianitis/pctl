@@ -23,7 +23,14 @@ from .common import (
     target_options,
 )
 
-RESULT_COLUMNS = ["accessPackage", "target", "targetId", "status", "requestId", "requestState"]
+RESULT_COLUMNS = [
+    "accessPackage",
+    "target",
+    "targetId",
+    "status",
+    "requestId",
+    "requestState",
+]
 USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
 
 
@@ -35,7 +42,13 @@ USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
     metavar="NAME|ID",
     help="The access package to revoke. Display name or object ID.",
 )
-@click.argument("targets", nargs=-1)
+@click.option(
+    "--target",
+    "targets",
+    multiple=True,
+    metavar="EMAIL|NAME|ID",
+    help="Person whose assignment to remove. Repeat for several.",
+)
 @azure_options
 @target_options
 @output_options
@@ -51,8 +64,8 @@ def command(
 ) -> None:
     """Remove one or more people's assignment to an access package.
 
-    --access-package is a display name or ID. Each target is an email address, a display name or a
-    user object ID.
+    --access-package is a display name or ID. Each --target is an email address, a display
+    name or a user object ID.
 
     Idempotent: current assignments are read first, and someone who has none is reported
     rather than sent as a request. No policy is needed, unlike add-assignment: an
@@ -69,7 +82,7 @@ def command(
     Requires EntitlementManagement.ReadWrite.All.
 
     \b
-      pctl azure eam remove-assignment --access-package "$PKG" ann@company.com --wait
+      pctl azure eam remove-assignment --access-package "$PKG" --target ann@company.com --wait
       pctl azure eam remove-assignment --access-package "$PKG" --emails a@b.com,c@d.com --wait
     """
     from ..graph import run
@@ -77,7 +90,7 @@ def command(
     app = ctx.ensure_object(AppContext)
     wanted = collect_targets(targets, emails)
     if not wanted:
-        raise click.UsageError("Provide at least one person, positionally or with --emails.")
+        raise click.UsageError("Provide at least one person with --target or --emails.")
 
     async def _run() -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
         async with graph_client(app) as client:
@@ -105,7 +118,9 @@ def command(
                         "requestState": None,
                     }
                 created = await client.create_assignment_request(
-                    assignment_request(request_type="adminRemove", id=str(existing["id"]))
+                    assignment_request(
+                        request_type="adminRemove", id=str(existing["id"])
+                    )
                 )
                 return {
                     **record,
@@ -117,7 +132,9 @@ def command(
             results = await asyncio.gather(*[one(item) for item in wanted])
             records = [item for item in results if isinstance(item, dict)]
             if wait:
-                await settle_requests(client, records, timeout=wait_timeout, log=app.log)
+                await settle_requests(
+                    client, records, timeout=wait_timeout, log=app.log
+                )
             return (
                 records,
                 [item for item in results if isinstance(item, tuple)],
@@ -138,7 +155,9 @@ def command(
                 fg="cyan",
             )
     for identifier, reason in failed:
-        click.secho(f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow")
+        click.secho(
+            f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow"
+        )
 
     removed = [record for record in records if record["status"] == "removal-requested"]
     summarise(len(removed), "removal requested", quiet=app.quiet)

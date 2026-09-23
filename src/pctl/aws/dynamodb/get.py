@@ -10,11 +10,17 @@ from ...config import AppContext
 from ...errors import NotFoundError
 from ...options import aws_options, output_options
 from ...output import Renderer, summarise
+from .common import table_option
 
 
 @click.command(name="get")
-@click.argument("table")
-@click.argument("key")
+@table_option
+@click.option(
+    "--key",
+    required=True,
+    metavar="JSON",
+    help='Primary key as a JSON object, e.g. \'{"pk":"tenant#42","sk":"profile"}\'.',
+)
 @aws_options
 @click.option("--projection", metavar="EXPR", help="Fetch only these attributes.")
 @click.option("--consistent", is_flag=True, help="Use a strongly consistent read.")
@@ -29,19 +35,21 @@ def command(
 ) -> None:
     """Fetch a single item by primary key.
 
-    KEY is JSON, either plain or DynamoDB-typed:
+    --key takes JSON, either plain or DynamoDB-typed:
 
     \b
-      pctl aws ddb get my-table '{"pk":"tenant#42","sk":"profile"}'
-      pctl aws ddb get my-table '{"pk":{"S":"tenant#42"},"sk":{"S":"profile"}}'
+      pctl aws ddb get --table my-table --key '{"pk":"tenant#42","sk":"profile"}'
+      pctl aws ddb get --table my-table --key '{"pk":{"S":"tenant#42"}}'
     """
     from .client import get_item, make_client
     from .common import parse_json_option
 
     app = ctx.ensure_object(AppContext)
-    parsed = parse_json_option(key, "KEY")
+    parsed = parse_json_option(key, "--key")
     if not parsed:
-        raise click.BadParameter("key must be a non-empty JSON object", param_hint="KEY")
+        raise click.BadParameter(
+            "key must be a non-empty JSON object", param_hint="--key"
+        )
 
     extra: dict[str, Any] = {}
     if projection:

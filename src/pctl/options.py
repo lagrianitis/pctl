@@ -19,7 +19,9 @@ from .config import AppContext, OutputFormat
 OUTPUT_CHOICES = [fmt.value for fmt in OutputFormat]
 
 
-def _set_attr(name: str, transform: Callable[[Any], Any] | None = None) -> Callable[..., Any]:
+def _set_attr(
+    name: str, transform: Callable[[Any], Any] | None = None
+) -> Callable[..., Any]:
     """Build a click callback that stores a non-None value on the AppContext."""
 
     def callback(ctx: click.Context, _param: click.Parameter, value: Any) -> Any:
@@ -186,7 +188,7 @@ def aws_options(func: Any) -> Any:
 
 
 def read_names(names: tuple[str, ...], from_file: str | None) -> list[str]:
-    """Combine positional names with names read from a file or stdin (`-`).
+    """Combine repeated flag values with names read from a file or stdin (`-`).
 
     Blank lines and `#` comments are ignored, so a curated group list can live in
     version control next to your infrastructure code.

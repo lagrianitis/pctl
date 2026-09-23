@@ -120,7 +120,11 @@ async def resolve_owner(
     a name exists in both collections.
     """
     if looks_like_object_id(owner):
-        return {"id": owner.strip(), "displayName": owner.strip(), "_resolved": "object-id"}
+        return {
+            "id": owner.strip(),
+            "displayName": owner.strip(),
+            "_resolved": "object-id",
+        }
 
     collections = {
         "auto": ("users", "servicePrincipals"),
@@ -164,7 +168,7 @@ async def resolve_owner(
 
 
 def collect_owners(owners: tuple[str, ...], emails: str | None) -> list[str]:
-    """Combine positional owners with a comma-separated `--emails` value.
+    """Combine repeated `--owner` values with a comma-separated `--emails` value.
 
     Order is preserved and duplicates dropped, so naming the same person twice costs one
     lookup rather than two and cannot produce two conflicting result rows.
@@ -196,7 +200,9 @@ async def resolve_owners(
 
     async def one(candidate: str) -> dict[str, Any] | tuple[str, str]:
         try:
-            return await resolve_owner(client, candidate, mode=mode, owner_type=owner_type)
+            return await resolve_owner(
+                client, candidate, mode=mode, owner_type=owner_type
+            )
         except (NotFoundError, ConfigError) as exc:
             return candidate, str(exc)
 

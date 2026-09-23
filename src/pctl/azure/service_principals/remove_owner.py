@@ -33,13 +33,19 @@ RECOMMENDED_MINIMUM_OWNERS = 2
     metavar="NAME|ID",
     help="The Enterprise Application to remove owners from. Display name or ID.",
 )
-@click.argument("owners", nargs=-1)
+@click.option(
+    "--owner",
+    "owners",
+    multiple=True,
+    metavar="EMAIL|NAME|ID",
+    help="Owner to remove. Repeat for several.",
+)
 @azure_options
 @match_option
 @click.option(
     "--emails",
     metavar="A@B,C@D",
-    help="Comma-separated owner addresses, added to any given positionally.",
+    help="Comma-separated owner addresses, added to any given with --owner.",
 )
 @click.option(
     "--owner-type",
@@ -86,17 +92,17 @@ def command(
     not refuse.
 
     \b
-      pctl azure sp remove-owner --app "Company Incident.io SCIM" ann@company.com
-      pctl azure sp remove-owner --app SCIM ann@company.com bob@company.com
+      pctl azure sp remove-owner --app "Company Incident.io SCIM" --owner ann@company.com
+      pctl azure sp remove-owner --app SCIM --owner ann@company.com --owner bob@company.com
       pctl azure sp remove-owner --app SCIM --emails ann@company.com,bob@company.com
-      pctl azure sp remove-owner --app SCIM e6901838-637f-4bc7-b843-a8a7725a4872
+      pctl azure sp remove-owner --app SCIM --owner e6901838-637f-4bc7-b843-a8a7725a4872
     """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
     wanted = collect_owners(owners, emails)
     if not wanted:
-        raise click.UsageError("Provide at least one owner, positionally or with --emails.")
+        raise click.UsageError("Provide at least one owner with --owner or --emails.")
 
     async def _run() -> tuple[list[dict[str, Any]], list[tuple[str, str]], int]:
         async with graph_client(app) as client:
@@ -130,7 +136,9 @@ def command(
 
     records, failed, remaining = run(_run())
 
-    with Renderer(app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]) as out:
+    with Renderer(
+        app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]
+    ) as out:
         out.write_all(records)
 
     removed = [record for record in records if record["status"] == "removed"]

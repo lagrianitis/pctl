@@ -22,7 +22,13 @@ from .common import DEFAULT_LIST_COLUMNS, match_option, resolve_application
 
 
 @click.command(name="get")
-@click.argument("identifiers", nargs=-1)
+@click.option(
+    "--app",
+    "identifiers",
+    multiple=True,
+    metavar="NAME|APPID|ID",
+    help="Display name, appId or object ID. Repeat for several.",
+)
 @azure_options
 @click.option(
     "-f",
@@ -36,7 +42,9 @@ from .common import DEFAULT_LIST_COLUMNS, match_option, resolve_application
     is_flag=True,
     help="Also fetch the service principal that instantiates the app in this tenant.",
 )
-@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
+@click.option(
+    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
+)
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -67,10 +75,10 @@ def command(
     "no such object" errors.
 
     \b
-      pctl azure apps get "Company Incident.io SCIM"
-      pctl azure apps get 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
-      pctl azure apps get "Company Incident.io SCIM" --with-sp -o json
-      pctl azure apps get "incident" --match search
+      pctl azure apps get --app "Company Incident.io SCIM"
+      pctl azure apps get --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
+      pctl azure apps get --app "Company Incident.io SCIM" --with-sp -o json
+      pctl azure apps get --app "incident" --match search
       pctl azure apps get -f apps.txt --ignore-missing
     """
     from ..graph import DEFAULT_APPLICATION_SELECT, run
@@ -79,7 +87,7 @@ def command(
     wanted = read_names(identifiers, from_file)
     if not wanted:
         raise click.UsageError(
-            "Provide at least one display name, appId or object ID, or use --from-file."
+            "Provide at least one display name, appId or object ID with --app, or use --from-file."
         )
 
     fields = tuple(split_columns(select) or DEFAULT_APPLICATION_SELECT)
@@ -106,7 +114,10 @@ def command(
             if found and with_sp:
                 app.log(f"fetching service principals for {len(found)} app(s)")
                 principals = await asyncio.gather(
-                    *[client.find_service_principal_by_app_id(item["appId"]) for item in found]
+                    *[
+                        client.find_service_principal_by_app_id(item["appId"])
+                        for item in found
+                    ]
                 )
                 for item, principal in zip(found, principals, strict=True):
                     item["servicePrincipal"] = principal
@@ -115,7 +126,9 @@ def command(
 
     found, failed = run(_run())
 
-    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
+    with Renderer(
+        app.output, columns=table_columns, single=len(found) == 1
+    ) as renderer:
         renderer.write_all(found)
 
     for _identifier, reason in failed:
@@ -131,7 +144,9 @@ def command(
 
     summarise(len(found), "app registration", quiet=app.quiet)
     if failed and not ignore_missing:
-        raise NotFoundError(f"{len(failed)} of {len(wanted)} identifier(s) matched nothing.")
+        raise NotFoundError(
+            f"{len(failed)} of {len(wanted)} identifier(s) matched nothing."
+        )
 
 
 def _columns(with_sp: bool, selected: list[str] | None) -> list[str]:

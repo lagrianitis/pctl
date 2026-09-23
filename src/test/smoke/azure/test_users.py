@@ -33,7 +33,9 @@ def test_the_case_help_lists_the_service(azure: Callable[..., Any]) -> None:
     assert "users" in ok(azure("--help")).stdout
 
 
-def test_get_help_documents_all_three_identifier_forms(users: Callable[..., Any]) -> None:
+def test_get_help_documents_all_three_identifier_forms(
+    users: Callable[..., Any]
+) -> None:
     """The whole point is that you pass whatever you happen to know."""
     stdout = ok(users("get", "--help")).stdout
     for form in ("email", "display name", "object ID"):
@@ -55,7 +57,7 @@ def test_get_without_an_identifier_is_a_usage_error(users: Callable[..., Any]) -
 
 
 def test_an_unknown_match_mode_is_rejected(users: Callable[..., Any]) -> None:
-    failed(users("get", "ann@example.com", "--match", "fuzzy"), 2)
+    failed(users("get", "--user", "ann@example.com", "--match", "fuzzy"), 2)
 
 
 def test_the_service_resolves_by_prefix(azure: Callable[..., Any]) -> None:

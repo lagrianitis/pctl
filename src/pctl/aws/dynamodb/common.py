@@ -12,6 +12,20 @@ from typing import Any
 import click
 
 
+def table_option(func: Any) -> Any:
+    """`--table`, shared by every action that addresses a single table.
+
+    Named rather than positional so that a table name can never be confused with the
+    other values these commands take, notably `get --key`.
+    """
+    return click.option(
+        "--table",
+        required=True,
+        metavar="NAME",
+        help="DynamoDB table name.",
+    )(func)
+
+
 def read_options(func: Any) -> Any:
     """Options shared by the read actions (scan and query)."""
     func = click.option(
@@ -31,15 +45,21 @@ def read_options(func: Any) -> Any:
         metavar="EXPR",
         help="ProjectionExpression: fetch only these attributes (less data, faster).",
     )(func)
-    func = click.option("--index", metavar="NAME", help="Query or scan a secondary index.")(func)
-    func = click.option("--filter", "filter_expression", metavar="EXPR", help="FilterExpression.")(
-        func
-    )
-    func = click.option("--consistent", is_flag=True, help="Use a strongly consistent read.")(func)
-    func = click.option("--page-size", type=click.IntRange(1, 1000), help="Items per page.")(func)
-    func = click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N items.")(
-        func
-    )
+    func = click.option(
+        "--index", metavar="NAME", help="Query or scan a secondary index."
+    )(func)
+    func = click.option(
+        "--filter", "filter_expression", metavar="EXPR", help="FilterExpression."
+    )(func)
+    func = click.option(
+        "--consistent", is_flag=True, help="Use a strongly consistent read."
+    )(func)
+    func = click.option(
+        "--page-size", type=click.IntRange(1, 1000), help="Items per page."
+    )(func)
+    func = click.option(
+        "-n", "--limit", type=click.IntRange(min=1), help="Stop after N items."
+    )(func)
     return func
 
 

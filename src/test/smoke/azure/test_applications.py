@@ -43,7 +43,9 @@ def test_the_graph_alias_resolves(azure: Callable[..., Any]) -> None:
     assert "get" in ok(azure("applications", "--help")).stdout
 
 
-def test_the_help_distinguishes_apps_from_service_principals(apps: Callable[..., Any]) -> None:
+def test_the_help_distinguishes_apps_from_service_principals(
+    apps: Callable[..., Any]
+) -> None:
     """These two are the easiest pair in the tool to confuse, so say which is which."""
     assert "service principal" in ok(apps("--help")).stdout.lower()
 
@@ -54,7 +56,9 @@ def test_get_help_explains_the_two_guids(apps: Callable[..., Any]) -> None:
     assert "object ID" in stdout
 
 
-def test_get_help_documents_the_service_principal_join(apps: Callable[..., Any]) -> None:
+def test_get_help_documents_the_service_principal_join(
+    apps: Callable[..., Any]
+) -> None:
     assert "--with-sp" in ok(apps("get", "--help")).stdout
 
 
@@ -67,7 +71,7 @@ def test_get_without_an_identifier_is_a_usage_error(apps: Callable[..., Any]) ->
 
 
 def test_an_unknown_match_mode_is_rejected(apps: Callable[..., Any]) -> None:
-    failed(apps("get", "whatever", "--match", "fuzzy"), 2)
+    failed(apps("get", "--app", "whatever", "--match", "fuzzy"), 2)
 
 
 def test_an_invalid_page_size_is_rejected(apps: Callable[..., Any]) -> None:

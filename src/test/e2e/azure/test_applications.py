@@ -62,7 +62,13 @@ def tenant(graph: Any, seen: list[str]) -> Any:
             return httpx.Response(
                 200,
                 json={
-                    "value": [{"id": SP_OBJECT_ID, "appId": APP_CLIENT_ID, "displayName": SCIM_APP}]
+                    "value": [
+                        {
+                            "id": SP_OBJECT_ID,
+                            "appId": APP_CLIENT_ID,
+                            "displayName": SCIM_APP,
+                        }
+                    ]
                 },
             )
         return httpx.Response(200, json={"value": []})
@@ -80,7 +86,9 @@ def tenant(graph: Any, seen: list[str]) -> Any:
 # ---------------------------------------------------------------------------
 def test_list_streams_registrations(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "apps", "list", "--search", "incident"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "apps", "list", "--search", "incident"]
+        )
     )
 
     assert json.loads(lines(result.stdout)[0])["appId"] == APP_CLIENT_ID
@@ -94,9 +102,15 @@ def test_starts_with_becomes_a_display_name_filter(
     assert filters(seen) == ["startswith(displayName,'Company ')"]
 
 
-def test_the_default_columns_lead_with_the_client_id(runner: Any, cli: Any, tenant: Any) -> None:
+def test_the_default_columns_lead_with_the_client_id(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
     """appId is what you pivot on, so it belongs in the terminal view."""
-    result = ok(runner.invoke(cli, ["-o", "csv", "azure", "apps", "list", "--search", "incident"]))
+    result = ok(
+        runner.invoke(
+            cli, ["-o", "csv", "azure", "apps", "list", "--search", "incident"]
+        )
+    )
 
     assert lines(result.stdout)[0] == "displayName,appId,signInAudience,id"
 
@@ -109,17 +123,27 @@ def test_a_guid_is_tried_as_an_app_id_first(
 ) -> None:
     """The portal shows appId prominently, so it is the likelier thing to be holding."""
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "apps", "get", APP_CLIENT_ID])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "apps", "get", "--app", APP_CLIENT_ID]
+            )
+        ).stdout
     )
 
     assert payload["id"] == APP_OBJECT_ID
     assert filters(seen) == [f"appId eq '{APP_CLIENT_ID}'"]
 
 
-def test_an_object_id_falls_back_to_direct_addressing(runner: Any, cli: Any, tenant: Any) -> None:
+def test_an_object_id_falls_back_to_direct_addressing(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
     """No appId matches an object ID, so the lookup retries /applications/{id}."""
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "apps", "get", APP_OBJECT_ID])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "apps", "get", "--app", APP_OBJECT_ID]
+            )
+        ).stdout
     )
 
     assert payload["appId"] == APP_CLIENT_ID
@@ -128,19 +152,28 @@ def test_an_object_id_falls_back_to_direct_addressing(runner: Any, cli: Any, ten
 def test_a_display_name_uses_an_equality_filter(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "apps", "get", SCIM_APP]))
+    ok(runner.invoke(cli, ["azure", "apps", "get", "--app", SCIM_APP]))
 
     assert filters(seen) == [f"displayName eq '{SCIM_APP}'"]
 
 
-def test_an_ambiguous_display_name_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
-    result = failed(runner.invoke(cli, ["azure", "apps", "get", "Company", "--match", "prefix"]), 2)
+def test_an_ambiguous_display_name_is_refused(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
+    result = failed(
+        runner.invoke(
+            cli, ["azure", "apps", "get", "--app", "Company", "--match", "prefix"]
+        ),
+        2,
+    )
 
     assert "2 application registrations match" in result.output
 
 
 def test_an_unknown_name_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
-    result = failed(runner.invoke(cli, ["azure", "apps", "get", "no-such-app"]), 4)
+    result = failed(
+        runner.invoke(cli, ["azure", "apps", "get", "--app", "no-such-app"]), 4
+    )
 
     assert "no-such-app" in result.output
 
@@ -148,9 +181,16 @@ def test_an_unknown_name_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
 # ---------------------------------------------------------------------------
 # get --with-sp: the appId join
 # ---------------------------------------------------------------------------
-def test_with_sp_attaches_the_service_principal(runner: Any, cli: Any, tenant: Any) -> None:
+def test_with_sp_attaches_the_service_principal(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "apps", "get", SCIM_APP, "--with-sp"])).stdout
+        ok(
+            runner.invoke(
+                cli,
+                ["-o", "json", "azure", "apps", "get", "--app", SCIM_APP, "--with-sp"],
+            )
+        ).stdout
     )
 
     assert payload["servicePrincipalId"] == SP_OBJECT_ID
@@ -160,7 +200,12 @@ def test_with_sp_attaches_the_service_principal(runner: Any, cli: Any, tenant: A
 def test_the_two_objects_have_different_ids(runner: Any, cli: Any, tenant: Any) -> None:
     """The whole point of --with-sp: one appId, two object IDs, easily confused."""
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "apps", "get", SCIM_APP, "--with-sp"])).stdout
+        ok(
+            runner.invoke(
+                cli,
+                ["-o", "json", "azure", "apps", "get", "--app", SCIM_APP, "--with-sp"],
+            )
+        ).stdout
     )
 
     assert payload["id"] != payload["servicePrincipalId"]
@@ -171,7 +216,7 @@ def test_the_service_principal_is_looked_up_by_app_id(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
     """Never by object ID: the two differ, and that mistake returns nothing."""
-    ok(runner.invoke(cli, ["azure", "apps", "get", SCIM_APP, "--with-sp"]))
+    ok(runner.invoke(cli, ["azure", "apps", "get", "--app", SCIM_APP, "--with-sp"]))
 
     assert f"appId eq '{APP_CLIENT_ID}'" in filters(seen)
     assert f"appId eq '{APP_OBJECT_ID}'" not in filters(seen)
@@ -182,7 +227,10 @@ def test_a_registration_without_a_service_principal_is_reported(
 ) -> None:
     """Registered but not instantiated here, which is a real and confusing state."""
     result = ok(
-        runner.invoke(cli, ["azure", "apps", "get", "Company Registered Only", "--with-sp"])
+        runner.invoke(
+            cli,
+            ["azure", "apps", "get", "--app", "Company Registered Only", "--with-sp"],
+        )
     )
 
     assert "no service principal in this tenant" in result.stderr
@@ -191,7 +239,7 @@ def test_a_registration_without_a_service_principal_is_reported(
 def test_without_the_flag_no_service_principal_call_is_made(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "apps", "get", SCIM_APP]))
+    ok(runner.invoke(cli, ["azure", "apps", "get", "--app", SCIM_APP]))
 
     assert not any("servicePrincipals" in url for url in seen)
 
@@ -199,17 +247,9 @@ def test_without_the_flag_no_service_principal_call_is_made(
 # ---------------------------------------------------------------------------
 # batches
 # ---------------------------------------------------------------------------
-def test_several_identifiers_resolve_concurrently(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(
-        runner.invoke(
-            cli, ["-o", "ndjson", "azure", "apps", "get", APP_CLIENT_ID, ORPHAN_CLIENT_ID]
-        )
-    )
-
-    assert len(lines(result.stdout)) == 2
-
-
-def test_ignore_missing_tolerates_an_unknown_identifier(runner: Any, cli: Any, tenant: Any) -> None:
+def test_several_identifiers_resolve_concurrently(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -219,7 +259,32 @@ def test_ignore_missing_tolerates_an_unknown_identifier(runner: Any, cli: Any, t
                 "azure",
                 "apps",
                 "get",
+                "--app",
                 APP_CLIENT_ID,
+                "--app",
+                ORPHAN_CLIENT_ID,
+            ],
+        )
+    )
+
+    assert len(lines(result.stdout)) == 2
+
+
+def test_ignore_missing_tolerates_an_unknown_identifier(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "apps",
+                "get",
+                "--app",
+                APP_CLIENT_ID,
+                "--app",
                 "no-such-app",
                 "--ignore-missing",
             ],

@@ -10,11 +10,11 @@ from ...config import AppContext
 from ...options import aws_options, columns_option, output_options
 from ...output import Renderer, summarise
 from .client import MAX_SEGMENTS
-from .common import read_options
+from .common import read_options, table_option
 
 
 @click.command(name="scan")
-@click.argument("table")
+@table_option
 @aws_options
 @read_options
 @click.option(
@@ -46,9 +46,9 @@ def command(
     threads with --segments.
 
     \b
-      pctl aws ddb scan my-table -n 20
-      pctl aws ddb scan my-table --segments 8 -o ndjson > items.ndjson
-      pctl aws ddb scan my-table --filter "#s = :s" \\
+      pctl aws ddb scan --table my-table -n 20
+      pctl aws ddb scan --table my-table --segments 8 -o ndjson > items.ndjson
+      pctl aws ddb scan --table my-table --filter "#s = :s" \\
           --names '{"#s":"status"}' --values '{":s":"ACTIVE"}'
     """
     from .client import ScanRequest, make_client, scan, serialize_values
@@ -65,7 +65,9 @@ def command(
         index=index,
         projection=projection,
         filter_expression=filter_expression,
-        expression_values=serialize_values(parse_json_option(expression_values, "--values")),
+        expression_values=serialize_values(
+            parse_json_option(expression_values, "--values")
+        ),
         expression_names=parse_json_option(expression_names, "--names"),
         consistent=consistent,
         page_size=page_size,

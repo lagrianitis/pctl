@@ -22,7 +22,13 @@ from .common import match_option
 
 
 @click.command(name="get")
-@click.argument("names", nargs=-1)
+@click.option(
+    "--name",
+    "names",
+    multiple=True,
+    metavar="NAME",
+    help="Service principal display name. Repeat for several.",
+)
 @azure_options
 @click.option(
     "-f",
@@ -46,7 +52,9 @@ from .common import match_option
     type=click.IntRange(min=1),
     help="Cap the number of assignments fetched per service principal.",
 )
-@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
+@click.option(
+    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
+)
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -73,10 +81,10 @@ def command(
     substrings.
 
     \b
-      pctl azure sp get "Company Incident.io SCIM"
-      pctl azure sp get "incident.io" -o json
-      pctl azure sp get "Company Incident.io SCIM" --assignments -o ndjson
-      pctl azure sp get "Company Incident.io SCIM" --roles -o json
+      pctl azure sp get --name "Company Incident.io SCIM"
+      pctl azure sp get --name "incident.io" -o json
+      pctl azure sp get --name "Company Incident.io SCIM" --assignments -o ndjson
+      pctl azure sp get --name "Company Incident.io SCIM" --roles -o json
       pctl azure sp get -f apps.txt --match exact
     """
     from ..graph import DEFAULT_SERVICE_PRINCIPAL_SELECT, run
@@ -85,7 +93,7 @@ def command(
     wanted = read_names(names, from_file)
     if not wanted:
         raise click.UsageError(
-            "Provide at least one service principal display name, or use --from-file."
+            "Provide at least one service principal display name with --name, or use --from-file."
         )
 
     fields = split_columns(select) or [*DEFAULT_SERVICE_PRINCIPAL_SELECT]
@@ -135,11 +143,15 @@ def command(
 
     found, missing = run(_run())
 
-    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
+    with Renderer(
+        app.output, columns=table_columns, single=len(found) == 1
+    ) as renderer:
         renderer.write_all(found)
 
     for name in missing:
-        click.secho(f"No service principal matched display name: {name}", err=True, fg="yellow")
+        click.secho(
+            f"No service principal matched display name: {name}", err=True, fg="yellow"
+        )
     summarise(len(found), "service principal", quiet=app.quiet)
     if missing and not ignore_missing:
         raise NotFoundError(

@@ -33,7 +33,9 @@ def _sp(name: str = SCIM_APP, sp_id: str = SP_ID) -> dict[str, Any]:
     }
 
 
-def _assignment(principal: str, *, role: str = ROLE_ID, kind: str = "Group") -> dict[str, Any]:
+def _assignment(
+    principal: str, *, role: str = ROLE_ID, kind: str = "Group"
+) -> dict[str, Any]:
     return {
         "id": f"assignment-{principal}",
         "principalDisplayName": principal,
@@ -67,7 +69,9 @@ def scim_app(graph: Any, seen: list[str]) -> Any:
     graph.get(f"{GRAPH}/servicePrincipals/{SP_ID}").mock(
         return_value=httpx.Response(
             200,
-            json={"appRoles": [{"id": ROLE_ID, "displayName": "User", "value": "User"}]},
+            json={
+                "appRoles": [{"id": ROLE_ID, "displayName": "User", "value": "User"}]
+            },
         )
     )
 
@@ -89,7 +93,11 @@ def test_search_sends_the_advanced_query_parameters(
     runner: Any, cli: Any, scim_app: Any, seen: list[str]
 ) -> None:
     """This is the request shape the feature was specified against."""
-    ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "list", "--search", "incident.io"]))
+    ok(
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "list", "--search", "incident.io"]
+        )
+    )
 
     url = unquote_plus(seen[-1])
     assert '$search="displayName:incident.io"' in url
@@ -105,7 +113,11 @@ def test_app_id_becomes_an_equality_filter(
 
 
 def test_list_streams_service_principals(runner: Any, cli: Any, scim_app: Any) -> None:
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "list", "--search", "incident"]))
+    result = ok(
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "list", "--search", "incident"]
+        )
+    )
 
     assert json.loads(lines(result.stdout)[0])["displayName"] == SCIM_APP
 
@@ -118,7 +130,11 @@ def test_get_resolves_a_long_display_name_by_substring(
 ) -> None:
     """The default match mode is search, so a fragment is enough."""
     payload = json.loads(
-        ok(runner.invoke(cli, ["-o", "json", "azure", "sp", "get", "incident"])).stdout
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "sp", "get", "--name", "incident"]
+            )
+        ).stdout
     )
 
     assert payload["displayName"] == SCIM_APP
@@ -128,7 +144,19 @@ def test_get_resolves_a_long_display_name_by_substring(
 def test_get_can_attach_the_assignments(runner: Any, cli: Any, scim_app: Any) -> None:
     payload = json.loads(
         ok(
-            runner.invoke(cli, ["-o", "json", "azure", "sp", "get", "incident", "--assignments"])
+            runner.invoke(
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "sp",
+                    "get",
+                    "--name",
+                    "incident",
+                    "--assignments",
+                ],
+            )
         ).stdout
     )
 
@@ -137,23 +165,37 @@ def test_get_can_attach_the_assignments(runner: Any, cli: Any, scim_app: Any) ->
     assert "AWS Platform Admins" in names
 
 
-def test_an_unmatched_display_name_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
-    result = failed(runner.invoke(cli, ["azure", "sp", "get", "no-such-app"]), 4)
+def test_an_unmatched_display_name_exits_4(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
+    result = failed(
+        runner.invoke(cli, ["azure", "sp", "get", "--name", "no-such-app"]), 4
+    )
 
     assert "no-such-app" in result.output
 
 
-def test_ignore_missing_downgrades_a_miss_to_success(runner: Any, cli: Any, scim_app: Any) -> None:
-    ok(runner.invoke(cli, ["azure", "sp", "get", "no-such-app", "--ignore-missing"]))
+def test_ignore_missing_downgrades_a_miss_to_success(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
+    ok(
+        runner.invoke(
+            cli, ["azure", "sp", "get", "--name", "no-such-app", "--ignore-missing"]
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # assignments
 # ---------------------------------------------------------------------------
-def test_assignments_defaults_to_who_has_access(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_assignments_defaults_to_who_has_access(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """appRoleAssignedTo, not appRoleAssignments: the question users actually ask."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"]
+        )
     )
 
     names = [json.loads(line)["principalDisplayName"] for line in lines(result.stdout)]
@@ -163,7 +205,17 @@ def test_assignments_defaults_to_who_has_access(runner: Any, cli: Any, scim_app:
 def test_outbound_inverts_the_direction(runner: Any, cli: Any, scim_app: Any) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident", "--outbound"]
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "sp",
+                "assignments",
+                "--app",
+                "incident",
+                "--outbound",
+            ],
         )
     )
 
@@ -171,38 +223,59 @@ def test_outbound_inverts_the_direction(runner: Any, cli: Any, scim_app: Any) ->
     assert [row["principalType"] for row in rows] == ["ServicePrincipal"]
 
 
-def test_the_role_guid_is_resolved_to_a_name(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_the_role_guid_is_resolved_to_a_name(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """An assignment carries appRoleId, which is unreadable without the app's roles."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"]
+        )
     )
 
     rows = [json.loads(line) for line in lines(result.stdout)]
     assert rows[0]["appRoleName"] == "User"
 
 
-def test_the_all_zero_guid_becomes_default_access(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_the_all_zero_guid_becomes_default_access(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """Graph's stand-in for an app that exposes no roles of its own."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"]
+        )
     )
 
     rows = [json.loads(line) for line in lines(result.stdout)]
     assert rows[1]["appRoleName"] == "Default Access"
 
 
-def test_no_role_names_skips_the_extra_request(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_no_role_names_skips_the_extra_request(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
-            ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident", "--no-role-names"],
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "sp",
+                "assignments",
+                "--app",
+                "incident",
+                "--no-role-names",
+            ],
         )
     )
 
     assert "appRoleName" not in json.loads(lines(result.stdout)[0])
 
 
-def test_principal_filters_to_one_assignment(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_principal_filters_to_one_assignment(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -225,7 +298,9 @@ def test_principal_filters_to_one_assignment(runner: Any, cli: Any, scim_app: An
     assert json.loads(rows[0])["principalDisplayName"] == "AWS Platform Admins"
 
 
-def test_principal_matching_is_case_insensitive(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_principal_matching_is_case_insensitive(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -246,7 +321,9 @@ def test_principal_matching_is_case_insensitive(runner: Any, cli: Any, scim_app:
     assert len(lines(result.stdout)) == 1
 
 
-def test_principal_match_prefix_returns_every_match(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_principal_match_prefix_returns_every_match(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """A prefix is for exploring: "who from the AWS estate has access to this app"."""
     result = ok(
         runner.invoke(
@@ -296,7 +373,9 @@ def test_principal_match_contains_finds_a_mid_string_match(
     assert len(lines(result.stdout)) == 1
 
 
-def test_a_prefix_that_matches_nothing_still_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_a_prefix_that_matches_nothing_still_exits_4(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     result = failed(
         runner.invoke(
             cli,
@@ -318,20 +397,35 @@ def test_a_prefix_that_matches_nothing_still_exits_4(runner: Any, cli: Any, scim
     assert "prefix" in result.output
 
 
-def test_no_principal_returns_every_assignment(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_no_principal_returns_every_assignment(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """The default: no filter, so both assignments come back."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "sp", "assignments", "--app", "incident"]
+        )
     )
 
     assert len(lines(result.stdout)) == 2
 
 
-def test_a_principal_with_no_assignment_exits_4(runner: Any, cli: Any, scim_app: Any) -> None:
+def test_a_principal_with_no_assignment_exits_4(
+    runner: Any, cli: Any, scim_app: Any
+) -> None:
     """Scriptable: absence of an expected assignment is a failure, not an empty list."""
     result = failed(
         runner.invoke(
-            cli, ["azure", "sp", "assignments", "--app", "incident", "--principal", "Nobody"]
+            cli,
+            [
+                "azure",
+                "sp",
+                "assignments",
+                "--app",
+                "incident",
+                "--principal",
+                "Nobody",
+            ],
         ),
         4,
     )

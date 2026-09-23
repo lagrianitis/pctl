@@ -32,7 +32,16 @@ def test_a_query_parameter_reaches_graph_unchanged(
     result = ok(
         runner.invoke(
             cli,
-            ["-o", "ndjson", "azure", "raw", "users", "--param", "$select=id,displayName"],
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "raw",
+                "--path",
+                "users",
+                "--param",
+                "$select=id,displayName",
+            ],
         )
     )
 
@@ -42,4 +51,6 @@ def test_a_query_parameter_reaches_graph_unchanged(
 
 def test_a_malformed_param_is_a_usage_error(runner: Any, cli: Any, graph: Any) -> None:
     """`--param` without an `=` cannot become a query parameter, so reject it early."""
-    failed(runner.invoke(cli, ["azure", "raw", "users", "--param", "broken"]), 2)
+    failed(
+        runner.invoke(cli, ["azure", "raw", "--path", "users", "--param", "broken"]), 2
+    )

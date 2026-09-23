@@ -23,7 +23,13 @@ from .common import DEFAULT_LIST_COLUMNS, match_option
 
 
 @click.command(name="get")
-@click.argument("identifiers", nargs=-1)
+@click.option(
+    "--user",
+    "identifiers",
+    multiple=True,
+    metavar="EMAIL|NAME|ID",
+    help="Email address, display name or object ID. Repeat for several.",
+)
 @azure_options
 @click.option(
     "-f",
@@ -32,7 +38,9 @@ from .common import DEFAULT_LIST_COLUMNS, match_option
     help="Read identifiers from a file, one per line ('-' for stdin).",
 )
 @match_option
-@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
+@click.option(
+    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
+)
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -56,16 +64,16 @@ def command(
     uses --match, and an ambiguous name is refused rather than guessed, because two people
     can share one.
 
-    Several identifiers are resolved concurrently, and one that matches nothing does not
-    block the others.
+    Repeat --user for several people. They are resolved concurrently, and one that matches
+    nothing does not block the others.
 
     \b
-      pctl azure users get ann@company.com
-      pctl azure users get "Ann Example" -o json
-      pctl azure users get e6901838-637f-4bc7-b843-a8a7725a4872
-      pctl azure users get ann@company.com bob@company.com -o ndjson
+      pctl azure users get --user ann@company.com
+      pctl azure users get --user "Ann Example" -o json
+      pctl azure users get --user e6901838-637f-4bc7-b843-a8a7725a4872
+      pctl azure users get --user ann@company.com --user bob@company.com -o ndjson
       pctl azure users get -f people.txt --ignore-missing
-      pctl azure users get "Ann" --match prefix
+      pctl azure users get --user "Ann" --match prefix
     """
     from ..graph import DEFAULT_USER_SELECT, run
 
@@ -73,7 +81,8 @@ def command(
     wanted = read_names(identifiers, from_file)
     if not wanted:
         raise click.UsageError(
-            "Provide at least one email address, display name or object ID, or use --from-file."
+            "Provide at least one email address, display name or object ID with --user, "
+            "or use --from-file."
         )
 
     fields = tuple(split_columns(select) or DEFAULT_USER_SELECT)
@@ -85,7 +94,9 @@ def command(
 
             async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
                 try:
-                    found = await find_user(client, identifier, select=fields, mode=match_mode)
+                    found = await find_user(
+                        client, identifier, select=fields, mode=match_mode
+                    )
                 except (NotFoundError, ConfigError) as exc:
                     return identifier, str(exc)
                 found["_query"] = identifier
@@ -99,7 +110,9 @@ def command(
 
     found, failed = run(_run())
 
-    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
+    with Renderer(
+        app.output, columns=table_columns, single=len(found) == 1
+    ) as renderer:
         renderer.write_all(found)
 
     for _identifier, reason in failed:
@@ -108,4 +121,6 @@ def command(
 
     summarise(len(found), "user", quiet=app.quiet)
     if failed and not ignore_missing:
-        raise NotFoundError(f"{len(failed)} of {len(wanted)} identifier(s) matched nothing.")
+        raise NotFoundError(
+            f"{len(failed)} of {len(wanted)} identifier(s) matched nothing."
+        )
