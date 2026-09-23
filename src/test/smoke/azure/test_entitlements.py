@@ -223,12 +223,13 @@ def test_delete_package_help_documents_the_confirmation(eam: Callable[..., Any])
     assert "--force" in stdout
 
 
-def test_delete_package_offers_no_match_option(eam: Callable[..., Any]) -> None:
-    """A pattern must not be able to choose what gets deleted."""
-    assert "--match" not in ok(eam("delete-package", "--help")).stdout
-
-
 def test_delete_package_rejects_a_match_option(eam: Callable[..., Any]) -> None:
+    """A pattern must not be able to choose what gets deleted.
+
+    Asserted by rejecting the option rather than by checking it is absent from the help
+    text, which it is not: the docstring explains at length that there is deliberately no
+    --match here, so the string appears in the prose.
+    """
     failed(eam("delete-package", "--access-package", "a", "--match", "contains"), 2)
 
 

@@ -94,12 +94,24 @@ def owned_app(graph: Any, seen: list[str]) -> Any:
         return httpx.Response(200, json={"value": []})
 
     graph.get(f"{GRAPH}/users").mock(side_effect=users)
-    graph.get(f"{GRAPH}/servicePrincipals").mock(
-        return_value=httpx.Response(
-            200,
-            json={"value": [{"id": SP_ID, "displayName": SCIM_APP, "appId": "app-1"}]},
-        )
-    )
+
+    def principals(request: httpx.Request) -> httpx.Response:
+        """Only answer for the app under test.
+
+        This used to return the application for every query, which made owner resolution
+        succeed for any name: `resolve_owner` tries users and then service principals, so
+        "Nobody" came back as the application itself. The tests asserting that an
+        unresolvable owner exits 4 without writing could not pass until this route said no.
+        """
+        url = unquote_plus(str(request.url))
+        if "incident" in url.casefold() or SCIM_APP in url:
+            return httpx.Response(
+                200,
+                json={"value": [{"id": SP_ID, "displayName": SCIM_APP, "appId": "app-1"}]},
+            )
+        return httpx.Response(200, json={"value": []})
+
+    graph.get(f"{GRAPH}/servicePrincipals").mock(side_effect=principals)
     return graph
 
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import unquote_plus
 
 import pytest
 
@@ -83,37 +84,30 @@ def provisioning(graph: Any) -> Any:
             },
         )
     )
-    graph.get(f"{GRAPH}/groups", name="groups").mock(
-        side_effect=lambda request: httpx.Response(
-            200,
-            json={
-                "value": (
-                    [{"id": GROUP_ID, "displayName": "AWS Platform Admins"}]
-                    if "AWS Platform Admins" in str(request.url)
-                    else []
-                )
-            },
-        )
-    )
-    graph.get(f"{GRAPH}/users", name="users").mock(
-        side_effect=lambda request: httpx.Response(
-            200,
-            json={
-                "value": (
-                    [
-                        {
-                            "id": ANN_ID,
-                            "displayName": "Ann Example",
-                            "userPrincipalName": "ann@example.com",
-                            "mail": "ann@example.com",
-                        }
-                    ]
-                    if "ann@example.com" in str(request.url)
-                    else []
-                )
-            },
-        )
-    )
+
+    # Both of these decode the URL before matching. httpx percent-encodes the filter, so
+    # `ann@example.com` arrives as `ann%40example.com` and the spaces in a display name
+    # arrive as `+`. Matching the raw URL silently found nothing, which made every
+    # provisioning test fail on an unresolvable subject rather than on what it was testing.
+    def groups(request: httpx.Request) -> httpx.Response:
+        url = unquote_plus(str(request.url))
+        found = [{"id": GROUP_ID, "displayName": "AWS Platform Admins"}]
+        return httpx.Response(200, json={"value": found if "AWS Platform Admins" in url else []})
+
+    def users(request: httpx.Request) -> httpx.Response:
+        url = unquote_plus(str(request.url))
+        found = [
+            {
+                "id": ANN_ID,
+                "displayName": "Ann Example",
+                "userPrincipalName": "ann@example.com",
+                "mail": "ann@example.com",
+            }
+        ]
+        return httpx.Response(200, json={"value": found if "ann@example.com" in url else []})
+
+    graph.get(f"{GRAPH}/groups", name="groups").mock(side_effect=groups)
+    graph.get(f"{GRAPH}/users", name="users").mock(side_effect=users)
     return graph
 
 

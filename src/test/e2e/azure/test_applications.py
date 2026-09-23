@@ -45,19 +45,22 @@ def tenant(graph: Any, seen: list[str]) -> Any:
 
     def applications(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
-        url = unquote_plus(str(request.url))
-        if APP_CLIENT_ID in url or "Incident" in url or SCIM_APP in url:
+        # Case-folded, because `$search` is case-insensitive at Graph and the tests use
+        # lowercase terms like "incident" against a display name that capitalises it.
+        # Matching case-sensitively made a search for "incident" return nothing.
+        url = unquote_plus(str(request.url)).casefold()
+        if APP_CLIENT_ID in url or "incident" in url or SCIM_APP.casefold() in url:
             return httpx.Response(200, json={"value": [APP]})
-        if ORPHAN_CLIENT_ID in url or "Registered Only" in url:
+        if ORPHAN_CLIENT_ID in url or "registered only" in url:
             return httpx.Response(200, json={"value": [ORPHAN]})
-        if "Company" in url:
+        if "company" in url:
             # A prefix that matches both, so ambiguity is reachable.
             return httpx.Response(200, json={"value": [APP, ORPHAN]})
         return httpx.Response(200, json={"value": []})
 
     def principals(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
-        url = unquote_plus(str(request.url))
+        url = unquote_plus(str(request.url)).casefold()
         if APP_CLIENT_ID in url:
             return httpx.Response(
                 200,

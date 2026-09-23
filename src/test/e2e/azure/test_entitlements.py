@@ -48,21 +48,35 @@ def governance(graph: Any, seen: list[str]) -> Any:
     """Routes for the access package and catalog collections."""
     import httpx
 
+    def matching(items: list[dict[str, Any]], url: str) -> list[dict[str, Any]] | None:
+        """Items an exact `displayName eq` filter selects, or None when unfiltered.
+
+        A filtered query that matches nothing must return nothing. Answering it with the
+        whole collection — which this fixture used to do — makes an unknown name look
+        found, so the tests asserting exit 4 on a miss passed for the wrong reason and
+        then failed once they actually ran.
+        """
+        if "$filter=" not in url:
+            return None
+        return [item for item in items if f"displayName eq '{item['displayName']}'" in url]
+
     def packages(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
         url = unquote_plus(str(request.url))
-        if "displayName eq 'AWS Platform Access'" in url:
-            return httpx.Response(200, json={"value": [PACKAGES[0]]})
-        if "startswith(displayName,'AWS " in url:
+        matched = matching(PACKAGES, url)
+        if matched is None:
+            # Unfiltered: `list-packages`, and every `--match contains`, which has to fetch
+            # the collection because Graph has no substring operator here.
+            return httpx.Response(200, json={"value": PACKAGES})
+        if not matched and "startswith(displayName,'AWS " in url:
             return httpx.Response(200, json={"value": PACKAGES[:2]})
-        return httpx.Response(200, json={"value": PACKAGES})
+        return httpx.Response(200, json={"value": matched})
 
     def catalogs(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
         url = unquote_plus(str(request.url))
-        if "displayName eq 'AWS Platform'" in url:
-            return httpx.Response(200, json={"value": [CATALOGS[0]]})
-        return httpx.Response(200, json={"value": CATALOGS})
+        matched = matching(CATALOGS, url)
+        return httpx.Response(200, json={"value": CATALOGS if matched is None else matched})
 
     graph.get(f"{EAM}/accessPackages/{PACKAGE_ID}").mock(
         return_value=httpx.Response(200, json=PACKAGES[0])
