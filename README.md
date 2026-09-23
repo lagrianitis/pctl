@@ -214,9 +214,45 @@ against `userPrincipalName` and `mail`. These two commands need
 
 **Assignments are not written directly.** Both commands create an
 [accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
-which Graph then processes, so they are **asynchronous**: the command returns a
-`requestId` and the state at submission, not finished access. Confirm with
-`list-assignments` afterwards.
+which Graph then processes, so they are **asynchronous**. Without `--wait` the command
+returns a `requestId` and the state at submission — which is *not* access yet, and exit 0
+does not mean the change is live.
+
+##### Knowing whether it actually applied
+
+`--wait` polls each request until it settles and exits 5 if any did not reach `delivered`:
+
+```bash
+pctl azure eam add-assignment    "$PKG" ann@company.com --wait
+pctl azure eam remove-assignment "$PKG" ann@company.com --wait --wait-timeout 300
+```
+
+Or check a request submitted earlier, which is what the `requestId` is for:
+
+```bash
+pctl azure eam get-request 4c2a1f7e-… --wait
+```
+
+The raw state is classified into an `outcome`, and the mapping is deliberately cautious:
+
+| outcome | states | exit |
+| --- | --- | --- |
+| `done` | `delivered` — the only state that means access exists | 0 |
+| `failed` | `denied`, `canceled`, `deliveryFailed` | 5 |
+| `partial` | `partiallyDelivered` — [reprocess rather than resubmit](https://learn.microsoft.com/en-us/graph/api/accessPackageAssignmentRequest-reprocess) | 5 |
+| `pending` | `submitted`, `pendingApproval`, `delivering`, **and anything unrecognised** | 5 on `--wait`, 0 on `get-request` |
+
+An unknown state counts as pending rather than done, so a future state value can never be
+mistaken for success. A request can sit in `delivering` indefinitely when provisioning is
+stuck, which is why `--wait` is bounded by `--wait-timeout` (120s default) and reports a
+still-pending request rather than hanging or claiming success.
+
+`get-request` exits 0 for a pending request, since "not yet" is a legitimate answer to a
+status query; `--fail-on-pending` makes it exit 5 instead.
+
+Note that a policy requiring approval means `pendingApproval` is the *expected* resting
+state, and no amount of waiting will change it until someone approves. In that case
+`--wait` will time out correctly rather than incorrectly.
 
 **`add-assignment` needs a policy**, because an `adminAdd` must say which rules govern the
 assignment. If the package has exactly one policy it is used without asking; if it has
