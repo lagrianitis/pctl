@@ -13,7 +13,7 @@ from ...output import Renderer
 from .. import graph_client
 from .common import request_outcome, wait_for_request
 
-COLUMNS = ["id", "requestType", "state", "outcome", "targetDisplayName", "accessPackageName"]
+COLUMNS = ["id", "requestType", "state", "outcome", "requestorName", "accessPackageName"]
 
 
 @click.command(name="get-request")
@@ -92,13 +92,18 @@ def command(
 
 
 def _shape(request: dict[str, Any]) -> dict[str, Any]:
-    """Lift the expanded names up and add the outcome classification."""
-    target = request.get("target") or {}
+    """Lift the expanded names up and add the outcome classification.
+
+    The person comes from `requestor`, which on a direct assignment is who was assigned
+    rather than who asked. A request has no `target`; that is on the assignment it
+    produces, and expanding it is what Graph rejects with 400.
+    """
+    requestor = request.get("requestor") or {}
     package = request.get("accessPackage") or {}
     state = request.get("state") or request.get("requestState")
     request["outcome"] = request_outcome(state)
     request["state"] = state
-    request["targetDisplayName"] = target.get("displayName") or target.get("email")
+    request["requestorName"] = requestor.get("displayName") or requestor.get("email")
     request["accessPackageName"] = package.get("displayName")
     return request
 

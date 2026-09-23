@@ -1297,7 +1297,7 @@ def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable
                 "id": "req-1",
                 "state": "delivered",
                 "requestType": "adminAdd",
-                "target": {"displayName": "Dave Example"},
+                "requestor": {"displayName": "Dave Example"},
                 "accessPackage": {"displayName": "AWS Platform Access"},
             },
         )
@@ -1313,7 +1313,33 @@ def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable
     )
 
     assert payload["outcome"] == "done"
-    assert payload["targetDisplayName"] == "Dave Example"
+    assert payload["requestorName"] == "Dave Example"
+
+
+def test_a_request_is_expanded_on_relationships_it_actually_has(
+    runner: Any, cli: Any, writable: Any, seen: list[str]
+) -> None:
+    """Graph rejects the whole request with 400 for an expand the type does not support.
+
+    An accessPackageAssignmentRequest relates to accessPackage, assignment and requestor.
+    It has no `target` - that is on the assignment it produces - and asking for it broke
+    both `get-request` and every `--wait` against a real tenant. The fakes answered
+    regardless of the query string, so nothing caught it until someone ran it.
+    """
+    import httpx
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"id": "req-1", "state": "delivered"})
+
+    writable.get(f"{EAM}/assignmentRequests/req-1").mock(side_effect=record)
+
+    ok(runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]))
+
+    expands = [unquote_plus(url) for url in seen if "assignmentRequests/req-1" in url]
+    assert expands, "the request was never fetched"
+    assert "$expand=accessPackage,requestor" in expands[-1]
+    assert "target" not in expands[-1]
 
 
 def test_get_request_exits_5_for_a_failed_request(runner: Any, cli: Any, writable: Any) -> None:

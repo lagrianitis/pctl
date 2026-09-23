@@ -63,6 +63,12 @@ DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
 # $count=true that _list_params adds would make Graph reject the request.
 EAM_BASE = "identityGovernance/entitlementManagement"
 
+# An accessPackageAssignmentRequest relates to accessPackage, assignment and requestor.
+# It has no `target` - that is on the accessPackageAssignment a request produces - and
+# expanding a property the type does not have makes Graph reject the whole request with
+# 400 rather than ignore it. Named once so the two callers cannot drift.
+ASSIGNMENT_REQUEST_EXPAND = "accessPackage,requestor"
+
 DEFAULT_ACCESS_PACKAGE_SELECT: tuple[str, ...] = (
     "id",
     "displayName",
@@ -721,10 +727,17 @@ class GraphClient:
         await self.request("DELETE", f"{EAM_BASE}/accessPackages/{package_id}")
 
     async def get_assignment_request(self, request_id: str) -> dict[str, Any]:
-        """One accessPackageAssignmentRequest, for polling a write to completion."""
+        """One accessPackageAssignmentRequest, for polling a write to completion.
+
+        Expands `requestor`, not `target`. A request has no `target`: its relationships are
+        `accessPackage`, `assignment` and `requestor`, and `target` belongs to the
+        accessPackageAssignment the request produces. Asking for it makes Graph reject the
+        whole request with 400 "Could not find a property named 'target'", which took out
+        both `eam get-request` and every `--wait`.
+        """
         return await self.get_json(
             f"{EAM_BASE}/assignmentRequests/{request_id}",
-            params={"$expand": "accessPackage,target"},
+            params={"$expand": ASSIGNMENT_REQUEST_EXPAND},
         )
 
     def list_assignment_requests(
@@ -738,7 +751,7 @@ class GraphClient:
         return self.list_governance(
             "assignmentRequests",
             filter_expr=filter_expr,
-            expand=("accessPackage", "target"),
+            expand=tuple(ASSIGNMENT_REQUEST_EXPAND.split(",")),
             limit=limit,
             page_size=page_size,
         )
