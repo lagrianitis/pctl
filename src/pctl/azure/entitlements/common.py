@@ -229,3 +229,83 @@ def build_filter(filter_expr: str | None, name: str | None, starts_with: str | N
     if starts_with:
         return f"startswith(displayName,'{escape_odata(starts_with)}')"
     return None
+
+
+# An assignment in one of these states is live or becoming live, so it blocks a fresh
+# add. Expired and DeliveryFailed deliberately do not: neither is access.
+ACTIVE_ASSIGNMENT_STATES = ("Delivered", "Delivering", "PartiallyDelivered")
+
+
+def target_options(func: Any) -> Any:
+    """The shared way to name one or more people for an assignment write."""
+    func = click.option(
+        "--ignore-missing",
+        is_flag=True,
+        help="Exit 0 even when a person could not be resolved.",
+    )(func)
+    func = click.option(
+        "--emails",
+        metavar="A@B,C@D",
+        help="Comma-separated addresses, added to any given positionally.",
+    )(func)
+    return func
+
+
+def collect_targets(targets: tuple[str, ...], emails: str | None) -> list[str]:
+    """Combine positional identifiers with a comma-separated `--emails` value.
+
+    Order is preserved and duplicates dropped, so naming someone twice costs one lookup
+    and cannot produce two contradictory result rows.
+    """
+    collected = [item.strip() for item in targets if item.strip()]
+    if emails:
+        collected.extend(part.strip() for part in emails.split(",") if part.strip())
+    seen: dict[str, None] = {}
+    for candidate in collected:
+        seen.setdefault(candidate, None)
+    return list(seen)
+
+
+async def resolve_policy_id(client: GraphClient, package_id: str, policy: str | None) -> str:
+    """Choose the assignment policy an adminAdd request will name.
+
+    An adminAdd must reference a policy, and a package can have several with different
+    approval and expiry rules. So: an explicit `policy` wins; exactly one policy is used
+    without asking; more than one is refused with the names listed, because picking
+    arbitrarily would silently grant access under the wrong rules.
+    """
+    policies = [item async for item in client.list_assignment_policies(package_id)]
+    if policy:
+        if looks_like_object_id(policy):
+            return policy.strip()
+        wanted = policy.casefold()
+        named = [item for item in policies if (item.get("displayName") or "").casefold() == wanted]
+        if not named:
+            available = ", ".join(str(item.get("displayName")) for item in policies) or "none"
+            raise NotFoundError(
+                f"No assignment policy named '{policy}' on this package. Available: {available}"
+            )
+        return str(named[0]["id"])
+
+    if not policies:
+        raise ConfigError(
+            "This access package has no assignment policy, so an assignment cannot be "
+            "created. Add a policy that allows direct assignment first."
+        )
+    if len(policies) > 1:
+        available = ", ".join(str(item.get("displayName")) for item in policies)
+        raise ConfigError(
+            f"This access package has {len(policies)} assignment policies ({available}). "
+            "Pass --policy to say which one should govern the assignment."
+        )
+    return str(policies[0]["id"])
+
+
+def assignment_request(*, request_type: str, **assignment: str) -> dict[str, Any]:
+    """Body for an accessPackageAssignmentRequest.
+
+    The v1.0 property is `assignment`; beta called it `accessPackageAssignment`, and the
+    request types are lower-camel here where beta capitalised them. A body copied from a
+    beta example fails against v1.0, which is worth encoding once rather than rediscovering.
+    """
+    return {"requestType": request_type, "assignment": assignment}

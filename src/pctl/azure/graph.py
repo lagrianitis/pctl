@@ -693,6 +693,65 @@ class GraphClient:
             )
         ]
 
+    async def create_assignment_request(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Create an accessPackageAssignmentRequest.
+
+        Assignments are not written directly: adding and removing access both go through
+        a request that Graph then processes, so the response describes a request in flight
+        rather than a finished assignment. Its `state` moves through `submitted` and
+        `delivering` to `delivered` after this call returns.
+
+        The v1.0 shape is `requestType: adminAdd | adminRemove` with an `assignment`
+        object. Beta used `AdminAdd` and `accessPackageAssignment`, so a body copied from
+        a beta example will be rejected here.
+        """
+        response = await self.request("POST", f"{EAM_BASE}/assignmentRequests", json=body)
+        return response.json() if response.content else {}
+
+    async def find_assignment(
+        self, package_id: str, target_id: str, *, states: Sequence[str] | None = None
+    ) -> dict[str, Any] | None:
+        """The existing assignment of one access package to one principal, if any.
+
+        Used to make the writes idempotent: adding an assignment someone already has, or
+        removing one they do not, should be reported rather than sent.
+
+        `states` narrows to assignments worth acting on. An Expired assignment is not
+        access, so it should not stop a fresh add.
+        """
+        literal_package = escape_odata(package_id)
+        literal_target = escape_odata(target_id)
+        clauses = [
+            f"accessPackage/id eq '{literal_package}'",
+            f"target/objectId eq '{literal_target}'",
+        ]
+        if states:
+            joined = " or ".join(f"state eq '{escape_odata(state)}'" for state in states)
+            clauses.append(f"({joined})")
+        matches = [
+            item
+            async for item in self.list_governance(
+                "assignments", filter_expr=" and ".join(clauses), expand=("target",), limit=1
+            )
+        ]
+        return matches[0] if matches else None
+
+    def list_assignment_policies(
+        self, package_id: str, *, limit: int | None = None
+    ) -> AsyncIterator[dict[str, Any]]:
+        """The assignment policies governing one access package.
+
+        An adminAdd request must name a policy, so this is how a caller who only knows the
+        package finds one.
+        """
+        literal = escape_odata(package_id)
+        return self.list_governance(
+            "assignmentPolicies",
+            select=("id", "displayName", "allowedTargetScope"),
+            filter_expr=f"accessPackage/id eq '{literal}'",
+            limit=limit,
+        )
+
     # -- applications (app registrations) ---------------------------------
     def list_applications(
         self,
