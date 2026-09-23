@@ -1,0 +1,136 @@
+"""Action: `pctl azure eam remove-assignment`."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+import click
+
+from ...config import AppContext
+from ...errors import ConfigError, NotFoundError
+from ...options import azure_options, output_options
+from ...output import Renderer, summarise
+from .. import graph_client
+from ..common import find_user
+from .common import (
+    ACTIVE_ASSIGNMENT_STATES,
+    assignment_request,
+    collect_targets,
+    resolve_package_id,
+    target_options,
+)
+
+RESULT_COLUMNS = ["accessPackage", "target", "targetId", "status", "requestId", "requestState"]
+USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
+
+
+@click.command(name="remove-assignment")
+@click.argument("package")
+@click.argument("targets", nargs=-1)
+@azure_options
+@target_options
+@output_options
+@click.pass_context
+def command(
+    ctx: click.Context,
+    package: str,
+    targets: tuple[str, ...],
+    emails: str | None,
+    ignore_missing: bool,
+) -> None:
+    """Remove one or more people's assignment to an access package.
+
+    PACKAGE is a display name or ID. Each target is an email address, a display name or a
+    user object ID.
+
+    Idempotent: current assignments are read first, and someone who has none is reported
+    rather than sent as a request. No policy is needed, unlike add-assignment: an
+    adminRemove names the existing assignment rather than the rules that created it.
+
+    This creates an adminRemove request, which Graph processes asynchronously, so access
+    may persist briefly after the command returns.
+
+    Requires EntitlementManagement.ReadWrite.All.
+
+    \b
+      pctl azure eam remove-assignment "AWS Platform Access" ann@company.com
+      pctl azure eam remove-assignment PKG --emails ann@company.com,bob@company.com
+    """
+    from ..graph import run
+
+    app = ctx.ensure_object(AppContext)
+    wanted = collect_targets(targets, emails)
+    if not wanted:
+        raise click.UsageError("Provide at least one person, positionally or with --emails.")
+
+    async def _run() -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
+        async with graph_client(app) as client:
+            package_id = await resolve_package_id(client, package)
+            app.log(f"package={package_id} targets={len(wanted)}")
+
+            async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
+                try:
+                    user = await find_user(client, identifier, select=USER_FIELDS)
+                except (NotFoundError, ConfigError) as exc:
+                    return identifier, str(exc)
+                record: dict[str, Any] = {
+                    "accessPackage": package,
+                    "target": user.get("displayName") or identifier,
+                    "targetId": user["id"],
+                }
+                existing = await client.find_assignment(
+                    package_id, user["id"], states=ACTIVE_ASSIGNMENT_STATES
+                )
+                if existing is None:
+                    return {
+                        **record,
+                        "status": "not-assigned",
+                        "requestId": None,
+                        "requestState": None,
+                    }
+                created = await client.create_assignment_request(
+                    assignment_request(request_type="adminRemove", id=str(existing["id"]))
+                )
+                return {
+                    **record,
+                    "status": "removal-requested",
+                    "requestId": created.get("id"),
+                    "requestState": created.get("state"),
+                }
+
+            results = await asyncio.gather(*[one(item) for item in wanted])
+            return (
+                [item for item in results if isinstance(item, dict)],
+                [item for item in results if isinstance(item, tuple)],
+            )
+
+    records, failed = run(_run())
+
+    with Renderer(app.output, columns=RESULT_COLUMNS) as renderer:
+        renderer.write_all(records)
+
+    for record in records:
+        if record["status"] == "not-assigned":
+            click.secho(
+                f"{record['target']} has no live assignment to {record['accessPackage']}; "
+                "nothing to do.",
+                err=True,
+                fg="cyan",
+            )
+    for identifier, reason in failed:
+        click.secho(f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow")
+
+    removed = [record for record in records if record["status"] == "removal-requested"]
+    summarise(len(removed), "removal requested", quiet=app.quiet)
+    if removed and not app.quiet:
+        click.secho(
+            "Requests are processed asynchronously; access may persist for a short while.",
+            err=True,
+            fg="green",
+        )
+    if failed and not ignore_missing:
+        raise NotFoundError(
+            f"{len(failed)} of {len(wanted)} target(s) could not be resolved. "
+            "Pass a user object ID, or use --ignore-missing."
+        )

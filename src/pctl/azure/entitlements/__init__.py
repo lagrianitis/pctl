@@ -52,6 +52,14 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.entitlements.list_assignments:command",
         "List who is assigned to an access package.",
     ),
+    "add-assignment": (
+        "pctl.azure.entitlements.add_assignment:command",
+        "Assign people to an access package, by email.",
+    ),
+    "remove-assignment": (
+        "pctl.azure.entitlements.remove_assignment:command",
+        "Remove people's assignment to an access package.",
+    ),
 }
 
 
