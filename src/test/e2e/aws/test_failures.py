@@ -18,9 +18,7 @@ pytestmark = pytest.mark.e2e
 
 def test_a_missing_item_exits_4(ddb: Any, ddb_table: str) -> None:
     """DynamoDB returns an empty response rather than an error, so the CLI decides."""
-    failed(
-        ddb("get", "--table", ddb_table, "--key", '{"pk":"missing","sk":"profile"}'), 4
-    )
+    failed(ddb("get", "--table", ddb_table, "--key", '{"pk":"missing","sk":"profile"}'), 4)
 
 
 def test_an_unknown_table_exits_4_and_names_it(ddb: Any, ddb_table: str) -> None:
@@ -34,9 +32,7 @@ def test_a_malformed_json_key_is_a_usage_error(ddb: Any, ddb_table: str) -> None
     failed(ddb("get", "--table", ddb_table, "--key", "{not json"), 2)
 
 
-def test_a_key_condition_without_values_is_reported_as_upstream(
-    ddb: Any, ddb_table: str
-) -> None:
+def test_a_key_condition_without_values_is_reported_as_upstream(ddb: Any, ddb_table: str) -> None:
     """`--key` names :pk but nothing binds it, and DynamoDB is what rejects that.
 
     Exit 5 rather than 2 because the validation happens server-side. Worth asserting so

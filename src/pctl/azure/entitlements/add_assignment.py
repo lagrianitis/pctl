@@ -147,9 +147,7 @@ def command(
             results = await asyncio.gather(*[one(item) for item in wanted])
             records = [item for item in results if isinstance(item, dict)]
             if wait:
-                await settle_requests(
-                    client, records, timeout=wait_timeout, log=app.log
-                )
+                await settle_requests(client, records, timeout=wait_timeout, log=app.log)
             return (
                 records,
                 [item for item in results if isinstance(item, tuple)],
@@ -170,9 +168,7 @@ def command(
                 fg="cyan",
             )
     for identifier, reason in failed:
-        click.secho(
-            f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow"
-        )
+        click.secho(f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow")
 
     requested = [record for record in records if record["status"] == "requested"]
     summarise(len(requested), "assignment requested", quiet=app.quiet)

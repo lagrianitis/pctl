@@ -52,9 +52,7 @@ from .common import match_option
     type=click.IntRange(min=1),
     help="Cap the number of assignments fetched per service principal.",
 )
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -143,15 +141,11 @@ def command(
 
     found, missing = run(_run())
 
-    with Renderer(
-        app.output, columns=table_columns, single=len(found) == 1
-    ) as renderer:
+    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
         renderer.write_all(found)
 
     for name in missing:
-        click.secho(
-            f"No service principal matched display name: {name}", err=True, fg="yellow"
-        )
+        click.secho(f"No service principal matched display name: {name}", err=True, fg="yellow")
     summarise(len(found), "service principal", quiet=app.quiet)
     if missing and not ignore_missing:
         raise NotFoundError(

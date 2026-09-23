@@ -20,9 +20,7 @@ from . import graph_client
     help="Graph path, relative to the API version root, e.g. users or groups/{id}/members.",
 )
 @azure_options
-@click.option(
-    "--param", "params", multiple=True, metavar="KEY=VALUE", help="Query parameter."
-)
+@click.option("--param", "params", multiple=True, metavar="KEY=VALUE", help="Query parameter.")
 @click.option("--paginate/--no-paginate", default=True, help="Follow @odata.nextLink.")
 @click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N items.")
 @columns_option
@@ -48,9 +46,7 @@ def command(
     for item in params:
         key, sep, value = item.partition("=")
         if not sep:
-            raise click.BadParameter(
-                f"expected KEY=VALUE, got {item!r}", param_hint="--param"
-            )
+            raise click.BadParameter(f"expected KEY=VALUE, got {item!r}", param_hint="--param")
         query[key] = value
 
     async def _run() -> int:

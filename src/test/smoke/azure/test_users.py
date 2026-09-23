@@ -33,9 +33,7 @@ def test_the_case_help_lists_the_service(azure: Callable[..., Any]) -> None:
     assert "users" in ok(azure("--help")).stdout
 
 
-def test_get_help_documents_all_three_identifier_forms(
-    users: Callable[..., Any]
-) -> None:
+def test_get_help_documents_all_three_identifier_forms(users: Callable[..., Any]) -> None:
     """The whole point is that you pass whatever you happen to know."""
     stdout = ok(users("get", "--help")).stdout
     for form in ("email", "display name", "object ID"):

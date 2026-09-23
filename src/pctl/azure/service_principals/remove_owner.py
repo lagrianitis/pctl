@@ -136,9 +136,7 @@ def command(
 
     records, failed, remaining = run(_run())
 
-    with Renderer(
-        app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]
-    ) as out:
+    with Renderer(app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]) as out:
         out.write_all(records)
 
     removed = [record for record in records if record["status"] == "removed"]

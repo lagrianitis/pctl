@@ -118,9 +118,7 @@ def command(
                         "requestState": None,
                     }
                 created = await client.create_assignment_request(
-                    assignment_request(
-                        request_type="adminRemove", id=str(existing["id"])
-                    )
+                    assignment_request(request_type="adminRemove", id=str(existing["id"]))
                 )
                 return {
                     **record,
@@ -132,9 +130,7 @@ def command(
             results = await asyncio.gather(*[one(item) for item in wanted])
             records = [item for item in results if isinstance(item, dict)]
             if wait:
-                await settle_requests(
-                    client, records, timeout=wait_timeout, log=app.log
-                )
+                await settle_requests(client, records, timeout=wait_timeout, log=app.log)
             return (
                 records,
                 [item for item in results if isinstance(item, tuple)],
@@ -155,9 +151,7 @@ def command(
                 fg="cyan",
             )
     for identifier, reason in failed:
-        click.secho(
-            f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow"
-        )
+        click.secho(f"Could not resolve '{identifier}': {reason}", err=True, fg="yellow")
 
     removed = [record for record in records if record["status"] == "removal-requested"]
     summarise(len(removed), "removal requested", quiet=app.quiet)

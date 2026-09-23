@@ -30,21 +30,15 @@ def test_tables_lists_the_table(ddb: Any, ddb_table: str) -> None:
     assert json.loads(lines(result.stdout)[0])["table"] == ddb_table
 
 
-def test_describe_returns_the_raw_describe_table_payload(
-    ddb: Any, ddb_table: str
-) -> None:
+def test_describe_returns_the_raw_describe_table_payload(ddb: Any, ddb_table: str) -> None:
     """`-o json` is an escape hatch: pass the API response through unreshaped."""
-    payload = json.loads(
-        ok(ddb("describe", "--table", ddb_table, output="json")).stdout
-    )
+    payload = json.loads(ok(ddb("describe", "--table", ddb_table, output="json")).stdout)
 
     assert payload["TableName"] == ddb_table
     assert "KeySchema" in payload
 
 
-def test_describe_summarises_the_key_schema_for_humans(
-    ddb: Any, ddb_table: str
-) -> None:
+def test_describe_summarises_the_key_schema_for_humans(ddb: Any, ddb_table: str) -> None:
     result = ok(ddb("describe", "--table", ddb_table))
 
     assert "pk:HASH" in result.stdout
@@ -54,9 +48,7 @@ def test_describe_summarises_the_key_schema_for_humans(
 # ---------------------------------------------------------------------------
 # scan
 # ---------------------------------------------------------------------------
-def test_a_parallel_scan_returns_every_item_exactly_once(
-    ddb: Any, ddb_table: str
-) -> None:
+def test_a_parallel_scan_returns_every_item_exactly_once(ddb: Any, ddb_table: str) -> None:
     """Segments must partition the table, not overlap or drop rows."""
     result = ok(ddb("scan", "--table", ddb_table, "--segments", "4", output="ndjson"))
 
@@ -231,9 +223,7 @@ def test_table_output_has_a_header_and_a_rule(ddb: Any, ddb_table: str) -> None:
 # ---------------------------------------------------------------------------
 # aliases and prefixes, end to end rather than help-only
 # ---------------------------------------------------------------------------
-def test_the_dynamodb_service_name_resolves(
-    runner: Any, cli: Any, ddb_table: str
-) -> None:
+def test_the_dynamodb_service_name_resolves(runner: Any, cli: Any, ddb_table: str) -> None:
     """`ddb` is the exposed name, but the package is `dynamodb` and both must work."""
     ok(
         runner.invoke(

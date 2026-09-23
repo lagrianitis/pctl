@@ -33,9 +33,7 @@ def test_token_help_documents_cache_control(azure: Callable[..., Any]) -> None:
     assert "--no-token-cache" in stdout
 
 
-def test_token_help_warns_that_decode_does_not_verify(
-    azure: Callable[..., Any]
-) -> None:
+def test_token_help_warns_that_decode_does_not_verify(azure: Callable[..., Any]) -> None:
     assert "no signature check" in ok(azure("token", "--help")).stdout
 
 

@@ -137,9 +137,7 @@ def succeeds(provisioning: Any) -> Any:
 # ---------------------------------------------------------------------------
 # the request body
 # ---------------------------------------------------------------------------
-def test_the_body_matches_the_documented_shape(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_the_body_matches_the_documented_shape(runner: Any, cli: Any, succeeds: Any) -> None:
     """parameters -> subjects -> objectId/objectTypeName, with the ruleId alongside."""
     ok(
         runner.invoke(
@@ -212,9 +210,7 @@ def test_a_versioned_rule_id_is_passed_through_unchanged(
     assert body["parameters"][0]["ruleId"] == RULE_ID
 
 
-def test_each_subject_gets_its_own_request(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_each_subject_gets_its_own_request(runner: Any, cli: Any, succeeds: Any) -> None:
     """One verdict comes back per response, so batching would lose the attribution."""
     result = ok(
         runner.invoke(
@@ -239,9 +235,7 @@ def test_each_subject_gets_its_own_request(
     assert len(lines(result.stdout)) == 2
 
 
-def test_a_duplicate_subject_is_provisioned_once(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_a_duplicate_subject_is_provisioned_once(runner: Any, cli: Any, succeeds: Any) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -268,9 +262,7 @@ def test_a_duplicate_subject_is_provisioned_once(
 # ---------------------------------------------------------------------------
 # the verdict hidden in the response
 # ---------------------------------------------------------------------------
-def test_success_reports_applied_and_exits_0(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_success_reports_applied_and_exits_0(runner: Any, cli: Any, succeeds: Any) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -328,9 +320,7 @@ def test_a_redundant_export_is_already_in_sync_and_exits_0(
     assert json.loads(lines(result.stdout)[0])["outcome"] == "already-in-sync"
 
 
-def test_an_out_of_scope_skip_is_a_failure(
-    runner: Any, cli: Any, provisioning: Any
-) -> None:
+def test_an_out_of_scope_skip_is_a_failure(runner: Any, cli: Any, provisioning: Any) -> None:
     """Also a Skipped, but nothing was provisioned, so exit 0 would be a lie."""
     import httpx
 
@@ -373,9 +363,7 @@ def test_a_failure_verdict_exits_5_despite_the_200(
     provisioning.post(f"{SYNC}/jobs/{JOB_ID}/provisionOnDemand").mock(
         return_value=httpx.Response(
             200,
-            json=verdict(
-                "Failure", errorCode="SchemaError", errorMessage="Bad mapping."
-            ),
+            json=verdict("Failure", errorCode="SchemaError", errorMessage="Bad mapping."),
         )
     )
 
@@ -425,9 +413,7 @@ def test_an_unrecognised_verdict_is_not_treated_as_success(
     )
 
 
-def test_an_unreadable_verdict_exits_5(
-    runner: Any, cli: Any, provisioning: Any
-) -> None:
+def test_an_unreadable_verdict_exits_5(runner: Any, cli: Any, provisioning: Any) -> None:
     """`key` is a JSON string by contract; if it stops being one, say so rather than crash."""
     import httpx
 
@@ -462,9 +448,7 @@ def test_one_failed_subject_still_reports_the_others(
         httpx.Response(200, json=verdict("Success")),
         httpx.Response(200, json=verdict("Failure", errorCode="SchemaError")),
     ]
-    provisioning.post(f"{SYNC}/jobs/{JOB_ID}/provisionOnDemand").mock(
-        side_effect=responses
-    )
+    provisioning.post(f"{SYNC}/jobs/{JOB_ID}/provisionOnDemand").mock(side_effect=responses)
 
     result = failed(
         runner.invoke(
@@ -493,9 +477,7 @@ def test_one_failed_subject_still_reports_the_others(
 # ---------------------------------------------------------------------------
 # job and rule resolution
 # ---------------------------------------------------------------------------
-def test_a_single_job_and_rule_need_no_flags(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_a_single_job_and_rule_need_no_flags(runner: Any, cli: Any, succeeds: Any) -> None:
     """The common case: one SCIM job, one rule, nothing to disambiguate."""
     ok(
         runner.invoke(
@@ -610,9 +592,7 @@ def test_a_forbidden_job_lookup_is_not_reported_as_not_enabled(
     assert "Insufficient privileges" in result.output
 
 
-def test_several_jobs_are_refused_and_listed(
-    runner: Any, cli: Any, provisioning: Any
-) -> None:
+def test_several_jobs_are_refused_and_listed(runner: Any, cli: Any, provisioning: Any) -> None:
     """Guessing could provision in the wrong direction."""
     import httpx
 
@@ -646,9 +626,7 @@ def test_several_jobs_are_refused_and_listed(
     assert "second-job" in result.output
 
 
-def test_explicit_job_and_rule_skip_both_lookups(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_explicit_job_and_rule_skip_both_lookups(runner: Any, cli: Any, succeeds: Any) -> None:
     """Naming both saves two round trips, one of which fetches the whole sync schema."""
     ok(
         runner.invoke(
@@ -674,9 +652,7 @@ def test_explicit_job_and_rule_skip_both_lookups(
     assert succeeds["provision"].call_count == 1
 
 
-def test_several_rules_are_refused_and_listed(
-    runner: Any, cli: Any, provisioning: Any
-) -> None:
+def test_several_rules_are_refused_and_listed(runner: Any, cli: Any, provisioning: Any) -> None:
     """Provisioning through the wrong rule writes the wrong attributes."""
     import httpx
 
@@ -721,9 +697,7 @@ def test_several_rules_are_refused_and_listed(
 # ---------------------------------------------------------------------------
 # subject resolution
 # ---------------------------------------------------------------------------
-def test_an_unknown_group_exits_4_and_names_it(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_an_unknown_group_exits_4_and_names_it(runner: Any, cli: Any, succeeds: Any) -> None:
     result = failed(
         runner.invoke(
             cli,
@@ -768,23 +742,15 @@ def test_ignore_missing_tolerates_an_unresolvable_subject(
     assert succeeds["provision"].call_count == 1
 
 
-def test_a_group_object_id_needs_no_lookup(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_a_group_object_id_needs_no_lookup(runner: Any, cli: Any, succeeds: Any) -> None:
     """A GUID is unambiguous, so it goes straight into the body."""
-    ok(
-        runner.invoke(
-            cli, ["azure", "sp", "provision", "--app", "incident", "--group", GROUP_ID]
-        )
-    )
+    ok(runner.invoke(cli, ["azure", "sp", "provision", "--app", "incident", "--group", GROUP_ID]))
 
     body = json.loads(succeeds["provision"].calls[0].request.content)
     assert body["parameters"][0]["subjects"][0]["objectId"] == GROUP_ID
 
 
-def test_an_ambiguous_group_name_is_refused(
-    runner: Any, cli: Any, succeeds: Any
-) -> None:
+def test_an_ambiguous_group_name_is_refused(runner: Any, cli: Any, succeeds: Any) -> None:
     """Stricter than `groups get`, which warns: this provisions into another system.
 
     Exit 4, not 2: an ambiguous name is collected as an unresolved subject alongside any

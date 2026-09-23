@@ -101,15 +101,11 @@ def test_search_is_not_a_valid_match_mode(eam: Callable[..., Any]) -> None:
     failed(eam("get-package", "--access-package", "x", "--match", "search"), 2)
 
 
-def test_get_package_without_an_identifier_is_a_usage_error(
-    eam: Callable[..., Any]
-) -> None:
+def test_get_package_without_an_identifier_is_a_usage_error(eam: Callable[..., Any]) -> None:
     failed(eam("get-package"), 2)
 
 
-def test_get_catalog_without_an_identifier_is_a_usage_error(
-    eam: Callable[..., Any]
-) -> None:
+def test_get_catalog_without_an_identifier_is_a_usage_error(eam: Callable[..., Any]) -> None:
     failed(eam("get-catalog"), 2)
 
 
@@ -120,15 +116,11 @@ def test_an_invalid_page_size_is_rejected(eam: Callable[..., Any]) -> None:
 # ---------------------------------------------------------------------------
 # the two assignment writes
 # ---------------------------------------------------------------------------
-def test_add_assignment_help_names_the_write_permission(
-    eam: Callable[..., Any]
-) -> None:
+def test_add_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
     assert "ReadWrite" in ok(eam("add-assignment", "--help")).stdout
 
 
-def test_remove_assignment_help_names_the_write_permission(
-    eam: Callable[..., Any]
-) -> None:
+def test_remove_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
     assert "ReadWrite" in ok(eam("remove-assignment", "--help")).stdout
 
 
@@ -196,9 +188,7 @@ def test_get_request_is_listed(eam: Callable[..., Any]) -> None:
     assert "get-request" in ok(eam("--help")).stdout
 
 
-def test_get_request_help_explains_the_outcome_classification(
-    eam: Callable[..., Any]
-) -> None:
+def test_get_request_help_explains_the_outcome_classification(eam: Callable[..., Any]) -> None:
     stdout = ok(eam("get-request", "--help")).stdout
     for word in ("delivered", "pending", "outcome"):
         assert word in stdout
@@ -210,9 +200,7 @@ def test_get_request_needs_an_id(eam: Callable[..., Any]) -> None:
 
 def test_a_zero_wait_timeout_is_rejected(eam: Callable[..., Any]) -> None:
     failed(
-        eam(
-            "add-assignment", "--access-package", "p", "a@b.com", "--wait-timeout", "0"
-        ),
+        eam("add-assignment", "--access-package", "p", "a@b.com", "--wait-timeout", "0"),
         2,
     )
 
@@ -225,18 +213,11 @@ def test_delete_package_help_says_it_cannot_be_undone(eam: Callable[..., Any]) -
     assert "cannot be undone" in ok(eam("delete-package", "--help")).stdout
 
 
-def test_delete_package_help_names_the_write_permission(
-    eam: Callable[..., Any]
-) -> None:
-    assert (
-        "EntitlementManagement.ReadWrite.All"
-        in ok(eam("delete-package", "--help")).stdout
-    )
+def test_delete_package_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
+    assert "EntitlementManagement.ReadWrite.All" in ok(eam("delete-package", "--help")).stdout
 
 
-def test_delete_package_help_documents_the_confirmation(
-    eam: Callable[..., Any]
-) -> None:
+def test_delete_package_help_documents_the_confirmation(eam: Callable[..., Any]) -> None:
     stdout = ok(eam("delete-package", "--help")).stdout
     assert "--yes" in stdout
     assert "--force" in stdout

@@ -36,9 +36,7 @@ def test_get_help_documents_the_match_modes(groups: Callable[..., Any]) -> None:
         assert mode in stdout
 
 
-def test_get_help_documents_reading_names_from_a_file(
-    groups: Callable[..., Any]
-) -> None:
+def test_get_help_documents_reading_names_from_a_file(groups: Callable[..., Any]) -> None:
     assert "--from-file" in ok(groups("get", "--help")).stdout
 
 
@@ -59,9 +57,7 @@ def test_no_option_offers_to_take_a_secret_value(groups: Callable[..., Any]) -> 
 # ---------------------------------------------------------------------------
 # required arguments and option validation
 # ---------------------------------------------------------------------------
-def test_get_without_names_explains_the_alternatives(
-    groups: Callable[..., Any]
-) -> None:
+def test_get_without_names_explains_the_alternatives(groups: Callable[..., Any]) -> None:
     result = failed(groups("get"), 2)
     assert "--from-file" in result.output
 

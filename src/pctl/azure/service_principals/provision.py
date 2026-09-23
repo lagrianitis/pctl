@@ -155,9 +155,7 @@ def command(
                 rule_id=rule_id or await resolve_rule_id(client, sp_id, job),
                 label=str(found.get("displayName") or sp_id),
             )
-            app.log(
-                f"provisioning through {target.label} job={job} rule={target.rule_id}"
-            )
+            app.log(f"provisioning through {target.label} job={job} rule={target.rule_id}")
 
             subjects, failed = await resolve_subjects(client, groups, users)
             records: list[dict[str, Any]] = []
@@ -181,9 +179,7 @@ def command(
     if unprovisioned:
         raise UpstreamError(
             f"{len(unprovisioned)} of {len(records)} subject(s) were not provisioned: "
-            + ", ".join(
-                f"{record['subject']} [{record['detail']}]" for record in unprovisioned
-            )
+            + ", ".join(f"{record['subject']} [{record['detail']}]" for record in unprovisioned)
         )
 
 
@@ -202,9 +198,7 @@ async def resolve_job_id(client: GraphClient, sp_id: str) -> str:
             "for it. Configure provisioning in the portal first."
         )
     if len(jobs) > 1:
-        available = ", ".join(
-            f"{job.get('id')} ({job.get('templateId')})" for job in jobs
-        )
+        available = ", ".join(f"{job.get('id')} ({job.get('templateId')})" for job in jobs)
         raise ConfigError(
             f"This application has {len(jobs)} synchronization jobs ({available}). "
             "Pass --job to say which one should provision."
@@ -380,9 +374,7 @@ def provision_outcome(payload: dict[str, Any]) -> tuple[str, str]:
     return "failed", detail
 
 
-def report(
-    records: list[dict[str, Any]], failed: list[tuple[str, str]], *, quiet: bool
-) -> None:
+def report(records: list[dict[str, Any]], failed: list[tuple[str, str]], *, quiet: bool) -> None:
     """Print per-subject outcomes on stderr, then the summary.
 
     Every record is reported before the caller raises, so one failure in a batch does not

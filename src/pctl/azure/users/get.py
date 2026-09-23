@@ -38,9 +38,7 @@ from .common import DEFAULT_LIST_COLUMNS, match_option
     help="Read identifiers from a file, one per line ('-' for stdin).",
 )
 @match_option
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -94,9 +92,7 @@ def command(
 
             async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
                 try:
-                    found = await find_user(
-                        client, identifier, select=fields, mode=match_mode
-                    )
+                    found = await find_user(client, identifier, select=fields, mode=match_mode)
                 except (NotFoundError, ConfigError) as exc:
                     return identifier, str(exc)
                 found["_query"] = identifier
@@ -110,9 +106,7 @@ def command(
 
     found, failed = run(_run())
 
-    with Renderer(
-        app.output, columns=table_columns, single=len(found) == 1
-    ) as renderer:
+    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
         renderer.write_all(found)
 
     for _identifier, reason in failed:
@@ -121,6 +115,4 @@ def command(
 
     summarise(len(found), "user", quiet=app.quiet)
     if failed and not ignore_missing:
-        raise NotFoundError(
-            f"{len(failed)} of {len(wanted)} identifier(s) matched nothing."
-        )
+        raise NotFoundError(f"{len(failed)} of {len(wanted)} identifier(s) matched nothing.")

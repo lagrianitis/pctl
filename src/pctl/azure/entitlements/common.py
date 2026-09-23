@@ -58,9 +58,7 @@ def match_option(func: Any) -> Any:
     )(func)
 
 
-def contains_filter(
-    items: list[dict[str, Any]], needle: str | None
-) -> list[dict[str, Any]]:
+def contains_filter(items: list[dict[str, Any]], needle: str | None) -> list[dict[str, Any]]:
     """Keep items whose displayName contains the needle, case-insensitively.
 
     Local, because `$search` does not exist on these collections and `contains()` is not
@@ -69,9 +67,7 @@ def contains_filter(
     if not needle:
         return items
     wanted = needle.casefold()
-    return [
-        item for item in items if wanted in (item.get("displayName") or "").casefold()
-    ]
+    return [item for item in items if wanted in (item.get("displayName") or "").casefold()]
 
 
 async def resolve_governance_id(
@@ -95,10 +91,7 @@ async def resolve_governance_id(
     )
     if not matches:
         everything = [
-            item
-            async for item in client.list_governance(
-                collection, select=("id", "displayName")
-            )
+            item async for item in client.list_governance(collection, select=("id", "displayName"))
         ]
         matches = contains_filter(everything, identifier)
     if not matches:
@@ -118,9 +111,7 @@ async def resolve_catalog_id(client: GraphClient, catalog: str) -> str:
 
 async def resolve_package_id(client: GraphClient, package: str) -> str:
     """Turn an access package display name or ID into an ID, for `accessPackage/id`."""
-    return await resolve_governance_id(
-        client, "accessPackages", package, noun="access package"
-    )
+    return await resolve_governance_id(client, "accessPackages", package, noun="access package")
 
 
 def flatten_assignment(item: dict[str, Any]) -> dict[str, Any]:
@@ -170,10 +161,7 @@ async def find_matching(
 
     if mode == "contains":
         everything = [
-            item
-            async for item in client.list_governance(
-                collection, select=select, expand=expand
-            )
+            item async for item in client.list_governance(collection, select=select, expand=expand)
         ]
         matches = contains_filter(everything, identifier)
     else:
@@ -200,9 +188,9 @@ def list_options(func: Any) -> Any:
         show_default=True,
         help="Graph $top page size.",
     )(func)
-    func = click.option(
-        "-n", "--limit", type=click.IntRange(min=1), help="Stop after N items."
-    )(func)
+    func = click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N items.")(
+        func
+    )
     func = click.option(
         "--contains",
         metavar="TEXT",
@@ -227,9 +215,7 @@ def list_options(func: Any) -> Any:
     return func
 
 
-def build_filter(
-    filter_expr: str | None, name: str | None, starts_with: str | None
-) -> str | None:
+def build_filter(filter_expr: str | None, name: str | None, starts_with: str | None) -> str | None:
     """Combine the filter shortcuts into one `$filter`, most explicit wins.
 
     A raw `--filter` is left alone: someone who wrote OData by hand means it.
@@ -298,9 +284,7 @@ async def settle_requests(
         return
 
     async def one(record: dict[str, Any]) -> None:
-        settled = await wait_for_request(
-            client, str(record["requestId"]), timeout=timeout, log=log
-        )
+        settled = await wait_for_request(client, str(record["requestId"]), timeout=timeout, log=log)
         state = settled.get("state") or settled.get("requestState")
         record["requestState"] = state
         record["outcome"] = request_outcome(state)
@@ -323,9 +307,7 @@ def report_outcomes(records: list[dict[str, Any]], *, noun: str, quiet: bool) ->
         state = record.get("requestState")
         if outcome == "done":
             if not quiet:
-                click.secho(
-                    f"{target}: {noun} applied ({state}).", err=True, fg="green"
-                )
+                click.secho(f"{target}: {noun} applied ({state}).", err=True, fg="green")
         elif outcome == "failed":
             click.secho(f"{target}: did not apply ({state}).", err=True, fg="red")
             unfinished.append(f"{target} [{state}]")
@@ -366,9 +348,7 @@ def collect_targets(targets: tuple[str, ...], emails: str | None) -> list[str]:
     return list(seen)
 
 
-async def resolve_policy_id(
-    client: GraphClient, package_id: str, policy: str | None
-) -> str:
+async def resolve_policy_id(client: GraphClient, package_id: str, policy: str | None) -> str:
     """Choose the assignment policy an adminAdd request will name.
 
     An adminAdd must reference a policy, and a package can have several with different
@@ -381,15 +361,9 @@ async def resolve_policy_id(
         if looks_like_object_id(policy):
             return policy.strip()
         wanted = policy.casefold()
-        named = [
-            item
-            for item in policies
-            if (item.get("displayName") or "").casefold() == wanted
-        ]
+        named = [item for item in policies if (item.get("displayName") or "").casefold() == wanted]
         if not named:
-            available = (
-                ", ".join(str(item.get("displayName")) for item in policies) or "none"
-            )
+            available = ", ".join(str(item.get("displayName")) for item in policies) or "none"
             raise NotFoundError(
                 f"No assignment policy named '{policy}' on this package. Available: {available}"
             )

@@ -65,9 +65,7 @@ def command(
         index=index,
         projection=projection,
         filter_expression=filter_expression,
-        expression_values=serialize_values(
-            parse_json_option(expression_values, "--values")
-        ),
+        expression_values=serialize_values(parse_json_option(expression_values, "--values")),
         expression_names=parse_json_option(expression_names, "--names"),
         consistent=consistent,
         page_size=page_size,

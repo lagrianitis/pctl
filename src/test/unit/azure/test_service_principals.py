@@ -72,10 +72,7 @@ def test_prefix_mode_matches_the_start_of_the_name() -> None:
 
 def test_prefix_mode_does_not_match_mid_string() -> None:
     assert (
-        filter_by_principal(
-            [_assignment("AWS Platform Admins")], "Platform", mode="prefix"
-        )
-        == []
+        filter_by_principal([_assignment("AWS Platform Admins")], "Platform", mode="prefix") == []
     )
 
 
@@ -92,16 +89,11 @@ def test_contains_mode_matches_anywhere_in_the_name() -> None:
 
 
 def test_prefix_mode_ignores_case() -> None:
-    assert (
-        filter_by_principal([_assignment("AWS Platform")], "aws", mode="prefix") != []
-    )
+    assert filter_by_principal([_assignment("AWS Platform")], "aws", mode="prefix") != []
 
 
 def test_contains_mode_ignores_case() -> None:
-    assert (
-        filter_by_principal([_assignment("AWS Platform")], "PLATFORM", mode="contains")
-        != []
-    )
+    assert filter_by_principal([_assignment("AWS Platform")], "PLATFORM", mode="contains") != []
 
 
 def test_an_unknown_mode_is_an_error_not_a_silent_pass() -> None:
@@ -221,9 +213,7 @@ def test_any_other_skip_is_a_failure() -> None:
     """Out of scope or unassigned means nothing was provisioned."""
     from pctl.azure.service_principals.provision import provision_outcome
 
-    outcome, _detail = provision_outcome(
-        _verdict("Skipped", errorCode="NotEffectivelyEntitled")
-    )
+    outcome, _detail = provision_outcome(_verdict("Skipped", errorCode="NotEffectivelyEntitled"))
 
     assert outcome == "failed"
 
@@ -231,9 +221,7 @@ def test_any_other_skip_is_a_failure() -> None:
 def test_a_failure_result_is_a_failure() -> None:
     from pctl.azure.service_principals.provision import provision_outcome
 
-    assert (
-        provision_outcome(_verdict("Failure", errorCode="SchemaError"))[0] == "failed"
-    )
+    assert provision_outcome(_verdict("Failure", errorCode="SchemaError"))[0] == "failed"
 
 
 def test_an_unknown_result_is_not_applied() -> None:

@@ -117,9 +117,7 @@ def command(
 
             to_add = [owner for owner in resolved if owner["id"] not in existing]
             if to_add:
-                await asyncio.gather(
-                    *[client.add_owner(sp_id, owner["id"]) for owner in to_add]
-                )
+                await asyncio.gather(*[client.add_owner(sp_id, owner["id"]) for owner in to_add])
 
             added = {owner["id"] for owner in to_add}
             records = [
@@ -135,9 +133,7 @@ def command(
 
     records, failed = run(_run())
 
-    with Renderer(
-        app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]
-    ) as out:
+    with Renderer(app.output, columns=["servicePrincipal", "owner", "ownerId", "status"]) as out:
         out.write_all(records)
 
     added = [record for record in records if record["status"] == "added"]

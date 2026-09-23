@@ -47,18 +47,12 @@ def directory(graph: Any, seen: list[str]) -> Any:
     """
     import httpx
 
-    graph.get(f"{GRAPH}/users/{ANN_ID}").mock(
-        return_value=httpx.Response(200, json=ANN)
-    )
+    graph.get(f"{GRAPH}/users/{ANN_ID}").mock(return_value=httpx.Response(200, json=ANN))
 
     def collection(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
         url = unquote_plus(str(request.url))
-        if (
-            "ann@example.com" in url
-            or "ann@example.onmicrosoft.com" in url
-            or "Ann" in url
-        ):
+        if "ann@example.com" in url or "ann@example.onmicrosoft.com" in url or "Ann" in url:
             return httpx.Response(200, json={"value": [ANN]})
         if "bob@example.com" in url or "Bob" in url:
             return httpx.Response(200, json={"value": [BOB]})
@@ -74,9 +68,7 @@ def directory(graph: Any, seen: list[str]) -> Any:
 # ---------------------------------------------------------------------------
 # the three identifier forms
 # ---------------------------------------------------------------------------
-def test_an_address_returns_the_user_object(
-    runner: Any, cli: Any, directory: Any
-) -> None:
+def test_an_address_returns_the_user_object(runner: Any, cli: Any, directory: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
@@ -97,14 +89,10 @@ def test_an_address_is_matched_against_upn_and_mail(
     """The two differ in practice, so checking only one would miss half the cases."""
     ok(runner.invoke(cli, ["azure", "users", "get", "--user", "ann@example.com"]))
 
-    assert filters(seen) == [
-        "userPrincipalName eq 'ann@example.com' or mail eq 'ann@example.com'"
-    ]
+    assert filters(seen) == ["userPrincipalName eq 'ann@example.com' or mail eq 'ann@example.com'"]
 
 
-def test_a_upn_that_differs_from_mail_also_resolves(
-    runner: Any, cli: Any, directory: Any
-) -> None:
+def test_a_upn_that_differs_from_mail_also_resolves(runner: Any, cli: Any, directory: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
@@ -138,11 +126,7 @@ def test_an_object_id_skips_the_collection_entirely(
 ) -> None:
     """A GUID addresses /users/{id} directly, so no filtered query is sent."""
     payload = json.loads(
-        ok(
-            runner.invoke(
-                cli, ["-o", "json", "azure", "users", "get", "--user", ANN_ID]
-            )
-        ).stdout
+        ok(runner.invoke(cli, ["-o", "json", "azure", "users", "get", "--user", ANN_ID])).stdout
     )
 
     assert payload["id"] == ANN_ID
@@ -152,9 +136,7 @@ def test_an_object_id_skips_the_collection_entirely(
 # ---------------------------------------------------------------------------
 # rendering and selection
 # ---------------------------------------------------------------------------
-def test_one_user_is_an_object_not_an_array(
-    runner: Any, cli: Any, directory: Any
-) -> None:
+def test_one_user_is_an_object_not_an_array(runner: Any, cli: Any, directory: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
@@ -167,9 +149,7 @@ def test_one_user_is_an_object_not_an_array(
     assert isinstance(payload, dict)
 
 
-def test_several_identifiers_resolve_concurrently(
-    runner: Any, cli: Any, directory: Any
-) -> None:
+def test_several_identifiers_resolve_concurrently(runner: Any, cli: Any, directory: Any) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -214,9 +194,7 @@ def test_select_narrows_the_requested_fields(
 
 def test_csv_uses_the_default_columns(runner: Any, cli: Any, directory: Any) -> None:
     result = ok(
-        runner.invoke(
-            cli, ["-o", "csv", "azure", "users", "get", "--user", "ann@example.com"]
-        )
+        runner.invoke(cli, ["-o", "csv", "azure", "users", "get", "--user", "ann@example.com"])
     )
 
     assert lines(result.stdout)[0] == "displayName,userPrincipalName,mail,id"
@@ -233,14 +211,10 @@ def test_an_unknown_address_exits_4(runner: Any, cli: Any, directory: Any) -> No
     assert "nobody@example.com" in result.output
 
 
-def test_an_ambiguous_display_name_is_refused(
-    runner: Any, cli: Any, directory: Any
-) -> None:
+def test_an_ambiguous_display_name_is_refused(runner: Any, cli: Any, directory: Any) -> None:
     """Two people can share a name, and the caller is about to act on the answer."""
     result = failed(
-        runner.invoke(
-            cli, ["azure", "users", "get", "--user", "Example", "--match", "prefix"]
-        ),
+        runner.invoke(cli, ["azure", "users", "get", "--user", "Example", "--match", "prefix"]),
         2,
     )
 

@@ -86,9 +86,7 @@ def tenant(graph: Any, seen: list[str]) -> Any:
 # ---------------------------------------------------------------------------
 def test_list_streams_registrations(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
-        runner.invoke(
-            cli, ["-o", "ndjson", "azure", "apps", "list", "--search", "incident"]
-        )
+        runner.invoke(cli, ["-o", "ndjson", "azure", "apps", "list", "--search", "incident"])
     )
 
     assert json.loads(lines(result.stdout)[0])["appId"] == APP_CLIENT_ID
@@ -102,15 +100,9 @@ def test_starts_with_becomes_a_display_name_filter(
     assert filters(seen) == ["startswith(displayName,'Company ')"]
 
 
-def test_the_default_columns_lead_with_the_client_id(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_the_default_columns_lead_with_the_client_id(runner: Any, cli: Any, tenant: Any) -> None:
     """appId is what you pivot on, so it belongs in the terminal view."""
-    result = ok(
-        runner.invoke(
-            cli, ["-o", "csv", "azure", "apps", "list", "--search", "incident"]
-        )
-    )
+    result = ok(runner.invoke(cli, ["-o", "csv", "azure", "apps", "list", "--search", "incident"]))
 
     assert lines(result.stdout)[0] == "displayName,appId,signInAudience,id"
 
@@ -124,9 +116,7 @@ def test_a_guid_is_tried_as_an_app_id_first(
     """The portal shows appId prominently, so it is the likelier thing to be holding."""
     payload = json.loads(
         ok(
-            runner.invoke(
-                cli, ["-o", "json", "azure", "apps", "get", "--app", APP_CLIENT_ID]
-            )
+            runner.invoke(cli, ["-o", "json", "azure", "apps", "get", "--app", APP_CLIENT_ID])
         ).stdout
     )
 
@@ -134,15 +124,11 @@ def test_a_guid_is_tried_as_an_app_id_first(
     assert filters(seen) == [f"appId eq '{APP_CLIENT_ID}'"]
 
 
-def test_an_object_id_falls_back_to_direct_addressing(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_an_object_id_falls_back_to_direct_addressing(runner: Any, cli: Any, tenant: Any) -> None:
     """No appId matches an object ID, so the lookup retries /applications/{id}."""
     payload = json.loads(
         ok(
-            runner.invoke(
-                cli, ["-o", "json", "azure", "apps", "get", "--app", APP_OBJECT_ID]
-            )
+            runner.invoke(cli, ["-o", "json", "azure", "apps", "get", "--app", APP_OBJECT_ID])
         ).stdout
     )
 
@@ -157,13 +143,9 @@ def test_a_display_name_uses_an_equality_filter(
     assert filters(seen) == [f"displayName eq '{SCIM_APP}'"]
 
 
-def test_an_ambiguous_display_name_is_refused(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_an_ambiguous_display_name_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
     result = failed(
-        runner.invoke(
-            cli, ["azure", "apps", "get", "--app", "Company", "--match", "prefix"]
-        ),
+        runner.invoke(cli, ["azure", "apps", "get", "--app", "Company", "--match", "prefix"]),
         2,
     )
 
@@ -171,9 +153,7 @@ def test_an_ambiguous_display_name_is_refused(
 
 
 def test_an_unknown_name_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
-    result = failed(
-        runner.invoke(cli, ["azure", "apps", "get", "--app", "no-such-app"]), 4
-    )
+    result = failed(runner.invoke(cli, ["azure", "apps", "get", "--app", "no-such-app"]), 4)
 
     assert "no-such-app" in result.output
 
@@ -181,9 +161,7 @@ def test_an_unknown_name_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
 # ---------------------------------------------------------------------------
 # get --with-sp: the appId join
 # ---------------------------------------------------------------------------
-def test_with_sp_attaches_the_service_principal(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_with_sp_attaches_the_service_principal(runner: Any, cli: Any, tenant: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
@@ -247,9 +225,7 @@ def test_without_the_flag_no_service_principal_call_is_made(
 # ---------------------------------------------------------------------------
 # batches
 # ---------------------------------------------------------------------------
-def test_several_identifiers_resolve_concurrently(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_several_identifiers_resolve_concurrently(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -270,9 +246,7 @@ def test_several_identifiers_resolve_concurrently(
     assert len(lines(result.stdout)) == 2
 
 
-def test_ignore_missing_tolerates_an_unknown_identifier(
-    runner: Any, cli: Any, tenant: Any
-) -> None:
+def test_ignore_missing_tolerates_an_unknown_identifier(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
         runner.invoke(
             cli,

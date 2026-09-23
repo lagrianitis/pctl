@@ -40,17 +40,13 @@ from .common import add_relations, match_option
 @click.option("--members", is_flag=True, help="Include direct members.")
 @click.option("--owners", is_flag=True, help="Include owners.")
 @click.option("--transitive", is_flag=True, help="Include transitive (nested) members.")
-@click.option(
-    "--counts", is_flag=True, help="Include member/owner counts without listing them."
-)
+@click.option("--counts", is_flag=True, help="Include member/owner counts without listing them.")
 @click.option(
     "--member-limit",
     type=click.IntRange(min=1),
     help="Cap the number of members/owners fetched per group.",
 )
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields for the group."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields for the group.")
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -101,9 +97,7 @@ def command(
             app.log(f"resolving {len(wanted)} display name(s) with match={match_mode}")
             resolved = await asyncio.gather(
                 *[
-                    client.find_groups_by_display_name(
-                        name, mode=match_mode, select=group_fields
-                    )
+                    client.find_groups_by_display_name(name, mode=match_mode, select=group_fields)
                     for name in wanted
                 ]
             )
@@ -138,9 +132,7 @@ def command(
 
     found, missing = run(_run())
 
-    with Renderer(
-        app.output, columns=table_columns, single=len(found) == 1
-    ) as renderer:
+    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
         renderer.write_all(found)
 
     for name in missing:

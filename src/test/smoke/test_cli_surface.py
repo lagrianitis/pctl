@@ -90,9 +90,7 @@ def test_every_command_renders_help(runner: Any, cli: Any, path: list[str]) -> N
 
 
 @pytest.mark.parametrize("path", COMMAND_PATHS, ids=lambda p: " ".join(p) or "root")
-def test_short_help_flag_works_everywhere(
-    runner: Any, cli: Any, path: list[str]
-) -> None:
+def test_short_help_flag_works_everywhere(runner: Any, cli: Any, path: list[str]) -> None:
     """`-h` is wired through context_settings on every group."""
     assert help_for(runner, cli, path, "-h").stdout.startswith("Usage: pctl")
 
@@ -179,9 +177,7 @@ def test_an_ambiguous_prefix_names_the_candidates(runner: Any, cli: Any) -> None
 # completion
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
-def test_completion_prints_setup_for_each_shell(
-    runner: Any, cli: Any, shell: str
-) -> None:
+def test_completion_prints_setup_for_each_shell(runner: Any, cli: Any, shell: str) -> None:
     result = ok(runner.invoke(cli, ["completion", "--shell", shell]))
     assert "_PCTL_COMPLETE" in result.stdout
     assert shell in result.stdout
@@ -200,9 +196,7 @@ def test_no_command_declares_a_positional_argument(cli: Any) -> None:
     import click
 
     def walk(command: click.Command, ctx: click.Context) -> None:
-        offenders = [
-            param.name for param in command.params if isinstance(param, click.Argument)
-        ]
+        offenders = [param.name for param in command.params if isinstance(param, click.Argument)]
         assert offenders == [], f"{command.name} declares positional {offenders}"
         if isinstance(command, click.Group):
             for name in command.list_commands(ctx):

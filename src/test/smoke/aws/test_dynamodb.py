@@ -67,9 +67,7 @@ def test_the_table_option_is_named_in_the_error(ddb: Callable[..., Any]) -> None
     assert "--table" in failed(ddb("scan"), 2).output
 
 
-def test_query_without_a_key_condition_is_a_usage_error(
-    ddb: Callable[..., Any]
-) -> None:
+def test_query_without_a_key_condition_is_a_usage_error(ddb: Callable[..., Any]) -> None:
     result = failed(ddb("query", "--table", TABLE), 2)
     assert "--key" in result.output
 

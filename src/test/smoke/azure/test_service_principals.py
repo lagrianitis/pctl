@@ -91,9 +91,7 @@ def test_owners_needs_an_app_name(sp: Callable[..., Any]) -> None:
 
 
 def test_an_unknown_owner_type_is_rejected(sp: Callable[..., Any]) -> None:
-    result = failed(
-        sp("add-owner", "--app", "a", "--owner", "someone", "--owner-type", "group"), 2
-    )
+    result = failed(sp("add-owner", "--app", "a", "--owner", "someone", "--owner-type", "group"), 2)
     assert "--owner-type" in result.output
 
 
@@ -120,9 +118,7 @@ def test_get_help_documents_the_match_modes(sp: Callable[..., Any]) -> None:
         assert mode in stdout
 
 
-def test_get_defaults_to_search_because_app_names_are_long(
-    sp: Callable[..., Any]
-) -> None:
+def test_get_defaults_to_search_because_app_names_are_long(sp: Callable[..., Any]) -> None:
     """Unlike groups, which default to exact."""
     assert "search" in ok(sp("get", "--help")).stdout
 
@@ -133,9 +129,7 @@ def test_assignments_help_documents_both_directions(sp: Callable[..., Any]) -> N
     assert "--principal" in stdout
 
 
-def test_assignments_help_documents_the_principal_match_modes(
-    sp: Callable[..., Any]
-) -> None:
+def test_assignments_help_documents_the_principal_match_modes(sp: Callable[..., Any]) -> None:
     stdout = ok(sp("assignments", "--help")).stdout
     for mode in ("exact", "prefix", "contains"):
         assert mode in stdout
@@ -180,16 +174,12 @@ def test_provision_help_names_the_permission(sp: Callable[..., Any]) -> None:
     assert "Synchronization.ReadWrite.All" in ok(sp("provision", "--help")).stdout
 
 
-def test_provision_help_explains_that_200_is_not_success(
-    sp: Callable[..., Any]
-) -> None:
+def test_provision_help_explains_that_200_is_not_success(sp: Callable[..., Any]) -> None:
     """The trap this command exists to hide, so the help has to say it."""
     assert "does not mean" in ok(sp("provision", "--help")).stdout
 
 
-def test_provision_help_documents_the_job_and_rule_overrides(
-    sp: Callable[..., Any]
-) -> None:
+def test_provision_help_documents_the_job_and_rule_overrides(sp: Callable[..., Any]) -> None:
     stdout = ok(sp("provision", "--help")).stdout
     assert "--job" in stdout
     assert "--rule" in stdout

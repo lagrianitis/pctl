@@ -42,9 +42,7 @@ from .common import DEFAULT_LIST_COLUMNS, match_option, resolve_application
     is_flag=True,
     help="Also fetch the service principal that instantiates the app in this tenant.",
 )
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
 @click.option(
     "--ignore-missing",
     is_flag=True,
@@ -114,10 +112,7 @@ def command(
             if found and with_sp:
                 app.log(f"fetching service principals for {len(found)} app(s)")
                 principals = await asyncio.gather(
-                    *[
-                        client.find_service_principal_by_app_id(item["appId"])
-                        for item in found
-                    ]
+                    *[client.find_service_principal_by_app_id(item["appId"]) for item in found]
                 )
                 for item, principal in zip(found, principals, strict=True):
                     item["servicePrincipal"] = principal
@@ -126,9 +121,7 @@ def command(
 
     found, failed = run(_run())
 
-    with Renderer(
-        app.output, columns=table_columns, single=len(found) == 1
-    ) as renderer:
+    with Renderer(app.output, columns=table_columns, single=len(found) == 1) as renderer:
         renderer.write_all(found)
 
     for _identifier, reason in failed:
@@ -144,9 +137,7 @@ def command(
 
     summarise(len(found), "app registration", quiet=app.quiet)
     if failed and not ignore_missing:
-        raise NotFoundError(
-            f"{len(failed)} of {len(wanted)} identifier(s) matched nothing."
-        )
+        raise NotFoundError(f"{len(failed)} of {len(wanted)} identifier(s) matched nothing.")
 
 
 def _columns(with_sp: bool, selected: list[str] | None) -> list[str]:

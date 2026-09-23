@@ -19,9 +19,7 @@ from .config import AppContext, OutputFormat
 OUTPUT_CHOICES = [fmt.value for fmt in OutputFormat]
 
 
-def _set_attr(
-    name: str, transform: Callable[[Any], Any] | None = None
-) -> Callable[..., Any]:
+def _set_attr(name: str, transform: Callable[[Any], Any] | None = None) -> Callable[..., Any]:
     """Build a click callback that stores a non-None value on the AppContext."""
 
     def callback(ctx: click.Context, _param: click.Parameter, value: Any) -> Any:

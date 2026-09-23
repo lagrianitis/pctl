@@ -47,9 +47,7 @@ def command(
     app = ctx.ensure_object(AppContext)
     parsed = parse_json_option(key, "--key")
     if not parsed:
-        raise click.BadParameter(
-            "key must be a non-empty JSON object", param_hint="--key"
-        )
+        raise click.BadParameter("key must be a non-empty JSON object", param_hint="--key")
 
     extra: dict[str, Any] = {}
     if projection:

@@ -200,9 +200,7 @@ async def resolve_owners(
 
     async def one(candidate: str) -> dict[str, Any] | tuple[str, str]:
         try:
-            return await resolve_owner(
-                client, candidate, mode=mode, owner_type=owner_type
-            )
+            return await resolve_owner(client, candidate, mode=mode, owner_type=owner_type)
         except (NotFoundError, ConfigError) as exc:
             return candidate, str(exc)
 

@@ -67,16 +67,12 @@ def test_the_page_size_asks_for_the_graph_maximum(
 def test_limit_stops_early(runner: Any, cli: Any, graph: Any, seen: list[str]) -> None:
     graph.get(f"{GRAPH}/groups").mock(side_effect=_paged(seen))
 
-    result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "groups", "list", "-n", "2"])
-    )
+    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "groups", "list", "-n", "2"]))
 
     assert len(lines(result.stdout)) == 2
 
 
-def test_table_output_honours_columns(
-    runner: Any, cli: Any, graph: Any, seen: list[str]
-) -> None:
+def test_table_output_honours_columns(runner: Any, cli: Any, graph: Any, seen: list[str]) -> None:
     graph.get(f"{GRAPH}/groups").mock(side_effect=_paged(seen))
 
     result = ok(runner.invoke(cli, ["azure", "groups", "list", "-c", "displayName,id"]))
@@ -84,15 +80,11 @@ def test_table_output_honours_columns(
     assert lines(result.stdout)[0].split() == ["displayName", "id"]
 
 
-def test_csv_writes_a_header_then_rows(
-    runner: Any, cli: Any, graph: Any, seen: list[str]
-) -> None:
+def test_csv_writes_a_header_then_rows(runner: Any, cli: Any, graph: Any, seen: list[str]) -> None:
     graph.get(f"{GRAPH}/groups").mock(side_effect=_paged(seen))
 
     result = ok(
-        runner.invoke(
-            cli, ["-o", "csv", "azure", "groups", "list", "-c", "displayName,mail"]
-        )
+        runner.invoke(cli, ["-o", "csv", "azure", "groups", "list", "-c", "displayName,mail"])
     )
 
     assert lines(result.stdout)[:2] == [
@@ -107,9 +99,7 @@ def test_a_single_result_is_still_a_json_array(
     """`list` returns a collection, so one item must not collapse to an object."""
     graph.get(f"{GRAPH}/groups").mock(side_effect=_paged(seen))
 
-    result = ok(
-        runner.invoke(cli, ["-o", "json", "azure", "groups", "list", "-n", "1"])
-    )
+    result = ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "list", "-n", "1"]))
 
     assert isinstance(json.loads(result.stdout), list)
 
@@ -158,9 +148,7 @@ def test_count_only_prints_just_the_number(runner: Any, cli: Any, graph: Any) ->
     import httpx
 
     graph.get(f"{GRAPH}/groups").mock(
-        return_value=httpx.Response(
-            200, json={"@odata.count": 4211, "value": [graph_group(0)]}
-        )
+        return_value=httpx.Response(200, json={"@odata.count": 4211, "value": [graph_group(0)]})
     )
 
     result = ok(runner.invoke(cli, ["azure", "groups", "list", "--count-only"]))
@@ -181,9 +169,7 @@ def named_groups(graph: Any, seen: list[str]) -> Any:
     import httpx
 
     graph.get(f"{GRAPH}/groups/a/members").mock(
-        return_value=httpx.Response(
-            200, json={"value": [{"id": "u1", "displayName": "Ann"}]}
-        )
+        return_value=httpx.Response(200, json={"value": [{"id": "u1", "displayName": "Ann"}]})
     )
     graph.get(f"{GRAPH}/groups/b/members").mock(
         return_value=httpx.Response(
@@ -191,41 +177,27 @@ def named_groups(graph: Any, seen: list[str]) -> Any:
         )
     )
     graph.get(f"{GRAPH}/groups/a/owners").mock(
-        return_value=httpx.Response(
-            200, json={"value": [{"id": "o1", "displayName": "Ola"}]}
-        )
+        return_value=httpx.Response(200, json={"value": [{"id": "o1", "displayName": "Ola"}]})
     )
-    graph.get(f"{GRAPH}/groups/a/members/$count").mock(
-        return_value=httpx.Response(200, text="1")
-    )
-    graph.get(f"{GRAPH}/groups/a/owners/$count").mock(
-        return_value=httpx.Response(200, text="1")
-    )
+    graph.get(f"{GRAPH}/groups/a/members/$count").mock(return_value=httpx.Response(200, text="1"))
+    graph.get(f"{GRAPH}/groups/a/owners/$count").mock(return_value=httpx.Response(200, text="1"))
 
     def by_display_name(request: httpx.Request) -> httpx.Response:
         url = unquote_plus(str(request.url))
         seen.append(str(request.url))
         if "'Team A'" in url:
-            return httpx.Response(
-                200, json={"value": [{"id": "a", "displayName": "Team A"}]}
-            )
+            return httpx.Response(200, json={"value": [{"id": "a", "displayName": "Team A"}]})
         if "'Team B'" in url:
-            return httpx.Response(
-                200, json={"value": [{"id": "b", "displayName": "Team B"}]}
-            )
+            return httpx.Response(200, json={"value": [{"id": "b", "displayName": "Team B"}]})
         return httpx.Response(200, json={"value": []})
 
     graph.get(f"{GRAPH}/groups").mock(side_effect=by_display_name)
     return graph
 
 
-def test_a_single_group_is_an_object_not_an_array(
-    runner: Any, cli: Any, named_groups: Any
-) -> None:
+def test_a_single_group_is_an_object_not_an_array(runner: Any, cli: Any, named_groups: Any) -> None:
     """`get` of one name is a document, unlike `list`, so jq needs no [0]."""
-    result = ok(
-        runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "--name", "Team A"])
-    )
+    result = ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "--name", "Team A"]))
 
     payload = json.loads(result.stdout)
     assert isinstance(payload, dict)
@@ -298,16 +270,12 @@ def test_from_file_skips_comments_and_removes_duplicates(
     listing = tmp_path / "groups.txt"
     listing.write_text("# platform groups\nTeam A\n\nTeam A\n", encoding="utf-8")
 
-    result = ok(
-        runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "-f", str(listing)])
-    )
+    result = ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "-f", str(listing)]))
 
     assert isinstance(json.loads(result.stdout), dict)
 
 
-def test_an_unmatched_display_name_exits_4(
-    runner: Any, cli: Any, named_groups: Any
-) -> None:
+def test_an_unmatched_display_name_exits_4(runner: Any, cli: Any, named_groups: Any) -> None:
     result = failed(runner.invoke(cli, ["azure", "groups", "get", "--name", "Nope"]), 4)
 
     assert "Nope" in result.output
@@ -316,16 +284,10 @@ def test_an_unmatched_display_name_exits_4(
 def test_ignore_missing_downgrades_a_miss_to_success(
     runner: Any, cli: Any, named_groups: Any
 ) -> None:
-    ok(
-        runner.invoke(
-            cli, ["azure", "groups", "get", "--name", "Nope", "--ignore-missing"]
-        )
-    )
+    ok(runner.invoke(cli, ["azure", "groups", "get", "--name", "Nope", "--ignore-missing"]))
 
 
-def test_no_names_at_all_is_a_usage_error(
-    runner: Any, cli: Any, named_groups: Any
-) -> None:
+def test_no_names_at_all_is_a_usage_error(runner: Any, cli: Any, named_groups: Any) -> None:
     failed(runner.invoke(cli, ["azure", "groups", "get"]), 2)
 
 
@@ -342,17 +304,13 @@ def member_routes(graph: Any) -> Any:
         return_value=httpx.Response(200, json={"value": [member]})
     )
     graph.get(f"{GRAPH}/groups/a/owners").mock(
-        return_value=httpx.Response(
-            200, json={"value": [{"id": "o1", "displayName": "Ola"}]}
-        )
+        return_value=httpx.Response(200, json={"value": [{"id": "o1", "displayName": "Ola"}]})
     )
     graph.get(f"{GRAPH}/groups/a/members").mock(
         return_value=httpx.Response(200, json={"value": [member]})
     )
     graph.get(f"{GRAPH}/groups").mock(
-        return_value=httpx.Response(
-            200, json={"value": [{"id": "a", "displayName": "Team A"}]}
-        )
+        return_value=httpx.Response(200, json={"value": [{"id": "a", "displayName": "Team A"}]})
     )
     return graph
 
@@ -361,9 +319,7 @@ def test_members_csv_uses_the_default_member_columns(
     runner: Any, cli: Any, member_routes: Any
 ) -> None:
     result = ok(
-        runner.invoke(
-            cli, ["-o", "csv", "azure", "groups", "members", "--group", "Team A"]
-        )
+        runner.invoke(cli, ["-o", "csv", "azure", "groups", "members", "--group", "Team A"])
     )
 
     assert lines(result.stdout)[:2] == [
@@ -372,22 +328,16 @@ def test_members_csv_uses_the_default_member_columns(
     ]
 
 
-def test_the_alias_and_command_prefixes_resolve(
-    runner: Any, cli: Any, member_routes: Any
-) -> None:
+def test_the_alias_and_command_prefixes_resolve(runner: Any, cli: Any, member_routes: Any) -> None:
     """`az gr mem` is `azure groups members`, and it has to work end to end."""
     result = ok(
-        runner.invoke(
-            cli, ["-o", "csv", "az", "gr", "mem", "--group", "Team A", "--transitive"]
-        )
+        runner.invoke(cli, ["-o", "csv", "az", "gr", "mem", "--group", "Team A", "--transitive"])
     )
 
     assert f"Ann,ann@{TENANT},u1" in result.stdout
 
 
-def test_owners_are_returned_instead_of_members(
-    runner: Any, cli: Any, member_routes: Any
-) -> None:
+def test_owners_are_returned_instead_of_members(runner: Any, cli: Any, member_routes: Any) -> None:
     result = ok(
         runner.invoke(
             cli,

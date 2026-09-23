@@ -45,9 +45,7 @@ CONTEXT_SETTINGS = {
     metavar="FORMAT",
     help="Output format for every command.",
 )
-@click.option(
-    "-q", "--quiet", is_flag=True, help="Suppress result summaries on stderr."
-)
+@click.option("-q", "--quiet", is_flag=True, help="Suppress result summaries on stderr.")
 @click.option("-v", "--verbose", is_flag=True, help="Log progress to stderr.")
 @click.option(
     "--timeout",

@@ -45,21 +45,15 @@ def read_options(func: Any) -> Any:
         metavar="EXPR",
         help="ProjectionExpression: fetch only these attributes (less data, faster).",
     )(func)
-    func = click.option(
-        "--index", metavar="NAME", help="Query or scan a secondary index."
-    )(func)
-    func = click.option(
-        "--filter", "filter_expression", metavar="EXPR", help="FilterExpression."
-    )(func)
-    func = click.option(
-        "--consistent", is_flag=True, help="Use a strongly consistent read."
-    )(func)
-    func = click.option(
-        "--page-size", type=click.IntRange(1, 1000), help="Items per page."
-    )(func)
-    func = click.option(
-        "-n", "--limit", type=click.IntRange(min=1), help="Stop after N items."
-    )(func)
+    func = click.option("--index", metavar="NAME", help="Query or scan a secondary index.")(func)
+    func = click.option("--filter", "filter_expression", metavar="EXPR", help="FilterExpression.")(
+        func
+    )
+    func = click.option("--consistent", is_flag=True, help="Use a strongly consistent read.")(func)
+    func = click.option("--page-size", type=click.IntRange(1, 1000), help="Items per page.")(func)
+    func = click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N items.")(
+        func
+    )
     return func
 
 

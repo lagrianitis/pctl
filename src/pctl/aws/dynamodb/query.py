@@ -21,9 +21,7 @@ from .common import read_options, table_option
     required=True,
     help='KeyConditionExpression, e.g. "pk = :pk AND begins_with(sk, :prefix)".',
 )
-@click.option(
-    "--desc", "descending", is_flag=True, help="Return items in descending sort order."
-)
+@click.option("--desc", "descending", is_flag=True, help="Return items in descending sort order.")
 @columns_option
 @output_options
 @click.pass_context
@@ -60,9 +58,7 @@ def command(
         projection=projection,
         filter_expression=filter_expression,
         key_condition=key_condition,
-        expression_values=serialize_values(
-            parse_json_option(expression_values, "--values")
-        ),
+        expression_values=serialize_values(parse_json_option(expression_values, "--values")),
         expression_names=parse_json_option(expression_names, "--names"),
         consistent=consistent,
         page_size=page_size,
