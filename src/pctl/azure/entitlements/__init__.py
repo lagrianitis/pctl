@@ -40,6 +40,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.entitlements.get_package:command",
         "Show an access package by name or ID.",
     ),
+    "delete-package": (
+        "pctl.azure.entitlements.delete_package:command",
+        "Delete an access package. Irreversible.",
+    ),
     "list-catalogs": (
         "pctl.azure.entitlements.list_catalogs:command",
         "List access package catalogs.",

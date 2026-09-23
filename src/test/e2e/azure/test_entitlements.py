@@ -34,7 +34,12 @@ CATALOGS = [
         "catalogType": "userManaged",
         "state": "published",
     },
-    {"id": "c2", "displayName": "Corporate", "catalogType": "serviceDefault", "state": "published"},
+    {
+        "id": "c2",
+        "displayName": "Corporate",
+        "catalogType": "serviceDefault",
+        "state": "published",
+    },
 ]
 
 
@@ -103,7 +108,9 @@ def test_the_path_is_nested_under_identity_governance(
 # ---------------------------------------------------------------------------
 # list-packages
 # ---------------------------------------------------------------------------
-def test_list_packages_streams_the_collection(runner: Any, cli: Any, governance: Any) -> None:
+def test_list_packages_streams_the_collection(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-packages"]))
 
     assert len(lines(result.stdout)) == 3
@@ -114,7 +121,8 @@ def test_starts_with_is_pushed_to_graph(
 ) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "eam", "list-packages", "--starts-with", "AWS "]
+            cli,
+            ["-o", "ndjson", "azure", "eam", "list-packages", "--starts-with", "AWS "],
         )
     )
 
@@ -125,7 +133,11 @@ def test_starts_with_is_pushed_to_graph(
 def test_name_becomes_an_equality_filter(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "eam", "list-packages", "--name", "AWS Platform Access"]))
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "list-packages", "--name", "AWS Platform Access"]
+        )
+    )
 
     assert filters(seen) == ["displayName eq 'AWS Platform Access'"]
 
@@ -135,7 +147,9 @@ def test_contains_filters_locally_and_sends_no_filter(
 ) -> None:
     """Graph has no substring operator here, so the narrowing happens after fetching."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "aws"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "aws"]
+        )
     )
 
     assert filters(seen) == []
@@ -146,19 +160,32 @@ def test_contains_filters_locally_and_sends_no_filter(
 def test_contains_is_case_insensitive(runner: Any, cli: Any, governance: Any) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "INCIDENT"]
+            cli,
+            ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "INCIDENT"],
         )
     )
 
     assert len(lines(result.stdout)) == 1
 
 
-def test_a_limit_applies_after_local_filtering(runner: Any, cli: Any, governance: Any) -> None:
+def test_a_limit_applies_after_local_filtering(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     """Capping before the filter would cap the wrong set and drop real matches."""
     result = ok(
         runner.invoke(
             cli,
-            ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "aws", "-n", "1"],
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "list-packages",
+                "--contains",
+                "aws",
+                "-n",
+                "1",
+            ],
         )
     )
 
@@ -168,12 +195,18 @@ def test_a_limit_applies_after_local_filtering(runner: Any, cli: Any, governance
 def test_a_raw_filter_is_passed_through_untouched(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "eam", "list-packages", "--filter", "isHidden eq false"]))
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "list-packages", "--filter", "isHidden eq false"]
+        )
+    )
 
     assert filters(seen) == ["isHidden eq false"]
 
 
-def test_the_default_columns_are_package_shaped(runner: Any, cli: Any, governance: Any) -> None:
+def test_the_default_columns_are_package_shaped(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     result = ok(runner.invoke(cli, ["-o", "csv", "azure", "eam", "list-packages"]))
 
     assert lines(result.stdout)[0] == "displayName,isHidden,id"
@@ -209,7 +242,16 @@ def test_get_package_by_id_addresses_it_directly(
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-package", "--access-package", PACKAGE_ID]
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-package",
+                    "--access-package",
+                    PACKAGE_ID,
+                ],
             )
         ).stdout
     )
@@ -225,7 +267,16 @@ def test_get_package_by_id_still_returns_exactly_one(
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-package", "--access-package", PACKAGE_ID]
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-package",
+                    "--access-package",
+                    PACKAGE_ID,
+                ],
             )
         ).stdout
     )
@@ -253,7 +304,9 @@ def test_with_policies_expands_the_policies(
     assert "$expand=assignmentPolicies" in unquote_plus(seen[-1])
 
 
-def test_a_contains_pattern_returns_every_match(runner: Any, cli: Any, governance: Any) -> None:
+def test_a_contains_pattern_returns_every_match(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     """A pattern matching several packages is the normal case, not an error."""
     result = ok(
         runner.invoke(
@@ -276,7 +329,9 @@ def test_a_contains_pattern_returns_every_match(runner: Any, cli: Any, governanc
     assert names == ["AWS Platform Access", "AWS Billing Access"]
 
 
-def test_a_prefix_pattern_returns_every_match(runner: Any, cli: Any, governance: Any) -> None:
+def test_a_prefix_pattern_returns_every_match(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -297,7 +352,9 @@ def test_a_prefix_pattern_returns_every_match(runner: Any, cli: Any, governance:
     assert len(lines(result.stdout)) == 2
 
 
-def test_several_matches_render_as_an_array(runner: Any, cli: Any, governance: Any) -> None:
+def test_several_matches_render_as_an_array(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
@@ -321,7 +378,9 @@ def test_several_matches_render_as_an_array(runner: Any, cli: Any, governance: A
     assert len(payload) == 2
 
 
-def test_a_single_match_renders_as_an_object(runner: Any, cli: Any, governance: Any) -> None:
+def test_a_single_match_renders_as_an_object(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     """So jq needs no index for the common case, matching `groups get`."""
     payload = json.loads(
         ok(
@@ -349,7 +408,16 @@ def test_a_single_match_renders_as_an_object(runner: Any, cli: Any, governance: 
 def test_an_unknown_package_exits_4(runner: Any, cli: Any, governance: Any) -> None:
     result = failed(
         runner.invoke(
-            cli, ["azure", "eam", "get-package", "--access-package", "nope", "--match", "contains"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "get-package",
+                "--access-package",
+                "nope",
+                "--match",
+                "contains",
+            ],
         ),
         4,
     )
@@ -362,7 +430,10 @@ def test_the_not_found_message_suggests_the_pattern_modes(
 ) -> None:
     """Exact is the default, and the pattern modes are what usually rescue it."""
     result = failed(
-        runner.invoke(cli, ["azure", "eam", "get-package", "--access-package", "Platform"]), 4
+        runner.invoke(
+            cli, ["azure", "eam", "get-package", "--access-package", "Platform"]
+        ),
+        4,
     )
 
     assert "--match prefix" in result.output
@@ -372,7 +443,9 @@ def test_the_not_found_message_suggests_the_pattern_modes(
 # ---------------------------------------------------------------------------
 # catalogs
 # ---------------------------------------------------------------------------
-def test_list_catalogs_streams_the_collection(runner: Any, cli: Any, governance: Any) -> None:
+def test_list_catalogs_streams_the_collection(
+    runner: Any, cli: Any, governance: Any
+) -> None:
     result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-catalogs"]))
 
     assert len(lines(result.stdout)) == 2
@@ -390,7 +463,16 @@ def test_get_catalog_by_name(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-catalog", "--catalog", "AWS Platform"]
+                cli,
+                [
+                    "-o",
+                    "json",
+                    "azure",
+                    "eam",
+                    "get-catalog",
+                    "--catalog",
+                    "AWS Platform",
+                ],
             )
         ).stdout
     )
@@ -402,7 +484,8 @@ def test_get_catalog_by_id(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-catalog", "--catalog", CATALOG_ID]
+                cli,
+                ["-o", "json", "azure", "eam", "get-catalog", "--catalog", CATALOG_ID],
             )
         ).stdout
     )
@@ -417,7 +500,11 @@ def test_catalog_name_is_resolved_then_used_as_a_filter(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
     """The name is looked up first, because the filter needs the catalog's id."""
-    ok(runner.invoke(cli, ["azure", "eam", "list-packages", "--catalog", "AWS Platform"]))
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "list-packages", "--catalog", "AWS Platform"]
+        )
+    )
 
     assert "displayName eq 'AWS Platform'" in filters(seen)
     assert f"catalog/id eq '{CATALOG_ID}'" in filters(seen)
@@ -449,7 +536,10 @@ def test_catalog_scope_combines_with_a_name_filter(
         )
     )
 
-    assert f"startswith(displayName,'AWS ') and catalog/id eq '{CATALOG_ID}'" in filters(seen)
+    assert (
+        f"startswith(displayName,'AWS ') and catalog/id eq '{CATALOG_ID}'"
+        in filters(seen)
+    )
 
 
 def test_a_raw_filter_wins_over_the_catalog_shortcut(
@@ -476,7 +566,10 @@ def test_a_raw_filter_wins_over_the_catalog_shortcut(
 
 def test_an_unknown_catalog_exits_4(runner: Any, cli: Any, governance: Any) -> None:
     result = failed(
-        runner.invoke(cli, ["azure", "eam", "list-packages", "--catalog", "no-such-catalog"]), 4
+        runner.invoke(
+            cli, ["azure", "eam", "list-packages", "--catalog", "no-such-catalog"]
+        ),
+        4,
     )
 
     assert "no-such-catalog" in result.output
@@ -489,19 +582,31 @@ ASSIGNMENTS = [
     {
         "id": "asg1",
         "state": "Delivered",
-        "target": {"objectId": "u1", "displayName": "Ann Example", "email": "ann@example.com"},
+        "target": {
+            "objectId": "u1",
+            "displayName": "Ann Example",
+            "email": "ann@example.com",
+        },
         "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
     },
     {
         "id": "asg2",
         "state": "Delivered",
-        "target": {"objectId": "u2", "displayName": "Bob Example", "email": "bob@example.com"},
+        "target": {
+            "objectId": "u2",
+            "displayName": "Bob Example",
+            "email": "bob@example.com",
+        },
         "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
     },
     {
         "id": "asg3",
         "state": "Expired",
-        "target": {"objectId": "u3", "displayName": "Carol Example", "email": "carol@example.com"},
+        "target": {
+            "objectId": "u3",
+            "displayName": "Carol Example",
+            "email": "carol@example.com",
+        },
         "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
     },
 ]
@@ -533,7 +638,13 @@ def test_the_package_name_becomes_an_access_package_filter(
     ok(
         runner.invoke(
             cli,
-            ["azure", "eam", "list-assignments", "--access-package", "AWS Platform Access"],
+            [
+                "azure",
+                "eam",
+                "list-assignments",
+                "--access-package",
+                "AWS Platform Access",
+            ],
         )
     )
 
@@ -559,21 +670,38 @@ def test_package_and_state_combine_into_one_filter(
         )
     )
 
-    assert f"accessPackage/id eq '{PACKAGE_ID}' and state eq 'Delivered'" in filters(seen)
+    assert f"accessPackage/id eq '{PACKAGE_ID}' and state eq 'Delivered'" in filters(
+        seen
+    )
 
 
 def test_a_package_id_skips_the_lookup(
     runner: Any, cli: Any, assignments: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "eam", "list-assignments", "--access-package", PACKAGE_ID]))
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "list-assignments", "--access-package", PACKAGE_ID]
+        )
+    )
 
     assert filters(seen) == [f"accessPackage/id eq '{PACKAGE_ID}'"]
 
 
-def test_the_state_filter_narrows_server_side(runner: Any, cli: Any, assignments: Any) -> None:
+def test_the_state_filter_narrows_server_side(
+    runner: Any, cli: Any, assignments: Any
+) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--state", "Delivered"]
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "list-assignments",
+                "--state",
+                "Delivered",
+            ],
         )
     )
 
@@ -603,7 +731,9 @@ def test_the_nested_names_are_lifted_to_the_top_level(
     runner: Any, cli: Any, assignments: Any
 ) -> None:
     """A table column cannot address target.displayName, so it is copied up."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"])
+    )
 
     first = json.loads(lines(result.stdout)[0])
     assert first["targetDisplayName"] == "Ann Example"
@@ -611,24 +741,37 @@ def test_the_nested_names_are_lifted_to_the_top_level(
     assert first["accessPackageName"] == "AWS Platform Access"
 
 
-def test_the_nested_objects_survive_flattening(runner: Any, cli: Any, assignments: Any) -> None:
+def test_the_nested_objects_survive_flattening(
+    runner: Any, cli: Any, assignments: Any
+) -> None:
     """The additions must not replace what json consumers already rely on."""
-    result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments"])
+    )
 
     first = json.loads(lines(result.stdout)[0])
     assert first["target"]["objectId"] == "u1"
     assert first["accessPackage"]["id"] == PACKAGE_ID
 
 
-def test_the_default_columns_are_assignment_shaped(runner: Any, cli: Any, assignments: Any) -> None:
+def test_the_default_columns_are_assignment_shaped(
+    runner: Any, cli: Any, assignments: Any
+) -> None:
     result = ok(runner.invoke(cli, ["-o", "csv", "azure", "eam", "list-assignments"]))
 
-    assert lines(result.stdout)[0] == "targetDisplayName,targetEmail,accessPackageName,state,id"
+    assert (
+        lines(result.stdout)[0]
+        == "targetDisplayName,targetEmail,accessPackageName,state,id"
+    )
 
 
-def test_target_filters_locally_on_name(runner: Any, cli: Any, assignments: Any) -> None:
+def test_target_filters_locally_on_name(
+    runner: Any, cli: Any, assignments: Any
+) -> None:
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "Ann"])
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "Ann"]
+        )
     )
 
     assert len(lines(result.stdout)) == 1
@@ -637,7 +780,10 @@ def test_target_filters_locally_on_name(runner: Any, cli: Any, assignments: Any)
 def test_target_also_matches_an_email(runner: Any, cli: Any, assignments: Any) -> None:
     """A person is as likely to be looked up by address as by name."""
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "bob@"])
+        runner.invoke(
+            cli,
+            ["-o", "ndjson", "azure", "eam", "list-assignments", "--target", "bob@"],
+        )
     )
 
     assert json.loads(lines(result.stdout)[0])["targetDisplayName"] == "Bob Example"
@@ -668,7 +814,12 @@ def test_an_invalid_state_is_rejected_before_any_request(
     runner: Any, cli: Any, assignments: Any, seen: list[str]
 ) -> None:
     """Graph's states are capitalised exactly, so a typo must fail at parse time."""
-    failed(runner.invoke(cli, ["azure", "eam", "list-assignments", "--state", "delivered"]), 2)
+    failed(
+        runner.invoke(
+            cli, ["azure", "eam", "list-assignments", "--state", "delivered"]
+        ),
+        2,
+    )
 
     assert seen == []
 
@@ -701,7 +852,9 @@ def writable(governance: Any, seen: list[str]) -> Any:
         seen.append(str(request.url))
         url = unquote_plus(str(request.url))
         if f"target/objectId eq '{ANN_ID}'" in url:
-            return httpx.Response(200, json={"value": [{"id": "asg-ann", "state": "Delivered"}]})
+            return httpx.Response(
+                200, json={"value": [{"id": "asg-ann", "state": "Delivered"}]}
+            )
         return httpx.Response(200, json={"value": []})
 
     def users(request: httpx.Request) -> httpx.Response:
@@ -725,7 +878,9 @@ def writable(governance: Any, seen: list[str]) -> Any:
     return governance
 
 
-def test_adding_by_email_posts_an_admin_add_request(runner: Any, cli: Any, writable: Any) -> None:
+def test_adding_by_email_posts_an_admin_add_request(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -737,6 +892,7 @@ def test_adding_by_email_posts_an_admin_add_request(runner: Any, cli: Any, writa
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -757,6 +913,7 @@ def test_the_add_body_uses_the_v1_shape(runner: Any, cli: Any, writable: Any) ->
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -771,7 +928,9 @@ def test_the_add_body_uses_the_v1_shape(runner: Any, cli: Any, writable: Any) ->
     }
 
 
-def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writable: Any) -> None:
+def test_an_existing_assignment_is_not_re_requested(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -783,6 +942,7 @@ def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writa
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "ann@example.com",
             ],
         )
@@ -792,7 +952,9 @@ def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writa
     assert json.loads(lines(result.stdout)[0])["status"] == "already-assigned"
 
 
-def test_an_existing_assignment_says_so_on_stderr(runner: Any, cli: Any, writable: Any) -> None:
+def test_an_existing_assignment_says_so_on_stderr(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -802,6 +964,7 @@ def test_an_existing_assignment_says_so_on_stderr(runner: Any, cli: Any, writabl
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "ann@example.com",
             ],
         )
@@ -823,6 +986,7 @@ def test_expired_assignments_do_not_block_a_fresh_add(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -834,7 +998,9 @@ def test_expired_assignments_do_not_block_a_fresh_add(
     assert "Expired" not in decoded
 
 
-def test_several_emails_are_assigned_in_one_call(runner: Any, cli: Any, writable: Any) -> None:
+def test_several_emails_are_assigned_in_one_call(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -853,7 +1019,8 @@ def test_several_emails_are_assigned_in_one_call(runner: Any, cli: Any, writable
     )
 
     statuses = {
-        json.loads(line)["target"]: json.loads(line)["status"] for line in lines(result.stdout)
+        json.loads(line)["target"]: json.loads(line)["status"]
+        for line in lines(result.stdout)
     }
     assert statuses == {"Dave Example": "requested", "Ann Example": "already-assigned"}
     assert writable["request"].call_count == 1
@@ -871,6 +1038,7 @@ def test_an_unresolvable_email_exits_4_without_writing(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "nobody@example.com",
             ],
         ),
@@ -896,6 +1064,7 @@ def test_removing_posts_an_admin_remove_naming_the_assignment(
                 "remove-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "ann@example.com",
             ],
         )
@@ -906,7 +1075,9 @@ def test_removing_posts_an_admin_remove_naming_the_assignment(
     assert json.loads(lines(result.stdout)[0])["status"] == "removal-requested"
 
 
-def test_removing_someone_unassigned_writes_nothing(runner: Any, cli: Any, writable: Any) -> None:
+def test_removing_someone_unassigned_writes_nothing(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -918,6 +1089,7 @@ def test_removing_someone_unassigned_writes_nothing(runner: Any, cli: Any, writa
                 "remove-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -940,6 +1112,7 @@ def test_remove_needs_no_policy_lookup(
                 "remove-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "ann@example.com",
             ],
         )
@@ -960,14 +1133,23 @@ def settling(writable: Any) -> Any:
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
-            200, json={"id": "req-1", "state": next(states, "delivered"), "requestType": "adminAdd"}
+            200,
+            json={
+                "id": "req-1",
+                "state": next(states, "delivered"),
+                "requestType": "adminAdd",
+            },
         )
 
-    writable.get(f"{EAM}/assignmentRequests/req-1", name="poll").mock(side_effect=handler)
+    writable.get(f"{EAM}/assignmentRequests/req-1", name="poll").mock(
+        side_effect=handler
+    )
     return writable
 
 
-def test_without_wait_the_command_does_not_poll(runner: Any, cli: Any, settling: Any) -> None:
+def test_without_wait_the_command_does_not_poll(
+    runner: Any, cli: Any, settling: Any
+) -> None:
     """The default stays fast; confirming is opt-in."""
     ok(
         runner.invoke(
@@ -978,6 +1160,7 @@ def test_without_wait_the_command_does_not_poll(runner: Any, cli: Any, settling:
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -998,6 +1181,7 @@ def test_without_wait_the_output_says_it_is_not_applied_yet(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
             ],
         )
@@ -1006,7 +1190,9 @@ def test_without_wait_the_output_says_it_is_not_applied_yet(
     assert "not applied yet" in result.stderr
 
 
-def test_wait_polls_until_delivered(runner: Any, cli: Any, settling: Any, no_sleep: None) -> None:
+def test_wait_polls_until_delivered(
+    runner: Any, cli: Any, settling: Any, no_sleep: None
+) -> None:
     result = ok(
         runner.invoke(
             cli,
@@ -1018,6 +1204,7 @@ def test_wait_polls_until_delivered(runner: Any, cli: Any, settling: Any, no_sle
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
                 "--wait",
             ],
@@ -1040,6 +1227,7 @@ def test_wait_reports_the_applied_state(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
                 "--wait",
             ],
@@ -1049,7 +1237,9 @@ def test_wait_reports_the_applied_state(
     assert "applied" in result.stderr
 
 
-def test_a_denied_request_exits_5(runner: Any, cli: Any, writable: Any, no_sleep: None) -> None:
+def test_a_denied_request_exits_5(
+    runner: Any, cli: Any, writable: Any, no_sleep: None
+) -> None:
     """A submitted request is not a granted one, and a pipeline must see the difference."""
     import httpx
 
@@ -1066,6 +1256,7 @@ def test_a_denied_request_exits_5(runner: Any, cli: Any, writable: Any, no_sleep
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
                 "--wait",
             ],
@@ -1082,7 +1273,9 @@ def test_a_partially_delivered_request_suggests_reprocessing(
     import httpx
 
     writable.get(f"{EAM}/assignmentRequests/req-1").mock(
-        return_value=httpx.Response(200, json={"id": "req-1", "state": "partiallyDelivered"})
+        return_value=httpx.Response(
+            200, json={"id": "req-1", "state": "partiallyDelivered"}
+        )
     )
 
     result = failed(
@@ -1094,6 +1287,7 @@ def test_a_partially_delivered_request_suggests_reprocessing(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
                 "--wait",
             ],
@@ -1123,6 +1317,7 @@ def test_a_stalled_request_times_out_rather_than_hanging(
                 "add-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "dave@example.com",
                 "--wait",
                 "--wait-timeout",
@@ -1150,6 +1345,7 @@ def test_removal_can_also_be_confirmed(
                 "remove-assignment",
                 "--access-package",
                 "AWS Platform Access",
+                "--target",
                 "ann@example.com",
                 "--wait",
             ],
@@ -1162,7 +1358,9 @@ def test_removal_can_also_be_confirmed(
 # ---------------------------------------------------------------------------
 # get-request
 # ---------------------------------------------------------------------------
-def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable: Any) -> None:
+def test_get_request_reports_a_delivered_request(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     import httpx
 
     writable.get(f"{EAM}/assignmentRequests/req-1").mock(
@@ -1181,7 +1379,8 @@ def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable
     payload = json.loads(
         ok(
             runner.invoke(
-                cli, ["-o", "json", "azure", "eam", "get-request", "--request-id", "req-1"]
+                cli,
+                ["-o", "json", "azure", "eam", "get-request", "--request-id", "req-1"],
             )
         ).stdout
     )
@@ -1190,17 +1389,25 @@ def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable
     assert payload["targetDisplayName"] == "Dave Example"
 
 
-def test_get_request_exits_5_for_a_failed_request(runner: Any, cli: Any, writable: Any) -> None:
+def test_get_request_exits_5_for_a_failed_request(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     import httpx
 
     writable.get(f"{EAM}/assignmentRequests/req-1").mock(
-        return_value=httpx.Response(200, json={"id": "req-1", "state": "deliveryFailed"})
+        return_value=httpx.Response(
+            200, json={"id": "req-1", "state": "deliveryFailed"}
+        )
     )
 
-    failed(runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]), 5)
+    failed(
+        runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]), 5
+    )
 
 
-def test_get_request_exits_0_for_a_pending_request(runner: Any, cli: Any, writable: Any) -> None:
+def test_get_request_exits_0_for_a_pending_request(
+    runner: Any, cli: Any, writable: Any
+) -> None:
     """Pending is not failure: the answer is "not yet", and that is worth exit 0."""
     import httpx
 
@@ -1208,7 +1415,9 @@ def test_get_request_exits_0_for_a_pending_request(runner: Any, cli: Any, writab
         return_value=httpx.Response(200, json={"id": "req-1", "state": "delivering"})
     )
 
-    result = ok(runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"]))
+    result = ok(
+        runner.invoke(cli, ["azure", "eam", "get-request", "--request-id", "req-1"])
+    )
 
     assert "has not settled" in result.stderr
 
@@ -1224,7 +1433,347 @@ def test_fail_on_pending_turns_a_pending_request_into_an_error(
 
     failed(
         runner.invoke(
-            cli, ["azure", "eam", "get-request", "--request-id", "req-1", "--fail-on-pending"]
+            cli,
+            [
+                "azure",
+                "eam",
+                "get-request",
+                "--request-id",
+                "req-1",
+                "--fail-on-pending",
+            ],
         ),
         5,
     )
+
+
+# ---------------------------------------------------------------------------
+# delete-package
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def deletable(graph: Any, seen: list[str]) -> Any:
+    """A deletable package: exact-name lookups answered strictly, and no assignments.
+
+    Built on `graph` rather than on `governance`, whose package route answers an unmatched
+    filter with the whole collection. That looseness is fine for the read tests but would
+    make the "no substring fallback" test here pass for the wrong reason, so this fixture
+    honours `displayName eq` and returns nothing when it does not match.
+
+    Every route is named so a test can count it and, where needed, replace its response.
+    respx matches routes in the order they were added, so re-registering the same pattern
+    inside a test is shadowed by the original and would quietly assert nothing. Overrides
+    assign to `deletable["<name>"].side_effect` or `.return_value` instead, which respx
+    rolls back after each test. Note that a route whose fixture set a `side_effect` must be
+    overridden through `side_effect` as well: it takes precedence over `return_value`.
+    """
+    import httpx
+
+    def packages(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        url = unquote_plus(str(request.url))
+        matched = [
+            package
+            for package in PACKAGES
+            if f"displayName eq '{package['displayName']}'" in url
+        ]
+        return httpx.Response(200, json={"value": matched})
+
+    def assignments(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"value": []})
+
+    graph.get(f"{EAM}/accessPackages/{PACKAGE_ID}").mock(
+        return_value=httpx.Response(200, json=PACKAGES[0])
+    )
+    graph.get(f"{EAM}/accessPackages", name="packages").mock(side_effect=packages)
+    graph.get(f"{EAM}/assignments", name="assignments").mock(side_effect=assignments)
+    graph.delete(f"{EAM}/accessPackages/{PACKAGE_ID}", name="delete").mock(
+        return_value=httpx.Response(204)
+    )
+    return graph
+
+
+def test_delete_removes_the_package(runner: Any, cli: Any, deletable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "json",
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+            ],
+        )
+    )
+
+    assert deletable["delete"].call_count == 1
+    assert json.loads(result.stdout)["status"] == "deleted"
+
+
+def test_delete_accepts_an_object_id(runner: Any, cli: Any, deletable: Any) -> None:
+    """A GUID is fetched first, so a typo fails as a lookup rather than as a delete."""
+    ok(
+        runner.invoke(
+            cli,
+            ["azure", "eam", "delete-package", "--access-package", PACKAGE_ID, "--yes"],
+        )
+    )
+
+    assert deletable["delete"].call_count == 1
+
+
+def test_delete_targets_the_entitlement_management_path(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+            ],
+        )
+    )
+
+    url = str(deletable["delete"].calls[0].request.url)
+    assert url.endswith(
+        f"/identityGovernance/entitlementManagement/accessPackages/{PACKAGE_ID}"
+    )
+
+
+def test_a_partial_name_is_not_resolved_by_substring(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """`get-package` falls back to a substring match; a delete must not.
+
+    The fixture answers the exact-name filter with nothing for 'AWS Platform', so a
+    substring fallback would find 'AWS Platform Access' and delete it.
+    """
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform",
+                "--yes",
+            ],
+        ),
+        4,
+    )
+
+    assert deletable["delete"].call_count == 0
+    assert "named exactly" in result.output
+
+
+def test_an_ambiguous_exact_name_is_refused_with_the_ids(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """Two packages can share a display name, and only an ID separates them."""
+    import httpx
+
+    deletable["packages"].side_effect = lambda request: httpx.Response(
+        200,
+        json={
+            "value": [
+                {"id": "dup-1", "displayName": "Shared Name"},
+                {"id": "dup-2", "displayName": "Shared Name"},
+            ]
+        },
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "Shared Name",
+                "--yes",
+            ],
+        ),
+        2,
+    )
+
+    assert deletable["delete"].call_count == 0
+    assert "dup-1" in result.output
+
+
+def test_existing_assignments_block_the_delete(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """Graph refuses this anyway; saying which assignments are in the way is the point."""
+    import httpx
+
+    deletable["assignments"].side_effect = lambda request: httpx.Response(
+        200,
+        json={
+            "value": [
+                {"id": "as-1", "state": "Delivered"},
+                {"id": "as-2", "state": "Delivered"},
+                {"id": "as-3", "state": "Expired"},
+            ]
+        },
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+            ],
+        ),
+        2,
+    )
+
+    assert deletable["delete"].call_count == 0
+    assert "3 assignment(s)" in result.output
+    assert "2 Delivered" in result.output
+    assert "1 Expired" in result.output
+    assert "remove-assignment" in result.output
+
+
+def test_the_assignment_check_filters_on_the_package(
+    runner: Any, cli: Any, deletable: Any, seen: list[str]
+) -> None:
+    """A check that counted every assignment in the tenant would block every delete."""
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+            ],
+        )
+    )
+
+    assert f"accessPackage/id eq '{PACKAGE_ID}'" in filters(seen)
+
+
+def test_force_skips_the_assignment_check(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """The escape hatch: let Graph decide rather than this command."""
+    ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+                "--force",
+            ],
+        )
+    )
+
+    assert deletable["assignments"].call_count == 0
+    assert deletable["delete"].call_count == 1
+
+
+def test_without_yes_the_delete_is_confirmed(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """Answering y at the prompt goes ahead."""
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+            ],
+            input="y\n",
+        )
+    )
+
+    assert deletable["delete"].call_count == 1
+    assert "cannot be undone" in result.output
+
+
+def test_declining_the_prompt_deletes_nothing(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """And it must not exit 0, or a wrapper reads a refused delete as a successful one."""
+    result = runner.invoke(
+        cli,
+        ["azure", "eam", "delete-package", "--access-package", "AWS Platform Access"],
+        input="n\n",
+    )
+
+    assert result.exit_code != 0
+    assert deletable["delete"].call_count == 0
+
+
+def test_the_prompt_names_the_package_it_will_delete(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """Confirmation happens after resolution, so it can say what is actually going."""
+    result = runner.invoke(
+        cli,
+        ["azure", "eam", "delete-package", "--access-package", "AWS Platform Access"],
+        input="n\n",
+    )
+
+    assert "AWS Platform Access" in result.output
+    assert PACKAGE_ID in result.output
+
+
+def test_a_graph_refusal_surfaces_as_upstream(
+    runner: Any, cli: Any, deletable: Any
+) -> None:
+    """With --force the pre-check is gone, so Graph's own message is what the user gets."""
+    import httpx
+
+    deletable["delete"].return_value = httpx.Response(
+        400,
+        json={
+            "error": {
+                "code": "Request_BadRequest",
+                "message": "AccessPackage has assignments and cannot be deleted.",
+            }
+        },
+    )
+
+    result = failed(
+        runner.invoke(
+            cli,
+            [
+                "azure",
+                "eam",
+                "delete-package",
+                "--access-package",
+                "AWS Platform Access",
+                "--yes",
+                "--force",
+            ],
+        ),
+        5,
+    )
+
+    assert "cannot be deleted" in result.output

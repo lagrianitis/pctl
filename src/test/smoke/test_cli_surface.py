@@ -41,6 +41,7 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "eam"],
     ["azure", "eam", "list-packages"],
     ["azure", "eam", "get-package"],
+    ["azure", "eam", "delete-package"],
     ["azure", "eam", "list-catalogs"],
     ["azure", "eam", "get-catalog"],
     ["azure", "eam", "list-assignments"],
@@ -54,6 +55,7 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "sp", "owners"],
     ["azure", "sp", "add-owner"],
     ["azure", "sp", "remove-owner"],
+    ["azure", "sp", "provision"],
     ["aws"],
     ["aws", "ddb"],
     ["aws", "ddb", "tables"],
@@ -88,7 +90,9 @@ def test_every_command_renders_help(runner: Any, cli: Any, path: list[str]) -> N
 
 
 @pytest.mark.parametrize("path", COMMAND_PATHS, ids=lambda p: " ".join(p) or "root")
-def test_short_help_flag_works_everywhere(runner: Any, cli: Any, path: list[str]) -> None:
+def test_short_help_flag_works_everywhere(
+    runner: Any, cli: Any, path: list[str]
+) -> None:
     """`-h` is wired through context_settings on every group."""
     assert help_for(runner, cli, path, "-h").stdout.startswith("Usage: pctl")
 
@@ -175,11 +179,35 @@ def test_an_ambiguous_prefix_names_the_candidates(runner: Any, cli: Any) -> None
 # completion
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
-def test_completion_prints_setup_for_each_shell(runner: Any, cli: Any, shell: str) -> None:
-    result = ok(runner.invoke(cli, ["completion", shell]))
+def test_completion_prints_setup_for_each_shell(
+    runner: Any, cli: Any, shell: str
+) -> None:
+    result = ok(runner.invoke(cli, ["completion", "--shell", shell]))
     assert "_PCTL_COMPLETE" in result.stdout
     assert shell in result.stdout
 
 
 def test_completion_rejects_an_unknown_shell(runner: Any, cli: Any) -> None:
-    failed(runner.invoke(cli, ["completion", "csh"]), 2)
+    failed(runner.invoke(cli, ["completion", "--shell", "csh"]), 2)
+
+
+def test_no_command_declares_a_positional_argument(cli: Any) -> None:
+    """Every value is a named flag, so a stray word can never be silently absorbed.
+
+    Walks the whole tree eagerly, which is the point: a new action that reintroduces a
+    positional should fail here rather than in review.
+    """
+    import click
+
+    def walk(command: click.Command, ctx: click.Context) -> None:
+        offenders = [
+            param.name for param in command.params if isinstance(param, click.Argument)
+        ]
+        assert offenders == [], f"{command.name} declares positional {offenders}"
+        if isinstance(command, click.Group):
+            for name in command.list_commands(ctx):
+                child = command.get_command(ctx, name)
+                assert child is not None
+                walk(child, click.Context(child, parent=ctx))
+
+    walk(cli, click.Context(cli))

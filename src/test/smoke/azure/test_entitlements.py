@@ -30,6 +30,7 @@ def test_the_service_help_lists_its_actions(eam: Callable[..., Any]) -> None:
     for action in (
         "list-packages",
         "get-package",
+        "delete-package",
         "list-catalogs",
         "get-catalog",
         "list-assignments",
@@ -100,11 +101,15 @@ def test_search_is_not_a_valid_match_mode(eam: Callable[..., Any]) -> None:
     failed(eam("get-package", "--access-package", "x", "--match", "search"), 2)
 
 
-def test_get_package_without_an_identifier_is_a_usage_error(eam: Callable[..., Any]) -> None:
+def test_get_package_without_an_identifier_is_a_usage_error(
+    eam: Callable[..., Any]
+) -> None:
     failed(eam("get-package"), 2)
 
 
-def test_get_catalog_without_an_identifier_is_a_usage_error(eam: Callable[..., Any]) -> None:
+def test_get_catalog_without_an_identifier_is_a_usage_error(
+    eam: Callable[..., Any]
+) -> None:
     failed(eam("get-catalog"), 2)
 
 
@@ -115,11 +120,15 @@ def test_an_invalid_page_size_is_rejected(eam: Callable[..., Any]) -> None:
 # ---------------------------------------------------------------------------
 # the two assignment writes
 # ---------------------------------------------------------------------------
-def test_add_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
+def test_add_assignment_help_names_the_write_permission(
+    eam: Callable[..., Any]
+) -> None:
     assert "ReadWrite" in ok(eam("add-assignment", "--help")).stdout
 
 
-def test_remove_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
+def test_remove_assignment_help_names_the_write_permission(
+    eam: Callable[..., Any]
+) -> None:
     assert "ReadWrite" in ok(eam("remove-assignment", "--help")).stdout
 
 
@@ -164,7 +173,7 @@ def test_add_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> No
 
 def test_add_assignment_needs_the_package_flag(eam: Callable[..., Any]) -> None:
     """The package is a named flag, so it cannot be confused with a target."""
-    failed(eam("add-assignment", "ann@example.com"), 2)
+    failed(eam("add-assignment", "--target", "ann@example.com"), 2)
 
 
 def test_remove_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
@@ -172,7 +181,7 @@ def test_remove_assignment_needs_at_least_one_person(eam: Callable[..., Any]) ->
 
 
 def test_remove_assignment_needs_the_package_flag(eam: Callable[..., Any]) -> None:
-    failed(eam("remove-assignment", "ann@example.com"), 2)
+    failed(eam("remove-assignment", "--target", "ann@example.com"), 2)
 
 
 def test_both_writes_offer_wait(eam: Callable[..., Any]) -> None:
@@ -187,7 +196,9 @@ def test_get_request_is_listed(eam: Callable[..., Any]) -> None:
     assert "get-request" in ok(eam("--help")).stdout
 
 
-def test_get_request_help_explains_the_outcome_classification(eam: Callable[..., Any]) -> None:
+def test_get_request_help_explains_the_outcome_classification(
+    eam: Callable[..., Any]
+) -> None:
     stdout = ok(eam("get-request", "--help")).stdout
     for word in ("delivered", "pending", "outcome"):
         assert word in stdout
@@ -198,4 +209,48 @@ def test_get_request_needs_an_id(eam: Callable[..., Any]) -> None:
 
 
 def test_a_zero_wait_timeout_is_rejected(eam: Callable[..., Any]) -> None:
-    failed(eam("add-assignment", "--access-package", "p", "a@b.com", "--wait-timeout", "0"), 2)
+    failed(
+        eam(
+            "add-assignment", "--access-package", "p", "a@b.com", "--wait-timeout", "0"
+        ),
+        2,
+    )
+
+
+# ---------------------------------------------------------------------------
+# delete-package
+# ---------------------------------------------------------------------------
+def test_delete_package_help_says_it_cannot_be_undone(eam: Callable[..., Any]) -> None:
+    """The only destructive command, so the help must lead with that."""
+    assert "cannot be undone" in ok(eam("delete-package", "--help")).stdout
+
+
+def test_delete_package_help_names_the_write_permission(
+    eam: Callable[..., Any]
+) -> None:
+    assert (
+        "EntitlementManagement.ReadWrite.All"
+        in ok(eam("delete-package", "--help")).stdout
+    )
+
+
+def test_delete_package_help_documents_the_confirmation(
+    eam: Callable[..., Any]
+) -> None:
+    stdout = ok(eam("delete-package", "--help")).stdout
+    assert "--yes" in stdout
+    assert "--force" in stdout
+
+
+def test_delete_package_offers_no_match_option(eam: Callable[..., Any]) -> None:
+    """A pattern must not be able to choose what gets deleted."""
+    assert "--match" not in ok(eam("delete-package", "--help")).stdout
+
+
+def test_delete_package_rejects_a_match_option(eam: Callable[..., Any]) -> None:
+    failed(eam("delete-package", "--access-package", "a", "--match", "contains"), 2)
+
+
+def test_delete_package_needs_the_package_flag(eam: Callable[..., Any]) -> None:
+    result = failed(eam("delete-package"), 2)
+    assert "--access-package" in result.output
