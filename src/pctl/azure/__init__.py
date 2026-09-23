@@ -29,6 +29,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.applications:applications",
         "Application registrations, the app objects behind service principals.",
     ),
+    "eam": (
+        "pctl.azure.entitlements:entitlements",
+        "Entitlement management: access packages and their catalogs.",
+    ),
     "sp": (
         "pctl.azure.service_principals:service_principals",
         "Service principals, known in the portal as Enterprise Applications.",
@@ -45,6 +49,8 @@ ALIASES = {
     "service-principals": "sp",
     "app-registrations": "apps",
     "applications": "apps",
+    "entitlement-management": "eam",
+    "access-packages": "eam",
 }
 
 
