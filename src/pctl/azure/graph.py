@@ -57,6 +57,30 @@ DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
     "appRoleAssignmentRequired",
     "tags",
 )
+# Entitlement management sits under identityGovernance, not at the root, and supports a
+# narrower set of OData parameters than the directory collections: $select, $filter and
+# $expand only. Notably NOT $search or $count, so the advanced-query header and
+# $count=true that _list_params adds would make Graph reject the request.
+EAM_BASE = "identityGovernance/entitlementManagement"
+
+DEFAULT_ACCESS_PACKAGE_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "description",
+    "isHidden",
+    "createdDateTime",
+    "modifiedDateTime",
+)
+DEFAULT_CATALOG_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "description",
+    "catalogType",
+    "state",
+    "isExternallyVisible",
+    "createdDateTime",
+)
+
 DEFAULT_APPLICATION_SELECT: tuple[str, ...] = (
     "id",
     "appId",
@@ -570,6 +594,104 @@ class GraphClient:
         return await self.find_by_display_name(
             "servicePrincipals", display_name, mode=mode, select=select, limit=limit
         )
+
+    # -- entitlement management -------------------------------------------
+    def _governance_params(
+        self,
+        *,
+        select: Sequence[str] | None,
+        filter_expr: str | None,
+        expand: Sequence[str] | None,
+        page_size: int,
+    ) -> dict[str, Any]:
+        """Query parameters for an entitlement management collection.
+
+        Deliberately not `_list_params`. That one adds `$count=true` and the
+        advanced-query header for search and ordering, and entitlement management
+        supports neither, so reusing it would turn a working query into a 400.
+        """
+        params: dict[str, Any] = {"$top": min(page_size, GRAPH_MAX_PAGE_SIZE)}
+        if select:
+            params["$select"] = ",".join(select)
+        if filter_expr:
+            params["$filter"] = filter_expr
+        if expand:
+            params["$expand"] = ",".join(expand)
+        return params
+
+    def list_governance(
+        self,
+        collection: str,
+        *,
+        select: Sequence[str] | None = None,
+        filter_expr: str | None = None,
+        expand: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream an entitlement management collection, following pagination.
+
+        `collection` is relative to `identityGovernance/entitlementManagement`, so
+        "accessPackages" and "catalogs" rather than full paths.
+        """
+        return self.paginate(
+            f"{EAM_BASE}/{collection}",
+            params=self._governance_params(
+                select=select, filter_expr=filter_expr, expand=expand, page_size=page_size
+            ),
+            limit=limit,
+        )
+
+    async def get_governance(
+        self,
+        collection: str,
+        object_id: str,
+        *,
+        select: Sequence[str] | None = None,
+        expand: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
+        """One object from an entitlement management collection, by ID."""
+        params: dict[str, Any] = {}
+        if select:
+            params["$select"] = ",".join(select)
+        if expand:
+            params["$expand"] = ",".join(expand)
+        return await self.get_json(f"{EAM_BASE}/{collection}/{object_id}", params=params or None)
+
+    async def find_governance_by_display_name(
+        self,
+        collection: str,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        expand: Sequence[str] | None = None,
+        limit: int | None = 2,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name within an entitlement management collection.
+
+        Only `exact` and `prefix` are server-side here. There is no `search` mode,
+        because `$search` is not supported on these collections; a substring match has to
+        be done by the caller after fetching, and saying so is better than sending a
+        query Graph will reject.
+        """
+        literal = escape_odata(display_name)
+        match mode:
+            case "exact":
+                filter_expr = f"displayName eq '{literal}'"
+            case "prefix":
+                filter_expr = f"startswith(displayName,'{literal}')"
+            case _:
+                raise ValueError(
+                    f"unsupported match mode for entitlement management: {mode}. "
+                    "Graph supports eq and startswith here, but not $search."
+                )
+        return [
+            item
+            async for item in self.list_governance(
+                collection, select=select, filter_expr=filter_expr, expand=expand, limit=limit
+            )
+        ]
 
     # -- applications (app registrations) ---------------------------------
     def list_applications(
