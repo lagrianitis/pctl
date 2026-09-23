@@ -17,7 +17,9 @@ from .common import (
     ACTIVE_ASSIGNMENT_STATES,
     assignment_request,
     collect_targets,
+    report_outcomes,
     resolve_package_id,
+    settle_requests,
     target_options,
 )
 
@@ -38,6 +40,8 @@ def command(
     targets: tuple[str, ...],
     emails: str | None,
     ignore_missing: bool,
+    wait: bool,
+    wait_timeout: float,
 ) -> None:
     """Remove one or more people's assignment to an access package.
 
@@ -48,14 +52,19 @@ def command(
     rather than sent as a request. No policy is needed, unlike add-assignment: an
     adminRemove names the existing assignment rather than the rules that created it.
 
-    This creates an adminRemove request, which Graph processes asynchronously, so access
-    may persist briefly after the command returns.
+    This creates an adminRemove request, which Graph applies afterwards, so without --wait
+    access may still be live when the command returns. That matters more here than for
+    add: if you are revoking access in response to an incident, exit 0 without --wait does
+    not mean the access is gone.
+
+    --wait polls each request until it is delivered and exits 5 if any is not, bounded by
+    --wait-timeout.
 
     Requires EntitlementManagement.ReadWrite.All.
 
     \b
-      pctl azure eam remove-assignment "AWS Platform Access" ann@company.com
-      pctl azure eam remove-assignment PKG --emails ann@company.com,bob@company.com
+      pctl azure eam remove-assignment "AWS Platform Access" ann@company.com --wait
+      pctl azure eam remove-assignment PKG --emails ann@company.com,bob@company.com --wait
     """
     from ..graph import run
 
@@ -100,14 +109,18 @@ def command(
                 }
 
             results = await asyncio.gather(*[one(item) for item in wanted])
+            records = [item for item in results if isinstance(item, dict)]
+            if wait:
+                await settle_requests(client, records, timeout=wait_timeout, log=app.log)
             return (
-                [item for item in results if isinstance(item, dict)],
+                records,
                 [item for item in results if isinstance(item, tuple)],
             )
 
     records, failed = run(_run())
 
-    with Renderer(app.output, columns=RESULT_COLUMNS) as renderer:
+    columns = RESULT_COLUMNS if not wait else [*RESULT_COLUMNS, "outcome"]
+    with Renderer(app.output, columns=columns) as renderer:
         renderer.write_all(records)
 
     for record in records:
@@ -123,14 +136,18 @@ def command(
 
     removed = [record for record in records if record["status"] == "removal-requested"]
     summarise(len(removed), "removal requested", quiet=app.quiet)
-    if removed and not app.quiet:
-        click.secho(
-            "Requests are processed asynchronously; access may persist for a short while.",
-            err=True,
-            fg="green",
-        )
+
     if failed and not ignore_missing:
         raise NotFoundError(
             f"{len(failed)} of {len(wanted)} target(s) could not be resolved. "
             "Pass a user object ID, or use --ignore-missing."
+        )
+    if wait:
+        report_outcomes(removed, noun="removal", quiet=app.quiet)
+    elif removed and not app.quiet:
+        click.secho(
+            "Requests are processed asynchronously; the access is not gone yet. Confirm "
+            "with --wait, or `eam get-request <id>`.",
+            err=True,
+            fg="yellow",
         )

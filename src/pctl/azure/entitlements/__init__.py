@@ -60,6 +60,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.entitlements.remove_assignment:command",
         "Remove people's assignment to an access package.",
     ),
+    "get-request": (
+        "pctl.azure.entitlements.get_request:command",
+        "Show an assignment request, to see whether a write landed.",
+    ),
 }
 
 

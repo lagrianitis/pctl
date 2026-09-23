@@ -17,8 +17,10 @@ from .common import (
     ACTIVE_ASSIGNMENT_STATES,
     assignment_request,
     collect_targets,
+    report_outcomes,
     resolve_package_id,
     resolve_policy_id,
+    settle_requests,
     target_options,
 )
 
@@ -44,6 +46,8 @@ def command(
     targets: tuple[str, ...],
     emails: str | None,
     ignore_missing: bool,
+    wait: bool,
+    wait_timeout: float,
     policy: str | None,
 ) -> None:
     """Assign one or more people to an access package.
@@ -57,14 +61,20 @@ def command(
     add, because an expired assignment is not access.
 
     This creates an adminAdd request rather than writing an assignment directly, so Graph
-    processes it asynchronously. The reported requestState is the state at submission;
-    check `eam list-assignments` afterwards for delivery.
+    applies it afterwards. Without --wait the command reports the state at submission,
+    which is not yet access.
+
+    --wait polls each request until it is delivered and exits 5 if any is not, so a
+    pipeline can depend on the access actually existing. A request can stall in
+    `delivering` indefinitely, so waiting is bounded by --wait-timeout and a request still
+    pending at that point is reported as such rather than assumed good.
 
     Requires EntitlementManagement.ReadWrite.All.
 
     \b
       pctl azure eam add-assignment "AWS Platform Access" ann@company.com
-      pctl azure eam add-assignment PKG --emails ann@company.com,bob@company.com
+      pctl azure eam add-assignment PKG ann@company.com --wait
+      pctl azure eam add-assignment PKG --emails ann@company.com,bob@company.com --wait
       pctl azure eam add-assignment PKG ann@company.com --policy "Direct assignment"
     """
     from ..graph import run
@@ -116,14 +126,18 @@ def command(
                 }
 
             results = await asyncio.gather(*[one(item) for item in wanted])
+            records = [item for item in results if isinstance(item, dict)]
+            if wait:
+                await settle_requests(client, records, timeout=wait_timeout, log=app.log)
             return (
-                [item for item in results if isinstance(item, dict)],
+                records,
                 [item for item in results if isinstance(item, tuple)],
             )
 
     records, failed = run(_run())
 
-    with Renderer(app.output, columns=RESULT_COLUMNS) as renderer:
+    columns = RESULT_COLUMNS if not wait else [*RESULT_COLUMNS, "outcome"]
+    with Renderer(app.output, columns=columns) as renderer:
         renderer.write_all(records)
 
     for record in records:
@@ -139,14 +153,18 @@ def command(
 
     requested = [record for record in records if record["status"] == "requested"]
     summarise(len(requested), "assignment requested", quiet=app.quiet)
-    if requested and not app.quiet:
-        click.secho(
-            "Requests are processed asynchronously; check `eam list-assignments` for delivery.",
-            err=True,
-            fg="green",
-        )
+
     if failed and not ignore_missing:
         raise NotFoundError(
             f"{len(failed)} of {len(wanted)} target(s) could not be resolved. "
             "Pass a user object ID, or use --ignore-missing."
+        )
+    if wait:
+        report_outcomes(requested, noun="assignment", quiet=app.quiet)
+    elif requested and not app.quiet:
+        click.secho(
+            "Requests are processed asynchronously and are not applied yet. Confirm with "
+            "--wait, or `eam get-request <id>`.",
+            err=True,
+            fg="yellow",
         )
