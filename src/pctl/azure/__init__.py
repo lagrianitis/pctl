@@ -25,6 +25,10 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "groups": ("pctl.azure.groups:groups", "List and inspect Entra ID groups."),
     "users": ("pctl.azure.users:users", "Look up Entra ID users."),
+    "apps": (
+        "pctl.azure.applications:applications",
+        "Application registrations, the app objects behind service principals.",
+    ),
     "sp": (
         "pctl.azure.service_principals:service_principals",
         "Service principals, known in the portal as Enterprise Applications.",
@@ -33,9 +37,15 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "raw": ("pctl.azure.raw:command", "Call any Graph path, with auth and pagination handled."),
 }
 
-# The portal says Enterprise Application, Graph says servicePrincipal. Accept both, so
-# nobody has to remember which name this tool chose.
-ALIASES = {"enterprise-apps": "sp", "service-principals": "sp"}
+# The portal and Graph disagree on every one of these names, so accept both spellings.
+# `apps` and `sp` are the pair most easily confused: an app registration is the
+# definition, a service principal is its instance in this tenant.
+ALIASES = {
+    "enterprise-apps": "sp",
+    "service-principals": "sp",
+    "app-registrations": "apps",
+    "applications": "apps",
+}
 
 
 @click.group(
