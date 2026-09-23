@@ -57,6 +57,16 @@ DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
     "appRoleAssignmentRequired",
     "tags",
 )
+DEFAULT_APPLICATION_SELECT: tuple[str, ...] = (
+    "id",
+    "appId",
+    "displayName",
+    "signInAudience",
+    "publisherDomain",
+    "createdDateTime",
+    "identifierUris",
+    "tags",
+)
 DEFAULT_USER_SELECT: tuple[str, ...] = (
     "id",
     "displayName",
@@ -560,6 +570,89 @@ class GraphClient:
         return await self.find_by_display_name(
             "servicePrincipals", display_name, mode=mode, select=select, limit=limit
         )
+
+    # -- applications (app registrations) ---------------------------------
+    def list_applications(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream application registrations, which the portal calls App registrations."""
+        return self.list_collection(
+            "applications",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_applications(self, *, filter_expr: str | None = None) -> int:
+        return await self.count_collection("applications", filter_expr=filter_expr)
+
+    async def find_applications_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return await self.find_by_display_name(
+            "applications", display_name, mode=mode, select=select, limit=limit
+        )
+
+    async def get_application(
+        self, object_id: str, *, select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT
+    ) -> dict[str, Any]:
+        """One application by its directory object ID, not its appId."""
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"applications/{object_id}", params=params)
+
+    async def find_application_by_app_id(
+        self, app_id: str, *, select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT
+    ) -> dict[str, Any] | None:
+        """One application by its appId, the client ID people copy from the portal.
+
+        An application has two GUIDs: `id` is its directory object, `appId` is the client
+        ID it shares with its service principal. The portal shows the appId far more
+        prominently, so a bare GUID is tried as an appId before an object ID.
+        """
+        literal = escape_odata(app_id)
+        matches = [
+            item
+            async for item in self.list_collection(
+                "applications", select=select, filter_expr=f"appId eq '{literal}'", limit=1
+            )
+        ]
+        return matches[0] if matches else None
+
+    async def find_service_principal_by_app_id(
+        self, app_id: str, *, select: Sequence[str] | None = None
+    ) -> dict[str, Any] | None:
+        """The service principal that instantiates an application in this tenant.
+
+        The two objects are joined by `appId`, never by object ID: an application and its
+        service principal have different `id` values, which is the single most common
+        source of confusion when working with both.
+        """
+        literal = escape_odata(app_id)
+        matches = [
+            item
+            async for item in self.list_collection(
+                "servicePrincipals",
+                select=select or DEFAULT_SERVICE_PRINCIPAL_SELECT,
+                filter_expr=f"appId eq '{literal}'",
+                limit=1,
+            )
+        ]
+        return matches[0] if matches else None
 
     # -- users ------------------------------------------------------------
     async def get_user(
