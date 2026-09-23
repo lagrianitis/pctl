@@ -13,11 +13,14 @@ from . import __version__
 from .config import AppContext, OutputFormat
 from .lazy import PctlGroup
 
-# One entry per case. Each case package owns its services, and each service owns
-# its actions, all resolved lazily so `--help` imports nothing heavy.
+# One entry per case, plus the two discovery commands. Each case package owns its
+# services, and each service owns its actions, all resolved lazily so `--help` imports
+# nothing heavy.
 LAZY_COMMANDS: dict[str, tuple[str, str]] = {
     "azure": ("pctl.azure:azure", "Microsoft Graph: tokens, groups and group members."),
     "aws": ("pctl.aws:aws", "AWS: read items and metadata from DynamoDB."),
+    "commands": ("pctl.surface:commands", "List every command in one flat table."),
+    "tree": ("pctl.surface:tree", "Draw the command tree."),
 }
 
 ALIASES = {"az": "azure", "graph": "azure", "ddb": "aws"}
@@ -75,6 +78,13 @@ def cli(
     """pctl - a fast CLI for Entra ID groups and DynamoDB items.
 
     \b
+    Finding your way around:
+      pctl commands                  every command, one row each
+      pctl commands | grep assign    search for what you want to do
+      pctl tree                      the shape of the whole CLI
+      pctl completion --shell zsh    tab-complete commands and flags
+
+    \b
     Common tasks:
       pctl azure token                          acquire a Graph token (cached)
       pctl azure groups list                    every group, paginated
@@ -109,9 +119,21 @@ def cli(
     help="Which shell to print instructions for.",
 )
 def completion(shell: str) -> None:
-    """Print shell completion setup instructions.
+    """Print the line that turns on tab completion, for one shell.
 
-    Example: pctl completion --shell zsh
+    Completion covers command names at every level, their aliases, option names, and the
+    values of any option with a fixed set of choices such as `--match` or `-o`. With
+    thirty commands across four levels it is the fastest way to find one.
+
+    \b
+      pctl completion --shell zsh              print the line
+      pctl completion --shell zsh >> ~/.zshrc  keep it
+
+    \b
+    Then, in a new shell:
+      pctl azure e<TAB>          eam, enterprise-apps
+      pctl azure eam <TAB>       all nine actions
+      pctl azure eam add-a<TAB> --<TAB>
     """
     variable = "_PCTL_COMPLETE"
     snippets = {

@@ -83,6 +83,44 @@ Global options work before or after the subcommand: `-o/--output`, `-q/--quiet`,
 `-v/--verbose`, `--timeout`, `--concurrency`. Command names accept unambiguous
 prefixes and aliases, so `pctl az gr li` is `pctl azure groups list`.
 
+### Finding a command
+
+Thirty commands across four levels, so start by searching rather than by drilling into
+`--help` four times:
+
+```bash
+pctl commands                      # every command, one row each, with a summary
+pctl commands | grep -i assign     # find the path from a word you remember
+pctl tree                          # the shape of the whole CLI
+pctl tree --depth 2                # just the cases and their services
+```
+
+`commands` goes through the same renderer as everything else, so it is data rather than a
+display: `-o ndjson | jq -r .command` for a list of invocations, `-o csv` for a review.
+Groups are left out by default, since you cannot run one — `--groups` includes them.
+`tree` is the opposite: always text, because the nesting is the point.
+
+Then use `--help` for the detail, which is the one thing neither of them can give you:
+
+```bash
+pctl azure eam add-assignment --help
+```
+
+**Turn on completion once and most of this stops being necessary:**
+
+```bash
+pctl completion --shell zsh >> ~/.zshrc     # or --shell bash / fish
+```
+
+That completes command names at every level, their aliases, option names, and the values
+of any option with fixed choices such as `--match` or `-o`:
+
+```
+pctl azure e<TAB>          -> eam, enterprise-apps
+pctl azure eam <TAB>       -> all nine actions
+pctl azure eam add-a<TAB> --<TAB>
+```
+
 **Every value you supply goes behind a named flag. There are no positional arguments.**
 The thing a command acts on: `--app`, `--access-package`, `--catalog`, `--group`,
 `--table`, `--path`. The subjects it acts on: `--owner`, `--target`, `--user`, `--name`.
@@ -598,6 +636,7 @@ lives in `aws/dynamodb/scan.py`, `pctl azure groups get` in `azure/groups/get.py
 src/pctl/
 ├── cli.py                 root group, global flags, case table
 ├── lazy.py                PctlGroup: lazy imports, aliases, prefix matching
+├── surface.py             `commands` and `tree`: one walk, two views
 ├── config.py              AppContext + credential/session resolution
 ├── options.py             shared click options (output, azure, aws)
 ├── output.py              Renderer: table / json / ndjson / csv
@@ -679,6 +718,7 @@ src/test/
 │   ├── test_options.py      shared click option helpers
 │   ├── test_errors.py       exit code contract
 │   ├── test_lazy.py         aliases, prefixes, lazy resolution
+│   ├── test_surface.py      the command-tree walk, against a fake tree
 │   ├── test_tokencache.py   expiry, permissions, corrupt files
 │   ├── azure/             case
 │   │   ├── conftest.py      graph_client fixture

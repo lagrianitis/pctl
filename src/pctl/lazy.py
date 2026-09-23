@@ -32,6 +32,25 @@ class PctlGroup(click.Group):
         self._lazy: dict[str, tuple[str, str]] = dict(lazy_subcommands or {})
         self._aliases: dict[str, str] = dict(aliases or {})
 
+    # -- introspection ----------------------------------------------------
+    @property
+    def lazy_subcommands(self) -> dict[str, tuple[str, str]]:
+        """The lazy table: name -> (import target, short help).
+
+        Exposed so that something walking the command tree can read a subcommand's
+        summary, and tell a group from an action by its target, without importing the
+        module behind it. That is the whole point of keeping the help text in the table,
+        and `surface.py` is the caller that depends on it.
+
+        A copy, so a caller cannot mutate the table it is reading.
+        """
+        return dict(self._lazy)
+
+    @property
+    def aliases(self) -> dict[str, str]:
+        """Alternative spellings: alias -> real command name."""
+        return dict(self._aliases)
+
     # -- resolution -------------------------------------------------------
     def list_commands(self, ctx: click.Context) -> list[str]:
         return sorted({*super().list_commands(ctx), *self._lazy})
@@ -52,6 +71,24 @@ class PctlGroup(click.Group):
         if not isinstance(command, click.Command):
             raise TypeError(f"{target} did not resolve to a click command")
         return command
+
+    def shell_complete(self, ctx: click.Context, incomplete: str) -> list[Any]:
+        """Complete subcommand names, their aliases, and this group's own options.
+
+        click completes only what `list_commands` returns, which excludes aliases, so
+        `pctl azure enter<TAB>` offered nothing even though `enterprise-apps` resolves.
+        They are added here, labelled, and sorted after the real names so the canonical
+        spelling is what you get first.
+        """
+        from click.shell_completion import CompletionItem
+
+        items = list(super().shell_complete(ctx, incomplete))
+        items.extend(
+            CompletionItem(alias, help=f"alias for {real}")
+            for alias, real in sorted(self._aliases.items())
+            if alias.startswith(incomplete)
+        )
+        return items
 
     def _match_prefix(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         """Allow unambiguous prefixes, so `pctl az gr li` works."""
