@@ -199,6 +199,19 @@ they run:
 page is fetched regardless, so it narrows what is rendered rather than what is
 transferred, and `-n/--limit` applies after the filter so a cap cannot drop real matches.
 
+**`get-package` and `get-catalog` take patterns, not just exact names.** `--match prefix`
+and `--match contains` return *every* match rather than refusing an ambiguous one, because
+"show me the AWS packages" is a question with several answers:
+
+```bash
+pctl azure eam get-package AWS --match prefix -o ndjson    # every AWS package
+pctl azure eam get-package incident --match contains        # substring, local
+```
+
+One match renders as an object and several as an array, the same shape `groups get` uses,
+so `jq` needs no index for the common case. An object ID is not a pattern and always
+returns exactly one.
+
 A raw `--filter` takes precedence over `--catalog`, `--name` and `--starts-with`: someone
 who wrote OData by hand means it.
 
