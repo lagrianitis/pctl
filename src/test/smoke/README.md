@@ -53,10 +53,10 @@ means a summary line can satisfy an assertion about data.
 
 ## Where the other tiers sit
 
-| tier | what it proves | provider |
-| --- | --- | --- |
-| `../unit/` | pure functions in isolation | none, no I/O |
-| `smoke/` | the CLI surface is intact | none reached |
-| `../e2e/` | the real command path, argv to the wire | Graph via respx, DynamoDB via moto |
+| tier       | what it proves                          | provider                           |
+| ---------- | --------------------------------------- | ---------------------------------- |
+| `../unit/` | pure functions in isolation             | none, no I/O                       |
+| `smoke/`   | the CLI surface is intact               | none reached                       |
+| `../e2e/`  | the real command path, argv to the wire | Graph via respx, DynamoDB via moto |
 
 Nothing in any tier needs credentials, a tenant or an AWS account.
