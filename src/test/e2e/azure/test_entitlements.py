@@ -203,17 +203,15 @@ def test_get_package_by_id_addresses_it_directly(
     assert seen == []
 
 
-def test_get_package_with_contains_match(runner: Any, cli: Any, governance: Any) -> None:
+def test_get_package_by_id_still_returns_exactly_one(
+    runner: Any, cli: Any, governance: Any
+) -> None:
+    """An ID is not a pattern, so it can only ever match one thing."""
     payload = json.loads(
-        ok(
-            runner.invoke(
-                cli,
-                ["-o", "json", "azure", "eam", "get-package", "Incident", "--match", "contains"],
-            )
-        ).stdout
+        ok(runner.invoke(cli, ["-o", "json", "azure", "eam", "get-package", PACKAGE_ID])).stdout
     )
 
-    assert payload["id"] == "p3"
+    assert isinstance(payload, dict)
 
 
 def test_with_policies_expands_the_policies(
@@ -228,12 +226,54 @@ def test_with_policies_expands_the_policies(
     assert "$expand=assignmentPolicies" in unquote_plus(seen[-1])
 
 
-def test_an_ambiguous_contains_match_is_refused(runner: Any, cli: Any, governance: Any) -> None:
-    result = failed(
-        runner.invoke(cli, ["azure", "eam", "get-package", "AWS", "--match", "contains"]), 2
+def test_a_contains_pattern_returns_every_match(runner: Any, cli: Any, governance: Any) -> None:
+    """A pattern matching several packages is the normal case, not an error."""
+    result = ok(
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "eam", "get-package", "AWS", "--match", "contains"]
+        )
     )
 
-    assert "2 access packages match" in result.output
+    names = [json.loads(line)["displayName"] for line in lines(result.stdout)]
+    assert names == ["AWS Platform Access", "AWS Billing Access"]
+
+
+def test_a_prefix_pattern_returns_every_match(runner: Any, cli: Any, governance: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli, ["-o", "ndjson", "azure", "eam", "get-package", "AWS ", "--match", "prefix"]
+        )
+    )
+
+    assert len(lines(result.stdout)) == 2
+
+
+def test_several_matches_render_as_an_array(runner: Any, cli: Any, governance: Any) -> None:
+    payload = json.loads(
+        ok(
+            runner.invoke(
+                cli, ["-o", "json", "azure", "eam", "get-package", "AWS", "--match", "contains"]
+            )
+        ).stdout
+    )
+
+    assert isinstance(payload, list)
+    assert len(payload) == 2
+
+
+def test_a_single_match_renders_as_an_object(runner: Any, cli: Any, governance: Any) -> None:
+    """So jq needs no index for the common case, matching `groups get`."""
+    payload = json.loads(
+        ok(
+            runner.invoke(
+                cli,
+                ["-o", "json", "azure", "eam", "get-package", "Incident", "--match", "contains"],
+            )
+        ).stdout
+    )
+
+    assert isinstance(payload, dict)
+    assert payload["id"] == "p3"
 
 
 def test_an_unknown_package_exits_4(runner: Any, cli: Any, governance: Any) -> None:
@@ -244,10 +284,13 @@ def test_an_unknown_package_exits_4(runner: Any, cli: Any, governance: Any) -> N
     assert "nope" in result.output
 
 
-def test_the_not_found_message_suggests_contains(runner: Any, cli: Any, governance: Any) -> None:
-    """Exact is the default, and contains is the thing that usually rescues it."""
+def test_the_not_found_message_suggests_the_pattern_modes(
+    runner: Any, cli: Any, governance: Any
+) -> None:
+    """Exact is the default, and the pattern modes are what usually rescue it."""
     result = failed(runner.invoke(cli, ["azure", "eam", "get-package", "Platform"]), 4)
 
+    assert "--match prefix" in result.output
     assert "--match contains" in result.output
 
 
