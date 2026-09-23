@@ -81,6 +81,21 @@ Global options work before or after the subcommand: `-o/--output`, `-q/--quiet`,
 `-v/--verbose`, `--timeout`, `--concurrency`. Command names accept unambiguous
 prefixes and aliases, so `pctl az gr li` is `pctl azure groups list`.
 
+**The thing a command acts on is a named flag, not a positional.** `--app` for an
+Enterprise Application, `--access-package` for an access package, `--catalog` for a
+catalog. Only the *subjects* of a command stay positional — the people or objects being
+looked up or changed:
+
+```bash
+pctl azure sp add-owner       --app "$APP" ann@company.com bob@company.com
+pctl azure eam add-assignment --access-package "$PKG" ann@company.com
+```
+
+Without this, `add-assignment "$PKG" ann@company.com` and
+`add-assignment ann@company.com "$PKG"` are both valid syntax and only one is right,
+which on a write is a bad way to find out. `groups`, `ddb`, `token` and `raw` keep their
+original positionals, since those shipped in v0.1.0.
+
 ### Tokens
 
 ```bash
@@ -145,8 +160,8 @@ containers called catalogs. `pctl azure entitlement-management` and
 pctl azure eam list-catalogs                      # usually the first call
 pctl azure eam list-packages --starts-with "AWS "
 pctl azure eam list-packages --contains incident -o json
-pctl azure eam get-package "AWS Platform Access" --with-policies -o json
-pctl azure eam get-catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
+pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
+pctl azure eam get-catalog --catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
 ```
 
 **These collections have a narrower OData surface than the rest of Graph.** `$select`,
@@ -175,10 +190,10 @@ containers called catalogs. `pctl azure entitlement-management` and
 
 ```bash
 pctl azure eam list-catalogs                          # usually the first call
-pctl azure eam get-catalog "AWS Platform"             # by name or by ID
+pctl azure eam get-catalog --catalog "AWS Platform"             # by name or by ID
 pctl azure eam list-packages --catalog "AWS Platform" # scope by catalog name
 pctl azure eam list-packages --contains incident -o json
-pctl azure eam get-package "AWS Platform Access" --with-policies -o json
+pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
 
 # who has this access, and is it live?
 pctl azure eam list-assignments --access-package "AWS Platform Access" --state Delivered
@@ -203,9 +218,9 @@ pctl -o ndjson azure eam list-assignments --access-package "$PKG" --state Delive
 #### Granting and revoking access
 
 ```bash
-pctl azure eam add-assignment    "AWS Platform Access" ann@company.com
-pctl azure eam add-assignment    "$PKG" --emails ann@company.com,bob@company.com
-pctl azure eam remove-assignment "$PKG" --emails ann@company.com,bob@company.com
+pctl azure eam add-assignment    --access-package "AWS Platform Access" ann@company.com
+pctl azure eam add-assignment    --access-package "$PKG" --emails ann@company.com,bob@company.com
+pctl azure eam remove-assignment --access-package "$PKG" --emails ann@company.com,bob@company.com
 ```
 
 Each target is an email address, a display name or a user object ID; an address is matched
@@ -223,14 +238,14 @@ does not mean the change is live.
 `--wait` polls each request until it settles and exits 5 if any did not reach `delivered`:
 
 ```bash
-pctl azure eam add-assignment    "$PKG" ann@company.com --wait
-pctl azure eam remove-assignment "$PKG" ann@company.com --wait --wait-timeout 300
+pctl azure eam add-assignment    --access-package "$PKG" ann@company.com --wait
+pctl azure eam remove-assignment --access-package "$PKG" ann@company.com --wait --wait-timeout 300
 ```
 
 Or check a request submitted earlier, which is what the `requestId` is for:
 
 ```bash
-pctl azure eam get-request 4c2a1f7e-… --wait
+pctl azure eam get-request --request-id 4c2a1f7e-… --wait
 ```
 
 The raw state is classified into an `outcome`, and the mapping is deliberately cautious:
@@ -291,8 +306,8 @@ and `--match contains` return *every* match rather than refusing an ambiguous on
 "show me the AWS packages" is a question with several answers:
 
 ```bash
-pctl azure eam get-package AWS --match prefix -o ndjson    # every AWS package
-pctl azure eam get-package incident --match contains        # substring, local
+pctl azure eam get-package --access-package AWS --match prefix -o ndjson    # every AWS package
+pctl azure eam get-package --access-package incident --match contains        # substring, local
 ```
 
 One match renders as an object and several as an array, the same shape `groups get` uses,
@@ -355,11 +370,11 @@ row gains an `appRoleName`, because `appRoleId` on its own is an opaque GUID. Wi
 ```bash
 APP="Company Incident.io SCIM"
 
-pctl azure sp assignments "$APP"                                   # everyone
-pctl azure sp assignments "$APP" --outbound                        # the reverse question
-pctl azure sp assignments "$APP" --principal "AWS Platform Admins" # exact, the default
-pctl azure sp assignments "$APP" --principal aws-     --principal-match prefix
-pctl azure sp assignments "$APP" --principal platform --principal-match contains
+pctl azure sp assignments --app "$APP"                                   # everyone
+pctl azure sp assignments --app "$APP" --outbound                        # the reverse question
+pctl azure sp assignments --app "$APP" --principal "AWS Platform Admins" # exact, the default
+pctl azure sp assignments --app "$APP" --principal aws-     --principal-match prefix
+pctl azure sp assignments --app "$APP" --principal platform --principal-match contains
 ```
 
 `exact` is the default because the usual job is an access check, where a coincidental
@@ -368,7 +383,7 @@ exploring. All three ignore case, and the command exits 4 when nothing matches, 
 check can be scripted on the exit code:
 
 ```bash
-pctl -q azure sp assignments "$APP" --principal "$GROUP" >/dev/null 2>&1
+pctl -q azure sp assignments --app "$APP" --principal "$GROUP" >/dev/null 2>&1
 case $? in 0) echo assigned ;; 4) echo "not assigned" ;; *) echo "check failed" ;; esac
 ```
 
@@ -379,18 +394,18 @@ commands in `pctl` that write anything, and they need `Application.ReadWrite.All
 than the read permission everything else uses.
 
 ```bash
-pctl azure sp owners "$APP"
+pctl azure sp owners --app "$APP"
 
 # one owner, or several, positionally or comma-separated
-pctl azure sp add-owner    "$APP" ann@company.com
-pctl azure sp add-owner    "$APP" ann@company.com bob@company.com
-pctl azure sp add-owner    "$APP" --emails ann@company.com,bob@company.com
-pctl azure sp remove-owner "$APP" --emails ann@company.com,bob@company.com
+pctl azure sp add-owner    --app "$APP" ann@company.com
+pctl azure sp add-owner    --app "$APP" ann@company.com bob@company.com
+pctl azure sp add-owner    --app "$APP" --emails ann@company.com,bob@company.com
+pctl azure sp remove-owner --app "$APP" --emails ann@company.com,bob@company.com
 
 # a display name, an object ID, or a service principal
-pctl azure sp add-owner    "$APP" "Ann Example"
-pctl azure sp add-owner    "$APP" e6901838-637f-4bc7-b843-a8a7725a4872
-pctl azure sp add-owner    "$APP" platform-automation --owner-type sp
+pctl azure sp add-owner    --app "$APP" "Ann Example"
+pctl azure sp add-owner    --app "$APP" e6901838-637f-4bc7-b843-a8a7725a4872
+pctl azure sp add-owner    --app "$APP" platform-automation --owner-type sp
 ```
 
 Each owner can be an **email address**, a **display name**, or a **directory object ID**,
@@ -409,7 +424,7 @@ with a `status` of `added`, `already-owner`, `removed` or `not-an-owner`, so a b
 you exactly what happened:
 
 ```bash
-pctl -o ndjson azure sp add-owner "$APP" --emails ann@company.com,bob@company.com \
+pctl -o ndjson azure sp add-owner --app "$APP" --emails ann@company.com,bob@company.com \
   | jq -r '[.owner, .status] | @tsv'
 ```
 
