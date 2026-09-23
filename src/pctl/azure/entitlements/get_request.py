@@ -17,7 +17,13 @@ COLUMNS = ["id", "requestType", "state", "outcome", "targetDisplayName", "access
 
 
 @click.command(name="get-request")
-@click.argument("request_id")
+@click.option(
+    "--request-id",
+    "request_id",
+    required=True,
+    metavar="ID",
+    help="The requestId returned by add-assignment or remove-assignment.",
+)
 @azure_options
 @click.option(
     "--wait",
@@ -62,9 +68,9 @@ def command(
     request exits 0 unless --fail-on-pending.
 
     \b
-      pctl azure eam get-request 4c2a1f7e-...
-      pctl azure eam get-request 4c2a1f7e-... --wait
-      pctl azure eam get-request 4c2a1f7e-... --wait --fail-on-pending
+      pctl azure eam get-request --request-id 4c2a1f7e-...
+      pctl azure eam get-request --request-id 4c2a1f7e-... --wait
+      pctl azure eam get-request --request-id 4c2a1f7e-... --wait --fail-on-pending
     """
     from ..graph import run
 

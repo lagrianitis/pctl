@@ -29,7 +29,13 @@ USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
 
 
 @click.command(name="add-assignment")
-@click.argument("package")
+@click.option(
+    "--access-package",
+    "package",
+    required=True,
+    metavar="NAME|ID",
+    help="The access package to assign. Display name or object ID.",
+)
 @click.argument("targets", nargs=-1)
 @azure_options
 @target_options
@@ -52,7 +58,7 @@ def command(
 ) -> None:
     """Assign one or more people to an access package.
 
-    PACKAGE is a display name or ID. Each target is an email address, a display name or a
+    --access-package is a display name or ID. Each target is an email address, a display name or a
     user object ID; an address is matched against userPrincipalName and mail, since those
     routinely differ.
 
@@ -72,10 +78,10 @@ def command(
     Requires EntitlementManagement.ReadWrite.All.
 
     \b
-      pctl azure eam add-assignment "AWS Platform Access" ann@company.com
-      pctl azure eam add-assignment PKG ann@company.com --wait
-      pctl azure eam add-assignment PKG --emails ann@company.com,bob@company.com --wait
-      pctl azure eam add-assignment PKG ann@company.com --policy "Direct assignment"
+      pctl azure eam add-assignment --access-package "AWS Platform Access" ann@company.com
+      pctl azure eam add-assignment --access-package "$PKG" ann@company.com --wait
+      pctl azure eam add-assignment --access-package "$PKG" --emails a@b.com,c@d.com --wait
+      pctl azure eam add-assignment --access-package "$PKG" a@b.com --policy "Direct"
     """
     from ..graph import run
 

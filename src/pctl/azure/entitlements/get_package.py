@@ -10,7 +10,13 @@ from .runner import run_get
 
 
 @click.command(name="get-package")
-@click.argument("identifier")
+@click.option(
+    "--access-package",
+    "identifier",
+    required=True,
+    metavar="NAME|ID",
+    help="Display name, name pattern, or object ID.",
+)
 @azure_options
 @match_option
 @click.option(
@@ -41,11 +47,11 @@ def command(
     --with-policies expands assignmentPolicies, where the approval and expiry rules live.
 
     \b
-      pctl azure eam get-package "AWS Platform Access"
-      pctl azure eam get-package AWS --match prefix -o ndjson
-      pctl azure eam get-package incident --match contains
-      pctl azure eam get-package "AWS Platform Access" --with-policies -o json
-      pctl azure eam get-package a914b616-e04e-476b-aa37-91038f0b165b
+      pctl azure eam get-package --access-package "AWS Platform Access"
+      pctl azure eam get-package --access-package AWS --match prefix -o ndjson
+      pctl azure eam get-package --access-package incident --match contains
+      pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
+      pctl azure eam get-package --access-package a914b616-e04e-476b-aa37-91038f0b165b
     """
     from ..graph import DEFAULT_ACCESS_PACKAGE_SELECT
 

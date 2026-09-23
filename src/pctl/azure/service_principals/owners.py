@@ -12,7 +12,13 @@ from .common import match_option, resolve_one
 
 
 @click.command(name="owners")
-@click.argument("name")
+@click.option(
+    "--app",
+    "name",
+    required=True,
+    metavar="NAME|ID",
+    help="The Enterprise Application whose owners to list. Display name or ID.",
+)
 @azure_options
 @match_option
 @click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N owners.")
@@ -32,9 +38,9 @@ def command(
     the JSON output.
 
     \b
-      pctl azure sp owners "Company Incident.io SCIM"
-      pctl azure sp owners "Company Incident.io SCIM" -o json
-      pctl azure sp owners SCIM -o ndjson | jq -r .displayName
+      pctl azure sp owners --app "Company Incident.io SCIM"
+      pctl azure sp owners --app "Company Incident.io SCIM" -o json
+      pctl azure sp owners --app SCIM -o ndjson | jq -r .displayName
     """
     from ..graph import run
 

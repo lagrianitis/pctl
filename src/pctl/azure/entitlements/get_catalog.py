@@ -10,7 +10,13 @@ from .runner import run_get
 
 
 @click.command(name="get-catalog")
-@click.argument("identifier")
+@click.option(
+    "--catalog",
+    "identifier",
+    required=True,
+    metavar="NAME|ID",
+    help="Display name, name pattern, or object ID.",
+)
 @azure_options
 @match_option
 @click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
@@ -29,10 +35,10 @@ def command(
     single result is an object, several are an array.
 
     \b
-      pctl azure eam get-catalog "AWS Platform"
-      pctl azure eam get-catalog aws --match contains -o json
-      pctl azure eam get-catalog AWS --match prefix -o ndjson
-      pctl azure eam get-catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
+      pctl azure eam get-catalog --catalog "AWS Platform"
+      pctl azure eam get-catalog --catalog aws --match contains -o json
+      pctl azure eam get-catalog --catalog AWS --match prefix -o ndjson
+      pctl azure eam get-catalog --catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
     """
     from ..graph import DEFAULT_CATALOG_SELECT
 

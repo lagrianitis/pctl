@@ -28,7 +28,13 @@ USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
 
 
 @click.command(name="remove-assignment")
-@click.argument("package")
+@click.option(
+    "--access-package",
+    "package",
+    required=True,
+    metavar="NAME|ID",
+    help="The access package to revoke. Display name or object ID.",
+)
 @click.argument("targets", nargs=-1)
 @azure_options
 @target_options
@@ -45,7 +51,7 @@ def command(
 ) -> None:
     """Remove one or more people's assignment to an access package.
 
-    PACKAGE is a display name or ID. Each target is an email address, a display name or a
+    --access-package is a display name or ID. Each target is an email address, a display name or a
     user object ID.
 
     Idempotent: current assignments are read first, and someone who has none is reported
@@ -63,8 +69,8 @@ def command(
     Requires EntitlementManagement.ReadWrite.All.
 
     \b
-      pctl azure eam remove-assignment "AWS Platform Access" ann@company.com --wait
-      pctl azure eam remove-assignment PKG --emails ann@company.com,bob@company.com --wait
+      pctl azure eam remove-assignment --access-package "$PKG" ann@company.com --wait
+      pctl azure eam remove-assignment --access-package "$PKG" --emails a@b.com,c@d.com --wait
     """
     from ..graph import run
 

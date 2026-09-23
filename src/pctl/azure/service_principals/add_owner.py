@@ -22,7 +22,13 @@ from .common import (
 
 
 @click.command(name="add-owner")
-@click.argument("name")
+@click.option(
+    "--app",
+    "name",
+    required=True,
+    metavar="NAME|ID",
+    help="The Enterprise Application to add owners to. Display name or ID.",
+)
 @click.argument("owners", nargs=-1)
 @azure_options
 @match_option
@@ -77,11 +83,11 @@ def command(
     default, because a prefix match on a write could name the wrong person.
 
     \b
-      pctl azure sp add-owner "Company Incident.io SCIM" ann@company.com
-      pctl azure sp add-owner SCIM ann@company.com bob@company.com
-      pctl azure sp add-owner SCIM --emails ann@company.com,bob@company.com
-      pctl azure sp add-owner SCIM "Ann Example" e6901838-637f-4bc7-b843-a8a7725a4872
-      pctl azure sp add-owner SCIM platform-automation --owner-type sp
+      pctl azure sp add-owner --app "Company Incident.io SCIM" ann@company.com
+      pctl azure sp add-owner --app SCIM ann@company.com bob@company.com
+      pctl azure sp add-owner --app SCIM --emails ann@company.com,bob@company.com
+      pctl azure sp add-owner --app SCIM "Ann Example" e6901838-637f-4bc7-b843-a8a7725a4872
+      pctl azure sp add-owner --app SCIM platform-automation --owner-type sp
     """
     from ..graph import run
 

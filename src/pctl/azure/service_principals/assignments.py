@@ -19,7 +19,13 @@ from .common import (
 
 
 @click.command(name="assignments")
-@click.argument("name")
+@click.option(
+    "--app",
+    "name",
+    required=True,
+    metavar="NAME|ID",
+    help="The Enterprise Application whose assignments to list. Display name or ID.",
+)
 @azure_options
 @match_option
 @click.option(
@@ -78,11 +84,11 @@ def command(
     code rather than parsed.
 
     \b
-      pctl azure sp assignments "Company Incident.io SCIM"
-      pctl azure sp assignments "Company Incident.io SCIM" -o ndjson --outbound
-      pctl azure sp assignments SCIM --principal "AWS Platform Admins"
-      pctl azure sp assignments SCIM --principal aws- --principal-match prefix
-      pctl azure sp assignments SCIM --principal platform --principal-match contains
+      pctl azure sp assignments --app "Company Incident.io SCIM"
+      pctl azure sp assignments --app "Company Incident.io SCIM" -o ndjson --outbound
+      pctl azure sp assignments --app SCIM --principal "AWS Platform Admins"
+      pctl azure sp assignments --app SCIM --principal aws- --principal-match prefix
+      pctl azure sp assignments --app SCIM --principal platform --principal-match contains
     """
     from ..graph import DEFAULT_ASSIGNMENT_COLUMNS, run
 

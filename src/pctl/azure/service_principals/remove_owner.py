@@ -26,7 +26,13 @@ RECOMMENDED_MINIMUM_OWNERS = 2
 
 
 @click.command(name="remove-owner")
-@click.argument("name")
+@click.option(
+    "--app",
+    "name",
+    required=True,
+    metavar="NAME|ID",
+    help="The Enterprise Application to remove owners from. Display name or ID.",
+)
 @click.argument("owners", nargs=-1)
 @azure_options
 @match_option
@@ -80,10 +86,10 @@ def command(
     not refuse.
 
     \b
-      pctl azure sp remove-owner "Company Incident.io SCIM" ann@company.com
-      pctl azure sp remove-owner SCIM ann@company.com bob@company.com
-      pctl azure sp remove-owner SCIM --emails ann@company.com,bob@company.com
-      pctl azure sp remove-owner SCIM e6901838-637f-4bc7-b843-a8a7725a4872
+      pctl azure sp remove-owner --app "Company Incident.io SCIM" ann@company.com
+      pctl azure sp remove-owner --app SCIM ann@company.com bob@company.com
+      pctl azure sp remove-owner --app SCIM --emails ann@company.com,bob@company.com
+      pctl azure sp remove-owner --app SCIM e6901838-637f-4bc7-b843-a8a7725a4872
     """
     from ..graph import run
 
