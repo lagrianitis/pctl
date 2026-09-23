@@ -19,9 +19,7 @@ from .runner import run_get
 )
 @azure_options
 @match_option
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
 @columns_option
 @output_options
 @click.pass_context

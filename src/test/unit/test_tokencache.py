@@ -91,9 +91,7 @@ def test_cache_key_is_filename_safe_and_short() -> None:
     assert key.isalnum()
 
 
-def test_cache_dir_prefers_the_explicit_override(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_cache_dir_prefers_the_explicit_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", "/tmp/pctl-somewhere")
     assert cache_dir() == Path("/tmp/pctl-somewhere")
 
@@ -192,18 +190,14 @@ def test_an_unwritable_directory_does_not_fail_the_command(
 # ---------------------------------------------------------------------------
 # disabling and clearing
 # ---------------------------------------------------------------------------
-def test_a_disabled_cache_writes_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_disabled_cache_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", str(tmp_path / "cache"))
     cache = TokenCache(cache_key("t"), enabled=False)
     cache.store(token())
     assert not cache.path.exists()
 
 
-def test_a_disabled_cache_never_reads(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_disabled_cache_never_reads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", str(tmp_path / "cache"))
     TokenCache(cache_key("t")).store(token())
     assert TokenCache(cache_key("t"), enabled=False).load() is None
@@ -219,9 +213,7 @@ def test_clear_on_a_missing_file_is_false_not_an_error(cache: TokenCache) -> Non
     assert cache.clear() is False
 
 
-def test_clear_all_counts_what_it_removed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_clear_all_counts_what_it_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", str(tmp_path / "cache"))
     for name in ("one", "two", "three"):
         TokenCache(cache_key(name)).store(token())

@@ -43,9 +43,7 @@ async def resolve_one(
     select: tuple[str, ...] = ("id", "displayName"),
 ) -> dict[str, Any]:
     """Resolve a display name to exactly one group, warning on ambiguity."""
-    matches = await client.find_groups_by_display_name(
-        name, mode=mode, select=select, limit=2
-    )
+    matches = await client.find_groups_by_display_name(name, mode=mode, select=select, limit=2)
     if not matches:
         raise NotFoundError(
             f"No group matched display name: {name}. Try --match prefix or --match search."
@@ -87,10 +85,7 @@ async def add_relations(
         )
     if transitive:
         tasks["transitiveMembers"] = client.relation(
-            group_id,
-            "transitiveMembers",
-            select=DEFAULT_MEMBER_SELECT,
-            limit=member_limit,
+            group_id, "transitiveMembers", select=DEFAULT_MEMBER_SELECT, limit=member_limit
         )
     if counts:
         tasks["memberCount"] = client.relation_count(group_id, "members")
@@ -102,11 +97,7 @@ async def add_relations(
     for key, value in zip(tasks, results, strict=True):
         group[key] = value
     # Derive counts for free when the relation was listed anyway.
-    if (
-        members
-        and isinstance(group.get("members"), list)
-        and "memberCount" not in group
-    ):
+    if members and isinstance(group.get("members"), list) and "memberCount" not in group:
         group["memberCount"] = len(group["members"])
     if owners and isinstance(group.get("owners"), list) and "ownerCount" not in group:
         group["ownerCount"] = len(group["owners"])

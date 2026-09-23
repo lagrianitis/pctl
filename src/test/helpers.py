@@ -51,9 +51,7 @@ def _explain(result: Any, want: int) -> str:
         parts.append(
             "".join(
                 traceback.format_exception(
-                    type(result.exception),
-                    result.exception,
-                    result.exception.__traceback__,
+                    type(result.exception), result.exception, result.exception.__traceback__
                 )
             )
         )
@@ -93,9 +91,7 @@ def filters(urls: list[str]) -> list[str]:
     from urllib.parse import unquote_plus
 
     decoded = [unquote_plus(url) for url in urls]
-    return [
-        url.split("$filter=")[1].split("&")[0] for url in decoded if "$filter=" in url
-    ]
+    return [url.split("$filter=")[1].split("&")[0] for url in decoded if "$filter=" in url]
 
 
 TABLE = "pctl-e2e-accounts"

@@ -50,9 +50,7 @@ def run_list(
                 # the friction this whole service exists to remove.
                 resolved = await resolve_catalog_id(client, catalog)
                 scope = f"catalog/id eq '{resolved}'"
-                server_filter = (
-                    f"{server_filter} and {scope}" if server_filter else scope
-                )
+                server_filter = f"{server_filter} and {scope}" if server_filter else scope
             app.log(f"listing {collection} filter={server_filter or 'none'}")
             # `--contains` cannot be pushed to Graph, so the limit has to be applied
             # after filtering or it would cap the wrong set.
@@ -112,9 +110,7 @@ def run_get(
                 select=fields,
                 expand=expand,
             )
-            app.log(
-                f"'{identifier}' matched {len(found)} {noun}(s) with match={match_mode}"
-            )
+            app.log(f"'{identifier}' matched {len(found)} {noun}(s) with match={match_mode}")
             return found
 
     found = run(_run())

@@ -18,23 +18,15 @@ from .common import DEFAULT_LIST_COLUMNS
     metavar="FIELDS",
     help="Comma-separated Graph fields to request. Fewer fields is faster.",
 )
-@click.option(
-    "--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression."
-)
-@click.option(
-    "--search", metavar="TEXT", help="Full-text search on displayName (substring)."
-)
+@click.option("--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression.")
+@click.option("--search", metavar="TEXT", help="Full-text search on displayName (substring).")
 @click.option(
     "--starts-with",
     metavar="PREFIX",
     help="Shortcut for a startswith(displayName) filter.",
 )
-@click.option(
-    "--order-by", metavar="FIELD", help="Server-side ordering, e.g. displayName."
-)
-@click.option(
-    "-n", "--limit", type=click.IntRange(min=1), help="Stop after N registrations."
-)
+@click.option("--order-by", metavar="FIELD", help="Server-side ordering, e.g. displayName.")
+@click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N registrations.")
 @click.option(
     "--page-size",
     type=click.IntRange(1, GRAPH_MAX_PAGE_SIZE),

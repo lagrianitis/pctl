@@ -55,9 +55,7 @@ class PctlGroup(click.Group):
 
     def _match_prefix(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         """Allow unambiguous prefixes, so `pctl az gr li` works."""
-        candidates = [
-            name for name in self.list_commands(ctx) if name.startswith(cmd_name)
-        ]
+        candidates = [name for name in self.list_commands(ctx) if name.startswith(cmd_name)]
         if len(candidates) == 1:
             return self.get_command(ctx, candidates[0])
         if len(candidates) > 1:
@@ -65,9 +63,7 @@ class PctlGroup(click.Group):
         return None
 
     # -- help -------------------------------------------------------------
-    def format_commands(
-        self, ctx: click.Context, formatter: click.HelpFormatter
-    ) -> None:
+    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         rows: list[tuple[str, str]] = []
         reverse_aliases: dict[str, list[str]] = {}
         for alias, target in self._aliases.items():

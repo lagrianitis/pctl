@@ -24,9 +24,7 @@ from .runner import run_get
     is_flag=True,
     help="Expand the assignment policies that govern the package.",
 )
-@click.option(
-    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
-)
+@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
 @columns_option
 @output_options
 @click.pass_context

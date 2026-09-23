@@ -72,9 +72,7 @@ def test_a_lazy_subcommand_runs(group: PctlGroup) -> None:
     assert "did it" in result.stdout
 
 
-def test_help_does_not_import_the_action_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_help_does_not_import_the_action_module(monkeypatch: pytest.MonkeyPatch) -> None:
     """The whole point of the group: `--help` must not pay for the command's imports."""
     monkeypatch.delitem(sys.modules, OTHER_MODULE, raising=False)
 
@@ -96,9 +94,7 @@ def test_short_help_comes_from_the_table(group: PctlGroup) -> None:
     assert "Do the thing, lazily." in result.stdout
 
 
-def test_a_bad_target_is_reported_as_a_type_error(
-    target_module: types.ModuleType,
-) -> None:
+def test_a_bad_target_is_reported_as_a_type_error(target_module: types.ModuleType) -> None:
     """A typo in the LAZY_SUBCOMMANDS table should fail loudly, not silently."""
 
     @click.group(

@@ -130,19 +130,13 @@ def test_table_header_is_verbatim_and_ruled(out: Out) -> None:
 
 
 def test_table_columns_are_padded_to_the_widest_cell(out: Out) -> None:
-    render(
-        [{"a": "short"}, {"a": "a much longer value"}],
-        OutputFormat.TABLE,
-        columns=["a"],
-    )
+    render([{"a": "short"}, {"a": "a much longer value"}], OutputFormat.TABLE, columns=["a"])
     lines = value(out).splitlines()
     assert lines[1] == "-" * len("a much longer value")
 
 
 def test_table_renders_placeholders_for_empty_values(out: Out) -> None:
-    render(
-        [{"a": None, "b": [], "c": False}], OutputFormat.TABLE, columns=["a", "b", "c"]
-    )
+    render([{"a": None, "b": [], "c": False}], OutputFormat.TABLE, columns=["a", "b", "c"])
     assert value(out).splitlines()[2].split() == ["-", "-", "false"]
 
 
@@ -170,9 +164,7 @@ def test_table_says_so_when_there_is_nothing(out: Out) -> None:
         ({"x", "y"}, b'{"a":["x","y"]}'),
     ],
 )
-def test_dumps_coerces_types_json_cannot_represent(
-    raw: object, expected: bytes
-) -> None:
+def test_dumps_coerces_types_json_cannot_represent(raw: object, expected: bytes) -> None:
     assert dumps({"a": raw}) == expected
 
 

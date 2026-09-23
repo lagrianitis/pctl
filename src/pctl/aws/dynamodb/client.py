@@ -83,9 +83,7 @@ def make_client(config: AwsConfig, *, max_pool: int = 10) -> Any:
             "dynamodb", endpoint_url=config.endpoint_url or None, config=boto_config
         )
     except NoRegionError as exc:
-        raise ConfigError(
-            "No AWS region configured. Pass --region, or set AWS_REGION."
-        ) from exc
+        raise ConfigError("No AWS region configured. Pass --region, or set AWS_REGION.") from exc
     except BotoCoreError as exc:
         raise ConfigError(f"Could not create an AWS session: {exc}") from exc
 
@@ -189,9 +187,7 @@ def query(
         raise wrap_client_error(exc, request.table) from exc
 
 
-def get_item(
-    client: Any, table: str, key: dict[str, Any], **kwargs: Any
-) -> dict[str, Any] | None:
+def get_item(client: Any, table: str, key: dict[str, Any], **kwargs: Any) -> dict[str, Any] | None:
     from botocore.exceptions import ClientError
 
     try:
@@ -277,9 +273,7 @@ def _scan_parallel(
             pages.put(_SENTINEL)
 
     threads = [
-        threading.Thread(
-            target=worker, args=(index,), name=f"pctl-scan-{index}", daemon=True
-        )
+        threading.Thread(target=worker, args=(index,), name=f"pctl-scan-{index}", daemon=True)
         for index in range(segments)
     ]
     for thread in threads:

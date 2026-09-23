@@ -50,9 +50,7 @@ from .common import (
     is_flag=True,
     help="Skip the extra request that resolves appRoleId to a role name.",
 )
-@click.option(
-    "-n", "--limit", type=click.IntRange(min=1), help="Stop after N assignments."
-)
+@click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N assignments.")
 @columns_option
 @output_options
 @click.pass_context
@@ -109,16 +107,12 @@ def command(
             sp_id = target["id"]
             app.log(f"resolved '{name}' to {target.get('displayName')} ({sp_id})")
 
-            items = await client.app_role_assignments(
-                sp_id, outbound=outbound, limit=limit
-            )
+            items = await client.app_role_assignments(sp_id, outbound=outbound, limit=limit)
             if not no_role_names and items:
                 label_roles(items, await client.app_role_names(sp_id))
             matched = filter_by_principal(items, principal, mode=principal_match)
             if principal:
-                app.log(
-                    f"{len(matched)} of {len(items)} assignments matched {principal_match}"
-                )
+                app.log(f"{len(matched)} of {len(items)} assignments matched {principal_match}")
             return matched
 
     found = run(_run())

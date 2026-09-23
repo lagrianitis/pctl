@@ -107,9 +107,7 @@ def test_optional_parts_appear_only_when_set() -> None:
 
 def test_consistent_read_is_omitted_rather_than_false() -> None:
     """Sending ConsistentRead=False is legal but noisy; omit it instead."""
-    assert (
-        "ConsistentRead" not in ScanRequest(table="t", consistent=False).base_kwargs()
-    )
+    assert "ConsistentRead" not in ScanRequest(table="t", consistent=False).base_kwargs()
 
 
 def test_paging_and_limits_are_not_request_kwargs() -> None:
@@ -149,17 +147,13 @@ def test_access_denied_keeps_the_service_message(
     client_error: Callable[..., Exception],
 ) -> None:
     error = wrap_client_error(
-        client_error(
-            "AccessDeniedException", "not authorized to perform dynamodb:Scan"
-        ),
+        client_error("AccessDeniedException", "not authorized to perform dynamodb:Scan"),
         "my-table",
     )
     assert "not authorized" in str(error)
 
 
-def test_expired_credentials_say_so_plainly(
-    client_error: Callable[..., Exception]
-) -> None:
+def test_expired_credentials_say_so_plainly(client_error: Callable[..., Exception]) -> None:
     """This is the most common failure in practice, so the wording matters."""
     error = wrap_client_error(client_error("ExpiredTokenException"), "t")
     assert "expired" in str(error).lower()

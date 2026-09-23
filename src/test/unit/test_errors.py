@@ -35,9 +35,7 @@ def test_exit_codes_are_stable(error: type[PctlError], exit_code: int) -> None:
     assert error("boom").exit_code == exit_code
 
 
-@pytest.mark.parametrize(
-    "error", [PctlError, ConfigError, AuthError, NotFoundError, UpstreamError]
-)
+@pytest.mark.parametrize("error", [PctlError, ConfigError, AuthError, NotFoundError, UpstreamError])
 def test_every_error_is_a_click_exception(error: type[PctlError]) -> None:
     """click prints these itself and honours `exit_code`; nothing calls sys.exit."""
     assert issubclass(error, click.ClickException)
