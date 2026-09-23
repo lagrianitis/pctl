@@ -708,6 +708,29 @@ class GraphClient:
         response = await self.request("POST", f"{EAM_BASE}/assignmentRequests", json=body)
         return response.json() if response.content else {}
 
+    async def get_assignment_request(self, request_id: str) -> dict[str, Any]:
+        """One accessPackageAssignmentRequest, for polling a write to completion."""
+        return await self.get_json(
+            f"{EAM_BASE}/assignmentRequests/{request_id}",
+            params={"$expand": "accessPackage,target"},
+        )
+
+    def list_assignment_requests(
+        self,
+        *,
+        filter_expr: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Assignment requests, current and historical, newest first where Graph allows."""
+        return self.list_governance(
+            "assignmentRequests",
+            filter_expr=filter_expr,
+            expand=("accessPackage", "target"),
+            limit=limit,
+            page_size=page_size,
+        )
+
     async def find_assignment(
         self, package_id: str, target_id: str, *, states: Sequence[str] | None = None
     ) -> dict[str, Any] | None:

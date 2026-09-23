@@ -239,6 +239,19 @@ ACTIVE_ASSIGNMENT_STATES = ("Delivered", "Delivering", "PartiallyDelivered")
 def target_options(func: Any) -> Any:
     """The shared way to name one or more people for an assignment write."""
     func = click.option(
+        "--wait-timeout",
+        type=click.FloatRange(min=1),
+        default=120.0,
+        show_default=True,
+        metavar="SECONDS",
+        help="With --wait, give up after this long. A request can stall indefinitely.",
+    )(func)
+    func = click.option(
+        "--wait",
+        is_flag=True,
+        help="Poll each request until it is delivered, and exit non-zero if it is not.",
+    )(func)
+    func = click.option(
         "--ignore-missing",
         is_flag=True,
         help="Exit 0 even when a person could not be resolved.",
@@ -249,6 +262,75 @@ def target_options(func: Any) -> Any:
         help="Comma-separated addresses, added to any given positionally.",
     )(func)
     return func
+
+
+async def settle_requests(
+    client: GraphClient,
+    records: list[dict[str, Any]],
+    *,
+    timeout: float,
+    log: Any = None,
+) -> None:
+    """Poll every submitted request in `records` concurrently, updating them in place.
+
+    Concurrent because a batch of ten should not take ten times as long to confirm. Each
+    record gains `outcome`, so the caller can decide the exit code without re-deriving it
+    from the raw state.
+    """
+    import asyncio
+
+    pending = [record for record in records if record.get("requestId")]
+    if not pending:
+        return
+
+    async def one(record: dict[str, Any]) -> None:
+        settled = await wait_for_request(client, str(record["requestId"]), timeout=timeout, log=log)
+        state = settled.get("state") or settled.get("requestState")
+        record["requestState"] = state
+        record["outcome"] = request_outcome(state)
+
+    await asyncio.gather(*[one(record) for record in pending])
+
+
+def report_outcomes(records: list[dict[str, Any]], *, noun: str, quiet: bool) -> None:
+    """Print per-request outcomes and raise when any failed to apply.
+
+    Raising on the first failure would hide the rest of a batch, so every record is
+    reported before the exception.
+    """
+    from ...errors import UpstreamError
+
+    unfinished: list[str] = []
+    for record in records:
+        outcome = record.get("outcome")
+        target = record.get("target")
+        state = record.get("requestState")
+        if outcome == "done":
+            if not quiet:
+                click.secho(f"{target}: {noun} applied ({state}).", err=True, fg="green")
+        elif outcome == "failed":
+            click.secho(f"{target}: did not apply ({state}).", err=True, fg="red")
+            unfinished.append(f"{target} [{state}]")
+        elif outcome == "partial":
+            click.secho(
+                f"{target}: only partly applied ({state}); reprocess rather than resubmit.",
+                err=True,
+                fg="red",
+            )
+            unfinished.append(f"{target} [{state}]")
+        elif outcome == "pending":
+            click.secho(
+                f"{target}: still {state} when waiting stopped; check with "
+                f"`eam get-request {record.get('requestId')}`.",
+                err=True,
+                fg="yellow",
+            )
+            unfinished.append(f"{target} [{state}]")
+
+    if unfinished:
+        raise UpstreamError(
+            f"{len(unfinished)} request(s) did not reach delivered: {', '.join(unfinished)}"
+        )
 
 
 def collect_targets(targets: tuple[str, ...], emails: str | None) -> list[str]:
@@ -309,3 +391,69 @@ def assignment_request(*, request_type: str, **assignment: str) -> dict[str, Any
     beta example fails against v1.0, which is worth encoding once rather than rediscovering.
     """
     return {"requestType": request_type, "assignment": assignment}
+
+
+# Request lifecycle. Graph spells these lower-camel in v1.0, but tenants have been seen
+# returning capitalised variants, so comparisons fold case.
+#
+# Terminal and applied. This is the only state that means the access exists.
+REQUEST_DELIVERED = "delivered"
+# Terminal and not applied.
+REQUEST_FAILED = ("denied", "canceled", "cancelled", "deliveryfailed", "failed")
+# Terminal but only partly applied. Microsoft's guidance is to reprocess these rather
+# than resubmit, so they are reported distinctly rather than lumped in with failure.
+REQUEST_PARTIAL = ("partiallydelivered",)
+
+
+def request_outcome(state: str | None) -> str:
+    """Classify a request state as done, failed, partial or pending.
+
+    Everything unrecognised counts as pending rather than done. A request can sit in
+    `delivering` indefinitely when provisioning is stuck, so treating an unknown state as
+    finished would report success for access that never arrived.
+    """
+    folded = (state or "").strip().casefold()
+    if folded == REQUEST_DELIVERED:
+        return "done"
+    if folded in REQUEST_FAILED:
+        return "failed"
+    if folded in REQUEST_PARTIAL:
+        return "partial"
+    return "pending"
+
+
+async def wait_for_request(
+    client: GraphClient,
+    request_id: str,
+    *,
+    timeout: float,
+    log: Any = None,
+) -> dict[str, Any]:
+    """Poll one assignment request until it settles, or until `timeout` seconds pass.
+
+    Returns the last request seen, whatever state it reached. The caller decides what a
+    non-delivered outcome means for the exit code, because that differs between granting
+    and revoking.
+
+    Backs off from one second to eight so a fast delivery is noticed promptly while a slow
+    one does not hammer Graph. Never raises on a timeout: "still pending" is a real answer
+    and the caller reports it as such.
+    """
+    import asyncio
+    import time
+
+    deadline = time.monotonic() + timeout
+    delay = 1.0
+    latest: dict[str, Any] = {}
+    while True:
+        latest = await client.get_assignment_request(request_id)
+        state = latest.get("state") or latest.get("requestState")
+        outcome = request_outcome(state)
+        if log:
+            log(f"request {request_id} state={state} ({outcome})")
+        if outcome != "pending":
+            return latest
+        if time.monotonic() + delay >= deadline:
+            return latest
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, 8.0)
