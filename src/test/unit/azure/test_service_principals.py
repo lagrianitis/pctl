@@ -56,21 +56,35 @@ def test_a_partial_name_does_not_match_by_default() -> None:
 # filter_by_principal: match modes
 # ---------------------------------------------------------------------------
 def test_prefix_mode_matches_the_start_of_the_name() -> None:
-    items = [_assignment("aws-platform"), _assignment("aws-billing"), _assignment("gcp-platform")]
+    items = [
+        _assignment("aws-platform"),
+        _assignment("aws-billing"),
+        _assignment("gcp-platform"),
+    ]
 
     matched = filter_by_principal(items, "aws-", mode="prefix")
 
-    assert [item["principalDisplayName"] for item in matched] == ["aws-platform", "aws-billing"]
+    assert [item["principalDisplayName"] for item in matched] == [
+        "aws-platform",
+        "aws-billing",
+    ]
 
 
 def test_prefix_mode_does_not_match_mid_string() -> None:
     assert (
-        filter_by_principal([_assignment("AWS Platform Admins")], "Platform", mode="prefix") == []
+        filter_by_principal(
+            [_assignment("AWS Platform Admins")], "Platform", mode="prefix"
+        )
+        == []
     )
 
 
 def test_contains_mode_matches_anywhere_in_the_name() -> None:
-    items = [_assignment("AWS Platform Admins"), _assignment("GCP Platform"), _assignment("Other")]
+    items = [
+        _assignment("AWS Platform Admins"),
+        _assignment("GCP Platform"),
+        _assignment("Other"),
+    ]
 
     matched = filter_by_principal(items, "platform", mode="contains")
 
@@ -78,11 +92,16 @@ def test_contains_mode_matches_anywhere_in_the_name() -> None:
 
 
 def test_prefix_mode_ignores_case() -> None:
-    assert filter_by_principal([_assignment("AWS Platform")], "aws", mode="prefix") != []
+    assert (
+        filter_by_principal([_assignment("AWS Platform")], "aws", mode="prefix") != []
+    )
 
 
 def test_contains_mode_ignores_case() -> None:
-    assert filter_by_principal([_assignment("AWS Platform")], "PLATFORM", mode="contains") != []
+    assert (
+        filter_by_principal([_assignment("AWS Platform")], "PLATFORM", mode="contains")
+        != []
+    )
 
 
 def test_an_unknown_mode_is_an_error_not_a_silent_pass() -> None:
@@ -166,3 +185,85 @@ def test_the_upn_stands_in_when_there_is_no_display_name() -> None:
 
 def test_the_id_stands_in_when_there_is_no_name_at_all() -> None:
     assert owner_label({"id": "u1", "_resolved": "users"}) == "u1 (u1)"
+
+
+# ---------------------------------------------------------------------------
+# provision_outcome
+# ---------------------------------------------------------------------------
+def _verdict(result: str, **details: str) -> dict[str, str]:
+    """A provisionOnDemand response, with the verdict JSON-encoded as Graph sends it."""
+    import json
+
+    return {"key": json.dumps({"result": result, "details": details}), "value": "{}"}
+
+
+def test_success_is_applied() -> None:
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    outcome, _detail = provision_outcome(_verdict("Success"))
+
+    assert outcome == "applied"
+
+
+def test_a_redundant_export_is_already_in_sync() -> None:
+    """The one skip reason that means the desired state was already true."""
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    outcome, detail = provision_outcome(
+        _verdict("Skipped", errorCode="RedundantExport", errorMessage="Already match.")
+    )
+
+    assert outcome == "already-in-sync"
+    assert "RedundantExport" in detail
+
+
+def test_any_other_skip_is_a_failure() -> None:
+    """Out of scope or unassigned means nothing was provisioned."""
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    outcome, _detail = provision_outcome(
+        _verdict("Skipped", errorCode="NotEffectivelyEntitled")
+    )
+
+    assert outcome == "failed"
+
+
+def test_a_failure_result_is_a_failure() -> None:
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    assert (
+        provision_outcome(_verdict("Failure", errorCode="SchemaError"))[0] == "failed"
+    )
+
+
+def test_an_unknown_result_is_not_applied() -> None:
+    """A verdict this code has never seen is not evidence that provisioning happened."""
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    assert provision_outcome(_verdict("Delivering"))[0] == "failed"
+
+
+def test_the_result_comparison_folds_case() -> None:
+    """Tenants have been seen returning different casing for these strings."""
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    assert provision_outcome(_verdict("success"))[0] == "applied"
+
+
+def test_a_missing_key_is_a_failure_not_a_crash() -> None:
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    outcome, detail = provision_outcome({"value": "{}"})
+
+    assert outcome == "failed"
+    assert "no provisioning result" in detail
+
+
+def test_an_unparseable_key_is_a_failure_not_a_crash() -> None:
+    """`key` is a JSON string by contract; report it rather than raising."""
+    from pctl.azure.service_principals.provision import provision_outcome
+
+    outcome, detail = provision_outcome({"key": "not json", "value": "{}"})
+
+    assert outcome == "failed"
+    assert "unreadable" in detail

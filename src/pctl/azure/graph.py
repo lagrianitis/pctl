@@ -708,6 +708,18 @@ class GraphClient:
         response = await self.request("POST", f"{EAM_BASE}/assignmentRequests", json=body)
         return response.json() if response.content else {}
 
+    async def delete_access_package(self, package_id: str) -> None:
+        """Delete an access package. Irreversible, and refused while assignments exist.
+
+        Graph rejects the delete if the package has any accessPackageAssignment, so the
+        caller checks for them first and explains what to remove rather than passing a
+        bare 400 back to someone who then has to guess.
+
+        Takes an ID rather than a name on purpose: the caller resolves the name to exactly
+        one package, so an ambiguous pattern can never reach a delete.
+        """
+        await self.request("DELETE", f"{EAM_BASE}/accessPackages/{package_id}")
+
     async def get_assignment_request(self, request_id: str) -> dict[str, Any]:
         """One accessPackageAssignmentRequest, for polling a write to completion."""
         return await self.get_json(
@@ -971,6 +983,62 @@ class GraphClient:
         the ownership link, which for a user means deleting the user.
         """
         await self.request("DELETE", f"servicePrincipals/{sp_id}/owners/{object_id}/$ref")
+
+    # -- provisioning (synchronization) -----------------------------------
+    async def synchronization_jobs(self, sp_id: str) -> list[dict[str, Any]]:
+        """The provisioning jobs configured on a service principal.
+
+        Empty means provisioning was never set up, which is a different problem from a
+        wrong job ID and is reported differently by the caller.
+
+        An application with no provisioning may have no `synchronization` segment at all,
+        in which case Graph answers 404 rather than an empty collection. Both mean the
+        same thing here, so the 404 becomes an empty list. Only 404: a 403 means the token
+        lacks Synchronization.ReadWrite.All, and reporting that as "provisioning is not
+        enabled" would send the caller to the portal to fix a consent problem.
+        """
+        try:
+            payload = await self.get_json(f"servicePrincipals/{sp_id}/synchronization/jobs")
+        except UpstreamError as exc:
+            # Matches the prefix `request` builds, so a 404 inside the URL cannot trip it.
+            if "Graph returned 404 for GET" in str(exc):
+                return []
+            raise
+        return list(payload.get("value") or [])
+
+    async def synchronization_rules(self, sp_id: str, job_id: str) -> list[dict[str, Any]]:
+        """The synchronization rules declared in a job's schema.
+
+        provisionOnDemand has to name a rule, and rules live in the schema rather than on
+        the job, so finding one costs a second round trip. The schema is fetched whole and
+        is large: it carries every attribute mapping for the connector, which is why the
+        caller resolves the rule once per run rather than per subject.
+        """
+        payload = await self.get_json(
+            f"servicePrincipals/{sp_id}/synchronization/jobs/{job_id}/schema"
+        )
+        return list(payload.get("synchronizationRules") or [])
+
+    async def provision_on_demand(
+        self, sp_id: str, job_id: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Provision one set of subjects immediately, without waiting for the sync cycle.
+
+        Unlike the rest of this client's writes, the interesting part of the response is
+        not the HTTP status. Graph answers 200 with a stringKeyStringValuePair whose
+        `key` and `value` are themselves JSON *strings*, and the provisioning verdict
+        (Success, Skipped, Failure) is inside `key`. A 200 here does not mean the subject
+        was provisioned.
+
+        Graph rate limits this action to 5 requests per 10 seconds, far tighter than the
+        rest of the API, so callers send subjects one at a time rather than concurrently.
+        """
+        response = await self.request(
+            "POST",
+            f"servicePrincipals/{sp_id}/synchronization/jobs/{job_id}/provisionOnDemand",
+            json=body,
+        )
+        return response.json() if response.content else {}
 
     async def app_role_names(self, sp_id: str) -> dict[str, str]:
         """Map appRoleId to its display name, for labelling assignments.

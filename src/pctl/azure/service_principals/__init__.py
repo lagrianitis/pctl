@@ -55,6 +55,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.service_principals.remove_owner:command",
         "Remove an owner, if it is one.",
     ),
+    "provision": (
+        "pctl.azure.service_principals.provision:command",
+        "Provision users or groups on demand, if provisioning is enabled.",
+    ),
 }
 
 
