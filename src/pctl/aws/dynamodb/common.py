@@ -12,6 +12,20 @@ from typing import Any
 import click
 
 
+def table_option(func: Any) -> Any:
+    """`--table`, shared by every action that addresses a single table.
+
+    Named rather than positional so that a table name can never be confused with the
+    other values these commands take, notably `get --key`.
+    """
+    return click.option(
+        "--table",
+        required=True,
+        metavar="NAME",
+        help="DynamoDB table name.",
+    )(func)
+
+
 def read_options(func: Any) -> Any:
     """Options shared by the read actions (scan and query)."""
     func = click.option(

@@ -22,7 +22,13 @@ from .common import add_relations, match_option
 
 
 @click.command(name="get")
-@click.argument("names", nargs=-1)
+@click.option(
+    "--name",
+    "names",
+    multiple=True,
+    metavar="NAME",
+    help="Group display name. Repeat for several.",
+)
 @azure_options
 @click.option(
     "-f",
@@ -64,21 +70,23 @@ def command(
 ) -> None:
     """Show details for one or more groups, looked up by display name.
 
-    Names can be positional or read from a file, and all of them are resolved
-    concurrently.
+    Repeat --name for several groups, or read them from a file; either way they are all
+    resolved concurrently.
 
     \b
-      pctl azure groups get "AWS Platform Admins"
-      pctl azure groups get "Team A" "Team B" --members --owners -o json
+      pctl azure groups get --name "AWS Platform Admins"
+      pctl azure groups get --name "Team A" --name "Team B" --members --owners -o json
       pctl azure groups get -f groups.txt --counts -o csv
-      pctl azure groups get platform --match search
+      pctl azure groups get --name platform --match search
     """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
     wanted = read_names(names, from_file)
     if not wanted:
-        raise click.UsageError("Provide at least one group display name, or use --from-file.")
+        raise click.UsageError(
+            "Provide at least one group display name with --name, or use --from-file."
+        )
 
     group_fields = split_columns(select)
     table_columns = app.columns or _columns(members, owners, transitive, counts)

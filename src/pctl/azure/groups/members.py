@@ -12,7 +12,13 @@ from .common import DEFAULT_MEMBER_COLUMNS, match_option, resolve_one
 
 
 @click.command(name="members")
-@click.argument("name")
+@click.option(
+    "--group",
+    "name",
+    required=True,
+    metavar="NAME",
+    help="The group whose members to stream. Display name.",
+)
 @azure_options
 @match_option
 @click.option("--owners", is_flag=True, help="List owners instead of members.")
@@ -32,9 +38,9 @@ def command(
     """Stream the members (or owners) of a single group, resolved by display name.
 
     \b
-      pctl azure groups members "AWS Platform Admins" -o csv
-      pctl azure groups members "AWS Platform Admins" --owners
-      pctl azure groups members "AWS Platform Admins" --transitive -o ndjson
+      pctl azure groups members --group "AWS Platform Admins" -o csv
+      pctl azure groups members --group "AWS Platform Admins" --owners
+      pctl azure groups members --group "AWS Platform Admins" --transitive -o ndjson
     """
     from ..graph import DEFAULT_MEMBER_SELECT, run
 
@@ -50,7 +56,10 @@ def command(
         async with graph_client(app) as client:
             group = await resolve_one(client, name, mode=match_mode)
             renderer = Renderer(app.output, columns=table_columns)
-            params = {"$top": GRAPH_MAX_PAGE_SIZE, "$select": ",".join(DEFAULT_MEMBER_SELECT)}
+            params = {
+                "$top": GRAPH_MAX_PAGE_SIZE,
+                "$select": ",".join(DEFAULT_MEMBER_SELECT),
+            }
             async for member in client.paginate(
                 f"groups/{group['id']}/{relation}", params=params, limit=limit
             ):

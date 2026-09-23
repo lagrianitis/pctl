@@ -24,8 +24,33 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "groups": ("pctl.azure.groups:groups", "List and inspect Entra ID groups."),
+    "users": ("pctl.azure.users:users", "Look up Entra ID users."),
+    "apps": (
+        "pctl.azure.applications:applications",
+        "Application registrations, the app objects behind service principals.",
+    ),
+    "eam": (
+        "pctl.azure.entitlements:entitlements",
+        "Entitlement management: access packages and their catalogs.",
+    ),
+    "sp": (
+        "pctl.azure.service_principals:service_principals",
+        "Service principals, known in the portal as Enterprise Applications.",
+    ),
     "token": ("pctl.azure.token:command", "Acquire an access token for Microsoft Graph."),
     "raw": ("pctl.azure.raw:command", "Call any Graph path, with auth and pagination handled."),
+}
+
+# The portal and Graph disagree on every one of these names, so accept both spellings.
+# `apps` and `sp` are the pair most easily confused: an app registration is the
+# definition, a service principal is its instance in this tenant.
+ALIASES = {
+    "enterprise-apps": "sp",
+    "service-principals": "sp",
+    "app-registrations": "apps",
+    "applications": "apps",
+    "entitlement-management": "eam",
+    "access-packages": "eam",
 }
 
 
@@ -33,11 +58,12 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     name="azure",
     cls=PctlGroup,
     lazy_subcommands=LAZY_SUBCOMMANDS,
+    aliases=ALIASES,
     context_settings=CONTEXT_SETTINGS,
 )
 @click.pass_context
 def azure(ctx: click.Context) -> None:
-    """Microsoft Graph: tokens and groups.
+    """Microsoft Graph: tokens, groups, users and service principals.
 
     \b
     Credentials resolve in this order:
@@ -66,4 +92,4 @@ def graph_client(app: AppContext) -> GraphClient:
     )
 
 
-__all__ = ["CONTEXT_SETTINGS", "azure", "graph_client"]
+__all__ = ["ALIASES", "CONTEXT_SETTINGS", "azure", "graph_client"]

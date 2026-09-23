@@ -67,7 +67,7 @@ def test_members_requires_a_group_name(groups: Callable[..., Any]) -> None:
 
 
 def test_an_unknown_match_mode_is_rejected(groups: Callable[..., Any]) -> None:
-    failed(groups("get", "Team A", "--match", "fuzzy"), 2)
+    failed(groups("get", "--name", "Team A", "--match", "fuzzy"), 2)
 
 
 def test_a_zero_limit_is_rejected(groups: Callable[..., Any]) -> None:

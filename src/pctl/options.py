@@ -186,7 +186,7 @@ def aws_options(func: Any) -> Any:
 
 
 def read_names(names: tuple[str, ...], from_file: str | None) -> list[str]:
-    """Combine positional names with names read from a file or stdin (`-`).
+    """Combine repeated flag values with names read from a file or stdin (`-`).
 
     Blank lines and `#` comments are ignored, so a curated group list can live in
     version control next to your infrastructure code.

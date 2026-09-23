@@ -10,13 +10,25 @@ from __future__ import annotations
 import click
 
 from ...lazy import PctlGroup
-from .common import parse_json_option, read_options
+from .common import parse_json_option, read_options, table_option
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
-    "tables": ("pctl.aws.dynamodb.tables:command", "List tables in this account and region."),
-    "describe": ("pctl.aws.dynamodb.describe:command", "Show keys, indexes, item count, size."),
-    "scan": ("pctl.aws.dynamodb.scan:command", "Scan a table, streaming items as they arrive."),
-    "query": ("pctl.aws.dynamodb.query:command", "Query a table or index by key condition."),
+    "tables": (
+        "pctl.aws.dynamodb.tables:command",
+        "List tables in this account and region.",
+    ),
+    "describe": (
+        "pctl.aws.dynamodb.describe:command",
+        "Show keys, indexes, item count, size.",
+    ),
+    "scan": (
+        "pctl.aws.dynamodb.scan:command",
+        "Scan a table, streaming items as they arrive.",
+    ),
+    "query": (
+        "pctl.aws.dynamodb.query:command",
+        "Query a table or index by key condition.",
+    ),
     "get": ("pctl.aws.dynamodb.get:command", "Fetch a single item by primary key."),
 }
 
@@ -26,4 +38,4 @@ def ddb() -> None:
     """Read items and metadata from DynamoDB tables."""
 
 
-__all__ = ["ddb", "parse_json_option", "read_options"]
+__all__ = ["ddb", "parse_json_option", "read_options", "table_option"]

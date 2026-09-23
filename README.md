@@ -40,8 +40,33 @@ export AZURE_CLIENT_ID=...
 export AZURE_CLIENT_SECRET=...      # prefer injecting this from a secret manager
 ```
 
-Graph application permissions needed: `Group.Read.All`, plus `User.Read.All` if
-you resolve members. Without a client secret, pctl falls back to
+Graph application permissions needed, all admin-consented:
+
+| permission                                                   | needed for                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `EntitlementManagement.Read.All`                             | the `eam` read actions                                        |
+| `EntitlementManagement.ReadWrite.All`                        | `eam add-assignment`, `remove-assignment`, `delete-package`   |
+| `Group.Read.All`                                             | `groups list`, `get`, `members`                               |
+| `User.Read.All`                                              | `users get`, group members, and owners by name or address     |
+| `Application.Read.All` **or** `Directory.Read.All`           | `apps list`, `get`; `sp list`, `get`, `assignments`, `owners` |
+| `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner` only                        |
+| `Synchronization.ReadWrite.All`                              | `sp provision` only                                           |
+
+Six commands write anything: the two `eam` assignment actions, `eam delete-package`, the two
+`sp` owner actions, and `sp provision`. Only `delete-package` destroys something. Everything
+else is read-only, so grant a write permission only where it is actually needed.
+`Directory.Read.All` covers all the reads on its own if your app already has it.
+
+A missing permission surfaces as **exit 5** with `Insufficient privileges to complete the
+operation`. Check what the token actually carries rather than what the portal lists, since
+a token issued before consent was granted will not have the new role:
+
+```bash
+pctl azure token --decode -o json | jq -r '.claims.roles[]'
+pctl azure token --clear-cache      # after granting consent, or the old token is reused
+```
+
+Without a client secret, pctl falls back to
 `azure-identity`'s `DefaultAzureCredential` when installed (`--extra azure`),
 which picks up `az login`, managed identity and workload identity.
 
@@ -57,6 +82,63 @@ pctl [global options] <azure|aws> ...
 Global options work before or after the subcommand: `-o/--output`, `-q/--quiet`,
 `-v/--verbose`, `--timeout`, `--concurrency`. Command names accept unambiguous
 prefixes and aliases, so `pctl az gr li` is `pctl azure groups list`.
+
+### Finding a command
+
+Thirty commands across four levels, so start by searching rather than by drilling into
+`--help` four times:
+
+```bash
+pctl commands                      # every command, one row each, with a summary
+pctl commands | grep -i assign     # find the path from a word you remember
+pctl tree                          # the shape of the whole CLI
+pctl tree --depth 2                # just the cases and their services
+```
+
+`commands` goes through the same renderer as everything else, so it is data rather than a
+display: `-o ndjson | jq -r .command` for a list of invocations, `-o csv` for a review.
+Groups are left out by default, since you cannot run one — `--groups` includes them.
+`tree` is the opposite: always text, because the nesting is the point.
+
+Then use `--help` for the detail, which is the one thing neither of them can give you:
+
+```bash
+pctl azure eam add-assignment --help
+```
+
+**Turn on completion once and most of this stops being necessary:**
+
+```bash
+pctl completion --shell zsh >> ~/.zshrc     # or --shell bash / fish
+```
+
+That completes command names at every level, their aliases, option names, and the values
+of any option with fixed choices such as `--match` or `-o`:
+
+```
+pctl azure e<TAB>          -> eam, enterprise-apps
+pctl azure eam <TAB>       -> all nine actions
+pctl azure eam add-a<TAB> --<TAB>
+```
+
+**Every value you supply goes behind a named flag. There are no positional arguments.**
+The thing a command acts on: `--app`, `--access-package`, `--catalog`, `--group`,
+`--table`, `--path`. The subjects it acts on: `--owner`, `--target`, `--user`, `--name`.
+
+```bash
+pctl azure sp add-owner       --app "$APP" --owner ann@company.com --owner bob@company.com
+pctl azure eam add-assignment --access-package "$PKG" --target ann@company.com
+pctl aws ddb get --table my-table --key '{"pk":"tenant#42","sk":"profile"}'
+```
+
+Without this, `add-assignment "$PKG" ann@company.com` and
+`add-assignment ann@company.com "$PKG"` are both valid syntax and only one is right,
+which on a write is a bad way to find out. Flags cost a few characters and remove the
+class of mistake entirely.
+
+Repeat a flag to pass several values — `--owner a --owner b` — rather than separating
+them with commas, because a display name may legitimately contain one. The exception is
+`--emails`, which is comma-separated by design: an address cannot contain a comma.
 
 ### Tokens
 
@@ -78,11 +160,11 @@ pctl azure groups list --starts-with "aws-" --limit 50
 pctl azure groups list --count-only
 
 # 2. details for one group, or a list you define, by display name
-pctl azure groups get "AWS Platform Admins"
-pctl azure groups get "Team A" "Team B" --members --owners -o json
+pctl azure groups get --name "AWS Platform Admins"
+pctl azure groups get --name "Team A" --name "Team B" --members --owners -o json
 pctl azure groups get -f my-groups.txt --counts -o csv
-pctl azure groups get "platform" --match search      # substring match
-pctl azure groups members "AWS Platform Admins" --transitive
+pctl azure groups get --name "platform" --match search      # substring match
+pctl azure groups members --group "AWS Platform Admins" --transitive
 ```
 
 `--from-file` reads one display name per line and ignores blanks and `#`
@@ -92,10 +174,416 @@ concurrently.
 Match modes: `exact` (default, `displayName eq`), `prefix` (`startswith`),
 `search` (Graph full-text, matches substrings).
 
+### Users
+
+`get` resolves a person to their directory object from whatever you happen to know:
+an email address, a display name, or an object ID. Which form you passed is inferred,
+so there is no flag to set.
+
+```bash
+pctl azure users get --user ann@company.com
+pctl azure users get --user "Ann Example" -o json
+pctl azure users get --user e6901838-637f-4bc7-b843-a8a7725a4872
+pctl azure users get --user ann@company.com --user bob@company.com -o ndjson
+pctl azure users get -f people.txt --ignore-missing
+```
+
+An address is matched against both `userPrincipalName` and `mail`, since those routinely
+differ. An object ID addresses `/users/{id}` directly, with no query. A display name uses
+`--match`, and an ambiguous name is **refused** rather than guessed — two people can share
+one, and you are about to act on the answer. Several identifiers resolve concurrently, and
+one that matches nothing does not block the others.
+
+### Entitlement management
+
+Read-only. Access packages are bundles of resources governed by policies, held in
+containers called catalogs. `pctl azure entitlement-management` and
+`pctl azure access-packages` both reach `eam`.
+
+```bash
+pctl azure eam list-catalogs                      # usually the first call
+pctl azure eam list-packages --starts-with "AWS "
+pctl azure eam list-packages --contains incident -o json
+pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
+pctl azure eam get-catalog --catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
+```
+
+**These collections have a narrower OData surface than the rest of Graph.** `$select`,
+`$filter` and `$expand` work; `$search` and `$count` are
+[not supported](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-list-accesspackages).
+So there is no `--search` here and no `--count-only`, and the match modes differ:
+
+| option                                | where it runs                              |
+| ------------------------------------- | ------------------------------------------ |
+| `--name`, `--starts-with`, `--filter` | server-side `$filter`                      |
+| `--contains`, `--match contains`      | **locally**, after fetching the collection |
+
+`--contains` exists because Graph has no substring operator on these collections. Every
+page is fetched regardless, so it narrows what is rendered rather than what is
+transferred, and `-n/--limit` is applied after the filter so a cap cannot drop real
+matches.
+
+`--with-policies` expands `assignmentPolicies`, which is where approval and expiry rules
+live.
+
+### Entitlement management
+
+Read-only. Access packages are bundles of resources governed by policies, held in
+containers called catalogs. `pctl azure entitlement-management` and
+`pctl azure access-packages` both reach `eam`.
+
+```bash
+pctl azure eam list-catalogs                          # usually the first call
+pctl azure eam get-catalog --catalog "AWS Platform"             # by name or by ID
+pctl azure eam list-packages --catalog "AWS Platform" # scope by catalog name
+pctl azure eam list-packages --contains incident -o json
+pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
+
+# who has this access, and is it live?
+pctl azure eam list-assignments --access-package "AWS Platform Access" --state Delivered
+```
+
+`list-assignments` answers "who is assigned to this package". `--access-package` takes a
+display name and resolves it to the ID the filter needs; `--state` narrows to one of
+`Delivering`, `PartiallyDelivered`, `Delivered`, `Expired`, `DeliveryFailed`, capitalised
+exactly as Graph expects. Together they produce
+`$filter=accessPackage/id eq '…' and state eq 'Delivered'`.
+
+`target` and `accessPackage` are expanded by default, and their names lifted to
+`targetDisplayName`, `targetEmail` and `accessPackageName` so a table or CSV can address
+them — a column cannot reach `target.displayName`. The nested objects stay intact for
+`json` and `ndjson`. `--no-expand` leaves the raw relationship IDs.
+
+```bash
+pctl -o ndjson azure eam list-assignments --access-package "$PKG" --state Delivered \
+  | jq -r '[.targetDisplayName, .targetEmail] | @tsv'
+```
+
+#### Granting and revoking access
+
+```bash
+pctl azure eam add-assignment    --access-package "AWS Platform Access" --target ann@company.com
+pctl azure eam add-assignment    --access-package "$PKG" --emails ann@company.com,bob@company.com
+pctl azure eam remove-assignment --access-package "$PKG" --emails ann@company.com,bob@company.com
+```
+
+Each `--target` is an email address, a display name or a user object ID; an address is
+matched against `userPrincipalName` and `mail`. These two commands need
+`EntitlementManagement.ReadWrite.All`.
+
+**Assignments are not written directly.** Both commands create an
+[accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
+which Graph then processes, so they are **asynchronous**. Without `--wait` the command
+returns a `requestId` and the state at submission — which is _not_ access yet, and exit 0
+does not mean the change is live.
+
+##### Knowing whether it actually applied
+
+`--wait` polls each request until it settles and exits 5 if any did not reach `delivered`:
+
+```bash
+pctl azure eam add-assignment    --access-package "$PKG" --target ann@company.com --wait
+pctl azure eam remove-assignment --access-package "$PKG" --target ann@company.com --wait \
+  --wait-timeout 300
+```
+
+Or check a request submitted earlier, which is what the `requestId` is for:
+
+```bash
+pctl azure eam get-request --request-id 4c2a1f7e-… --wait
+```
+
+The raw state is classified into an `outcome`, and the mapping is deliberately cautious:
+
+| outcome   | states                                                                                                                                        | exit                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `done`    | `delivered` — the only state that means access exists                                                                                         | 0                                 |
+| `failed`  | `denied`, `canceled`, `deliveryFailed`                                                                                                        | 5                                 |
+| `partial` | `partiallyDelivered` — [reprocess rather than resubmit](https://learn.microsoft.com/en-us/graph/api/accessPackageAssignmentRequest-reprocess) | 5                                 |
+| `pending` | `submitted`, `pendingApproval`, `delivering`, **and anything unrecognised**                                                                   | 5 on `--wait`, 0 on `get-request` |
+
+An unknown state counts as pending rather than done, so a future state value can never be
+mistaken for success. A request can sit in `delivering` indefinitely when provisioning is
+stuck, which is why `--wait` is bounded by `--wait-timeout` (120s default) and reports a
+still-pending request rather than hanging or claiming success.
+
+`get-request` exits 0 for a pending request, since "not yet" is a legitimate answer to a
+status query; `--fail-on-pending` makes it exit 5 instead.
+
+Note that a policy requiring approval means `pendingApproval` is the _expected_ resting
+state, and no amount of waiting will change it until someone approves. In that case
+`--wait` will time out correctly rather than incorrectly.
+
+**`add-assignment` needs a policy**, because an `adminAdd` must say which rules govern the
+assignment. If the package has exactly one policy it is used without asking; if it has
+several the command refuses and lists them, since picking arbitrarily would grant access
+under the wrong approval and expiry rules. `--policy` names one. `remove-assignment` needs
+none — an `adminRemove` references the existing assignment instead.
+
+Both are **idempotent**: current assignments are read first, so re-running reports
+`already-assigned` or `not-assigned` on exit 0 rather than sending a duplicate request.
+An `Expired` assignment does not block a fresh add, because an expired assignment is not
+access. Each person gets a result row with a `status` of `requested`, `already-assigned`,
+`removal-requested` or `not-assigned`, and one unresolvable address does not stop the rest
+— the command exits 4 at the end unless `--ignore-missing`.
+
+`get-catalog` and `get-package` take a display name or an object ID, and `--catalog`
+accepts a catalog name and resolves it to the ID the filter needs. That costs one extra
+request, which is the point of the option.
+
+**These collections have a narrower OData surface than the rest of Graph.** `$select`,
+`$filter` and `$expand` work; `$search` and `$count` are
+[not supported](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-list-accesspackages).
+So there is no `--search` and no `--count-only` here, and the match options split by where
+they run:
+
+| option                                                                            | where it runs                              |
+| --------------------------------------------------------------------------------- | ------------------------------------------ |
+| `--name`, `--starts-with`, `--filter`, `--catalog`, `--access-package`, `--state` | server-side `$filter`                      |
+| `--contains`, `--match contains`, `--target`                                      | **locally**, after fetching the collection |
+
+`--contains` exists because Graph has no substring operator on these collections. Every
+page is fetched regardless, so it narrows what is rendered rather than what is
+transferred, and `-n/--limit` applies after the filter so a cap cannot drop real matches.
+
+**`get-package` and `get-catalog` take patterns, not just exact names.** `--match prefix`
+and `--match contains` return _every_ match rather than refusing an ambiguous one, because
+"show me the AWS packages" is a question with several answers:
+
+```bash
+pctl azure eam get-package --access-package AWS --match prefix -o ndjson    # every AWS package
+pctl azure eam get-package --access-package incident --match contains        # substring, local
+```
+
+One match renders as an object and several as an array, the same shape `groups get` uses,
+so `jq` needs no index for the common case. An object ID is not a pattern and always
+returns exactly one.
+
+A raw `--filter` takes precedence over `--catalog`, `--name` and `--starts-with`: someone
+who wrote OData by hand means it.
+
+#### Deleting a package
+
+```bash
+pctl azure eam delete-package --access-package "Retired Access"          # prompts
+pctl azure eam delete-package --access-package "Retired Access" --yes    # for pipelines
+pctl azure eam delete-package --access-package a914b616-e04e-476b-aa37-91038f0b165b --yes
+```
+
+`delete-package` is the only destructive command in `pctl`, and it behaves differently from
+its neighbours in three ways that are all deliberate.
+
+**No `--match`, and no substring fallback.** Every other `eam` command will resolve a name
+loosely to be helpful; `get-package` even falls back to a substring match when an exact
+name finds nothing. This one takes an **exact display name or an object ID** and nothing
+else, because `Retired` quietly resolving to `Retired Access` is not a mistake worth
+risking. Two packages sharing a name are refused with both IDs listed.
+
+**It asks first.** The prompt comes _after_ resolution, so it names the package and ID that
+are about to go. Declining aborts non-zero, so a wrapper cannot read a refused delete as a
+successful one. `--yes` skips the prompt and is required in a pipeline, where stdin is not a
+terminal.
+
+**It checks for assignments.** Graph
+[will not delete a package](https://learn.microsoft.com/en-us/graph/api/accesspackage-delete)
+that has any `accessPackageAssignment`, so this looks first and tells you how many are in
+the way and in which states, rather than handing back a bare 400:
+
+```
+'AWS Platform Access' still has 3 assignment(s) (2 Delivered, 1 Expired), and Graph will
+not delete a package that has any. Remove them first with `pctl azure eam
+remove-assignment`, or pass --force to try the delete anyway.
+```
+
+`--force` skips that pre-check and lets Graph decide, which is only useful if you think the
+check is being over-cautious. It does **not** skip the confirmation — the two flags guard
+different things.
+
+Deleting takes the package's policies, resource role assignments and request history with
+it. If you only want it out of the catalog, hiding it is reversible and deleting is not.
+
+`--with-policies` expands `assignmentPolicies`, where approval and expiry rules live.
+
+### App registrations
+
+Read-only. The portal calls these **App registrations**; their tenant-local instances are
+**Enterprise applications**, which live under `sp` below. `pctl azure app-registrations`
+and `pctl azure applications` both reach `apps`.
+
+```bash
+pctl azure apps list --search "incident.io"
+pctl azure apps get --app "Company Incident.io SCIM"
+pctl azure apps get --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
+pctl azure apps get --app "Company Incident.io SCIM" --with-sp -o json
+```
+
+**An application has two GUIDs and they are not interchangeable.** `appId` is the
+Application (client) ID, shared with its service principal. `id` is its own directory
+object, and differs from the service principal's `id`. Using one where the other belongs is
+the usual cause of a confident "no such object". A bare GUID is tried as an `appId` first,
+since that is what the portal shows prominently, then as an object ID.
+
+`--with-sp` follows the `appId` join and attaches the service principal, which is how you
+get from a registration to the Enterprise Application it appears as:
+
+```bash
+pctl -o json azure apps get --app "$APP" --with-sp | jq '{appId, id, spId: .servicePrincipalId}'
+```
+
+A registration with no service principal is reported on stderr — that means registered here
+but not instantiated here, which is a real state and a confusing one. Conversely a
+third-party app you use but did not register has a service principal and no local
+application, so it appears under `sp list` and not here.
+
+### Service principals (Enterprise Applications)
+
+Graph calls them service principals, the portal calls them Enterprise Applications.
+`pctl azure enterprise-apps` and `pctl azure service-principals` both reach `sp`.
+
+```bash
+pctl azure sp list --search "incident.io"
+pctl azure sp list --app-id 00000003-0000-0000-c000-000000000000
+pctl azure sp get --name "Company Incident.io SCIM"
+pctl azure sp get --name "incident.io" --assignments -o json
+```
+
+`assignments` answers "who has access to this app", reading `appRoleAssignedTo`. Each
+row gains an `appRoleName`, because `appRoleId` on its own is an opaque GUID. With no
+`--principal` every assignment is returned; `--principal` narrows it and
+`--principal-match` decides how.
+
+```bash
+APP="Company Incident.io SCIM"
+
+pctl azure sp assignments --app "$APP"                                   # everyone
+pctl azure sp assignments --app "$APP" --outbound                        # the reverse question
+pctl azure sp assignments --app "$APP" --principal "AWS Platform Admins" # exact, the default
+pctl azure sp assignments --app "$APP" --principal aws-     --principal-match prefix
+pctl azure sp assignments --app "$APP" --principal platform --principal-match contains
+```
+
+`exact` is the default because the usual job is an access check, where a coincidental
+substring would report access that a specific group may not have. Widen it when
+exploring. All three ignore case, and the command exits 4 when nothing matches, so a
+check can be scripted on the exit code:
+
+```bash
+pctl -q azure sp assignments --app "$APP" --principal "$GROUP" >/dev/null 2>&1
+case $? in 0) echo assigned ;; 4) echo "not assigned" ;; *) echo "check failed" ;; esac
+```
+
+#### Owners
+
+`owners` lists them; `add-owner` and `remove-owner` change them. They need
+`Application.ReadWrite.All` rather than the read permission everything else uses.
+
+```bash
+pctl azure sp owners --app "$APP"
+
+# one owner, or several, repeated or comma-separated
+pctl azure sp add-owner    --app "$APP" --owner ann@company.com
+pctl azure sp add-owner    --app "$APP" --owner ann@company.com --owner bob@company.com
+pctl azure sp add-owner    --app "$APP" --emails ann@company.com,bob@company.com
+pctl azure sp remove-owner --app "$APP" --emails ann@company.com,bob@company.com
+
+# a display name, an object ID, or a service principal
+pctl azure sp add-owner    --app "$APP" --owner "Ann Example"
+pctl azure sp add-owner    --app "$APP" --owner e6901838-637f-4bc7-b843-a8a7725a4872
+pctl azure sp add-owner    --app "$APP" --owner platform-automation --owner-type sp
+```
+
+Each owner can be an **email address**, a **display name**, or a **directory object ID**,
+distinguished without a flag. An address is matched against both `userPrincipalName` and
+`mail`, since those routinely differ — a tenant may have `lef@company.onmicrosoft.com` as
+the UPN and `lef@company.com` as the mail, and you should be able to use either. A GUID is
+used as-is. A display name is resolved against users and then service principals, the only
+object types that
+[can own a service principal](https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-owners)
+— groups cannot, so they are not searched.
+
+Both writes are **idempotent**: the current owners are read once, and adding an existing
+owner or removing an absent one is reported as information rather than an error. Re-running
+from a pipeline is safe and will not create a duplicate. Each owner gets its own result row
+with a `status` of `added`, `already-owner`, `removed` or `not-an-owner`, so a batch tells
+you exactly what happened:
+
+```bash
+pctl -o ndjson azure sp add-owner --app "$APP" --emails ann@company.com,bob@company.com \
+  | jq -r '[.owner, .status] | @tsv'
+```
+
+Resolution is `exact` by default and an ambiguous name is refused rather than guessed,
+because a wrong match here grants or revokes real access. An owner that cannot be resolved
+does not block the others: the rest are still applied, and the command exits 4 unless
+`--ignore-missing` is passed. Use `--owner-type` to disambiguate a name that exists in both
+collections.
+
+`remove-owner` warns when the removal leaves fewer than two owners, which is Microsoft's
+recommended minimum, but does not refuse.
+
+Two things worth knowing before relying on this. The `--principal` filter runs
+client-side, because Graph does not support `$filter` on `principalDisplayName` for this
+relation, so every page is fetched regardless and `--principal` narrows what is rendered
+rather than what is transferred. And `sp get` and `sp assignments` default to
+`--match search` for resolving the _application_ name, rather than the `exact` that
+`groups` uses, because Enterprise Application names are long and rarely typed exactly.
+
+Note the two are independent: `--match` finds the app, `--principal-match` filters its
+assignments.
+
+#### Provisioning on demand
+
+Entra ID provisioning runs on a 40-minute cycle. `provision` is the
+[Provision on demand](https://learn.microsoft.com/en-us/graph/api/synchronization-synchronizationjob-provisionondemand)
+action: it pushes named users or groups through the connector immediately, which is what
+you want after fixing an attribute mapping or when someone needs access today. Needs
+`Synchronization.ReadWrite.All`.
+
+```bash
+pctl azure sp provision --app "$APP" --group "AWS Platform Admins"
+pctl azure sp provision --app "$APP" --user ann@company.com
+pctl azure sp provision --app "$APP" --group "Team A" --group "Team B"
+pctl azure sp provision --app "$APP" --user ann@company.com --job "$JOB" --rule "$RULE"
+```
+
+Only applications with provisioning configured have a synchronization job, so an
+application with none exits 2 saying provisioning is not enabled rather than failing
+obscurely. With exactly one job and one rule, neither has to be named. With more than one
+the command lists them and asks, because provisioning through the wrong rule writes the
+wrong attributes. `--rule` takes a rule ID as the schema reports it, which is not always a
+bare GUID: a versioned rule looks like `33f7c90d-…#V2`.
+
+**A 200 from Graph does not mean a subject was provisioned.** The verdict is a JSON string
+nested inside the response, and it distinguishes three cases that this command surfaces as
+an `outcome`:
+
+| `outcome`         | Graph said                                                      | Exit |
+| ----------------- | --------------------------------------------------------------- | ---- |
+| `applied`         | `Success`                                                       | 0    |
+| `already-in-sync` | `Skipped` / `RedundantExport` — source and target already match | 0    |
+| `failed`          | `Failure`, any other skip reason, or anything unrecognised      | 5    |
+
+The middle row is the idempotent case. The third deliberately includes skips: a subject
+that is out of scope or not assigned comes back as `Skipped`, and nothing was provisioned,
+so reporting that as success would be the worst possible lie here. An unrecognised verdict
+counts as failed for the same reason — this command is usually run because something is
+already wrong.
+
+```bash
+pctl -o ndjson azure sp provision --app "$APP" --group "$GROUP" \
+  | jq -r '[.subject, .outcome, .detail] | @tsv'
+```
+
+Subjects are sent **one request each, sequentially**. Graph rate limits this action to 5
+requests every 10 seconds, far tighter than the rest of the API, so a concurrent batch
+would simply be throttled. One request per subject is also what makes the per-subject
+outcome possible: the response carries a single verdict, so batching subjects into one call
+would report one result for several people.
+
 ### Escape hatch
 
 ```bash
-pctl azure raw users --param '$select=id,displayName' -n 10
+pctl azure raw --path users --param '$select=id,displayName' -n 10
 ```
 
 Any Graph path, with auth, retries and pagination handled.
@@ -104,14 +592,14 @@ Any Graph path, with auth, retries and pagination handled.
 
 ```bash
 pctl aws ddb tables
-pctl aws ddb describe my-table
-pctl aws ddb scan my-table -n 20
-pctl aws ddb scan my-table --segments 8 -o ndjson > items.ndjson
-pctl aws ddb scan my-table --filter "#s = :s" \
+pctl aws ddb describe --table my-table
+pctl aws ddb scan --table my-table -n 20
+pctl aws ddb scan --table my-table --segments 8 -o ndjson > items.ndjson
+pctl aws ddb scan --table my-table --filter "#s = :s" \
     --names '{"#s":"status"}' --values '{":s":"ACTIVE"}'
-pctl aws ddb query my-table --key "pk = :pk" --values '{":pk":"tenant#42"}'
-pctl aws ddb get my-table '{"pk":"tenant#42","sk":"profile"}'
-pctl aws ddb scan my-table --endpoint-url http://localhost:8000   # local DynamoDB
+pctl aws ddb query --table my-table --key "pk = :pk" --values '{":pk":"tenant#42"}'
+pctl aws ddb get --table my-table --key '{"pk":"tenant#42","sk":"profile"}'
+pctl aws ddb scan --table my-table --endpoint-url http://localhost:8000   # local DynamoDB
 ```
 
 Expression values are plain JSON; pctl converts them to DynamoDB's typed format.
@@ -130,7 +618,7 @@ Data goes to stdout, diagnostics and summaries to stderr, so pipes stay clean:
 
 ```bash
 pctl azure groups list -o ndjson | jq -r '.displayName' | sort
-pctl aws ddb scan my-table -o ndjson | head -5     # exits cleanly on SIGPIPE
+pctl aws ddb scan --table my-table -o ndjson | head -5   # exits cleanly on SIGPIPE
 ```
 
 Restrict columns with `-c/--columns`:
@@ -148,6 +636,7 @@ lives in `aws/dynamodb/scan.py`, `pctl azure groups get` in `azure/groups/get.py
 src/pctl/
 ├── cli.py                 root group, global flags, case table
 ├── lazy.py                PctlGroup: lazy imports, aliases, prefix matching
+├── surface.py             `commands` and `tree`: one walk, two views
 ├── config.py              AppContext + credential/session resolution
 ├── options.py             shared click options (output, azure, aws)
 ├── output.py              Renderer: table / json / ndjson / csv
@@ -156,14 +645,48 @@ src/pctl/
 ├── secrets.py             Azure credentials from AWS Secrets Manager
 ├── azure/                 case
 │   ├── __init__.py          `azure` group + graph_client() shared by all actions
+│   ├── common.py            directory lookups shared by `users` and `sp`
 │   ├── graph.py             Graph transport: token, retries, pagination
 │   ├── token.py             action (case-level, no service)
 │   ├── raw.py               action (case-level, no service)
-│   └── groups/            service
-│       ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
+│   ├── users/             service
+│   │   ├── __init__.py      `users` group
+│   │   ├── common.py        default columns, match_option
+│   │   └── get.py           action
+│   ├── entitlements/      service (exposed as `eam`)
+│   │   ├── __init__.py      `eam` group
+│   │   ├── common.py        match modes, local contains filter, filter builder
+│   │   ├── runner.py        list/get bodies shared by both collections
+│   │   ├── list_packages.py · get_package.py     actions
+│   │   └── list_catalogs.py · get_catalog.py     actions
+│   ├── entitlements/      service (exposed as `eam`)
+│   │   ├── __init__.py      `eam` group
+│   │   ├── common.py        match modes, local contains filter, catalog resolution
+│   │   ├── runner.py        list/get bodies shared by both collections
+│   │   ├── list_packages.py · get_package.py    actions
+│   │   ├── list_catalogs.py · get_catalog.py    actions
+│   │   ├── list_assignments.py                  action
+│   │   ├── add_assignment.py · remove_assignment.py   actions (write)
+│   │   └── delete_package.py                    action (destructive)
+│   ├── applications/      service (exposed as `apps`)
+│   │   ├── __init__.py      `apps` group
+│   │   ├── common.py        resolve_application: appId before object ID
+│   │   ├── list.py          action
+│   │   └── get.py           action
+│   ├── groups/            service
+│   │   ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
+│   │   ├── list.py          action
+│   │   ├── get.py           action
+│   │   └── members.py       action
+│   └── service_principals/ service (exposed as `sp`)
+│       ├── __init__.py      `sp` group + match_option, resolve_one, resolve_owner
 │       ├── list.py          action
 │       ├── get.py           action
-│       └── members.py       action
+│       ├── assignments.py   action
+│       ├── owners.py        action
+│       ├── add_owner.py     action (write)
+│       ├── remove_owner.py  action (write)
+│       └── provision.py     action (write): provision on demand
 └── aws/                   case
     ├── __init__.py          `aws` group
     └── dynamodb/          service (exposed as `ddb`)
@@ -195,10 +718,13 @@ src/test/
 │   ├── test_options.py      shared click option helpers
 │   ├── test_errors.py       exit code contract
 │   ├── test_lazy.py         aliases, prefixes, lazy resolution
+│   ├── test_surface.py      the command-tree walk, against a fake tree
 │   ├── test_tokencache.py   expiry, permissions, corrupt files
 │   ├── azure/             case
 │   │   ├── conftest.py      graph_client fixture
-│   │   └── test_graph.py    OData escaping, advanced-query headers
+│   │   ├── test_common.py   identifier form detection
+│   │   ├── test_graph.py    OData escaping, advanced-query headers
+│   │   └── test_service_principals.py  principal filtering, role labelling
 │   └── aws/               case
 │       ├── conftest.py      client_error fixture (botocore-shaped)
 │       └── test_dynamodb.py key typing, request kwargs, error mapping
@@ -208,6 +734,10 @@ src/test/
 │   ├── azure/             case
 │   │   ├── conftest.py      azure() and groups() invoke helpers
 │   │   ├── test_groups.py   groups service surface
+│   │   ├── test_service_principals.py  sp service surface
+│   │   ├── test_users.py    users service surface
+│   │   ├── test_applications.py  apps service surface
+│   │   ├── test_entitlements.py  eam service surface
 │   │   └── test_token.py    token and raw actions
 │   └── aws/               case
 │       ├── conftest.py      ddb() invoke helper
@@ -217,6 +747,12 @@ src/test/
     ├── azure/             case
     │   ├── conftest.py      azure_env and the respx router
     │   ├── test_groups.py   pagination, filters, rendering, resolution
+    │   ├── test_service_principals.py  assignment direction, role labelling
+    │   ├── test_sp_owners.py  the writes: idempotency, $ref bodies
+    │   ├── test_sp_provision.py  on demand: the verdict inside the 200
+    │   ├── test_users.py    identifier forms, ambiguity refusal
+    │   ├── test_applications.py  appId vs object ID, the sp join
+    │   ├── test_entitlements.py  the narrower OData surface, local filtering
     │   ├── test_token.py    masking, decoding, the disk cache
     │   ├── test_failures.py retries and the exit code contract
     │   └── test_raw.py      the escape hatch
@@ -280,10 +816,10 @@ uv run pytest                             # every tier
 
 Three tiers, all collected by pytest, so `uv run pytest` really is the whole suite.
 
-| what    | where                                                | how it runs                                                                            |
-| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `unit`  | `src/test/unit/`, with `azure/` and `aws/` per case  | pytest, marker `unit`. Pure functions, no I/O, no mocks.                                |
-| `smoke` | `src/test/smoke/`, with `azure/` and `aws/` per case | pytest, marker `smoke`. CLI surface: help, aliases, exit codes. No provider is reached. |
+| what    | where                                                | how it runs                                                                                  |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `unit`  | `src/test/unit/`, with `azure/` and `aws/` per case  | pytest, marker `unit`. Pure functions, no I/O, no mocks.                                     |
+| `smoke` | `src/test/smoke/`, with `azure/` and `aws/` per case | pytest, marker `smoke`. CLI surface: help, aliases, exit codes. No provider is reached.      |
 | `e2e`   | `src/test/e2e/`, with `azure/` and `aws/` per case   | pytest, marker `e2e`. The real command path, with Graph faked by respx and DynamoDB by moto. |
 
 ```bash

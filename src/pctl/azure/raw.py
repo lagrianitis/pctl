@@ -13,7 +13,12 @@ from . import graph_client
 
 
 @click.command(name="raw")
-@click.argument("path")
+@click.option(
+    "--path",
+    required=True,
+    metavar="PATH",
+    help="Graph path, relative to the API version root, e.g. users or groups/{id}/members.",
+)
 @azure_options
 @click.option("--param", "params", multiple=True, metavar="KEY=VALUE", help="Query parameter.")
 @click.option("--paginate/--no-paginate", default=True, help="Follow @odata.nextLink.")
@@ -31,8 +36,8 @@ def command(
     """Call any Graph path, with auth, retries and pagination handled.
 
     \b
-      pctl azure raw users --param '$select=id,displayName' -n 10
-      pctl azure raw organization --no-paginate
+      pctl azure raw --path users --param '$select=id,displayName' -n 10
+      pctl azure raw --path organization --no-paginate
     """
     from .graph import run
 

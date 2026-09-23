@@ -9,10 +9,11 @@ import click
 from ...config import AppContext, OutputFormat
 from ...options import aws_options, output_options
 from ...output import Renderer
+from .common import table_option
 
 
 @click.command(name="describe")
-@click.argument("table")
+@table_option
 @aws_options
 @output_options
 @click.pass_context
@@ -20,6 +21,10 @@ def command(ctx: click.Context, table: str) -> None:
     """Show a table's keys, indexes, item count and size.
 
     Table output is a summary; use -o json for the full DescribeTable payload.
+
+    \b
+      pctl aws ddb describe --table my-table
+      pctl aws ddb describe --table my-table -o json
     """
     from .client import describe_table, make_client
 

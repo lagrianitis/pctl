@@ -42,11 +42,11 @@ def test_split_columns(raw: str | None, expected: list[str] | None) -> None:
 # ---------------------------------------------------------------------------
 # read_names
 # ---------------------------------------------------------------------------
-def test_positional_names_are_kept_in_order() -> None:
+def test_flag_names_are_kept_in_order() -> None:
     assert read_names(("b", "a"), None) == ["b", "a"]
 
 
-def test_blank_positional_names_are_dropped() -> None:
+def test_blank_flag_names_are_dropped() -> None:
     assert read_names(("a", "  ", ""), None) == ["a"]
 
 
@@ -77,7 +77,7 @@ def test_names_are_stripped(tmp_path: Path) -> None:
     assert read_names((), str(listing)) == ["Team A", "Team B"]
 
 
-def test_positional_and_file_names_are_combined(tmp_path: Path) -> None:
+def test_flag_and_file_names_are_combined(tmp_path: Path) -> None:
     listing = tmp_path / "groups.txt"
     listing.write_text("Team B\n", encoding="utf-8")
     assert read_names(("Team A",), str(listing)) == ["Team A", "Team B"]

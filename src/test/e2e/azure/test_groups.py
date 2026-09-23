@@ -87,7 +87,10 @@ def test_csv_writes_a_header_then_rows(runner: Any, cli: Any, graph: Any, seen: 
         runner.invoke(cli, ["-o", "csv", "azure", "groups", "list", "-c", "displayName,mail"])
     )
 
-    assert lines(result.stdout)[:2] == ["displayName,mail", f"aws-team-0,team0@{TENANT}"]
+    assert lines(result.stdout)[:2] == [
+        "displayName,mail",
+        f"aws-team-0,team0@{TENANT}",
+    ]
 
 
 def test_a_single_result_is_still_a_json_array(
@@ -194,7 +197,7 @@ def named_groups(graph: Any, seen: list[str]) -> Any:
 
 def test_a_single_group_is_an_object_not_an_array(runner: Any, cli: Any, named_groups: Any) -> None:
     """`get` of one name is a document, unlike `list`, so jq needs no [0]."""
-    result = ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "Team A"]))
+    result = ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "--name", "Team A"]))
 
     payload = json.loads(result.stdout)
     assert isinstance(payload, dict)
@@ -204,7 +207,7 @@ def test_a_single_group_is_an_object_not_an_array(runner: Any, cli: Any, named_g
 def test_exact_match_uses_a_display_name_equality_filter(
     runner: Any, cli: Any, named_groups: Any, seen: list[str]
 ) -> None:
-    ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "Team A"]))
+    ok(runner.invoke(cli, ["-o", "json", "azure", "groups", "get", "--name", "Team A"]))
 
     assert filters(seen) == ["displayName eq 'Team A'"]
 
@@ -214,7 +217,19 @@ def test_several_names_resolve_with_members_attached(
 ) -> None:
     result = ok(
         runner.invoke(
-            cli, ["-o", "json", "azure", "groups", "get", "Team A", "Team B", "--members"]
+            cli,
+            [
+                "-o",
+                "json",
+                "azure",
+                "groups",
+                "get",
+                "--name",
+                "Team A",
+                "--name",
+                "Team B",
+                "--members",
+            ],
         )
     )
 
@@ -229,7 +244,18 @@ def test_counts_come_from_the_dedicated_count_endpoint(
     """`--counts` must not page the whole membership just to length it."""
     result = ok(
         runner.invoke(
-            cli, ["-o", "json", "azure", "groups", "get", "Team A", "--owners", "--counts"]
+            cli,
+            [
+                "-o",
+                "json",
+                "azure",
+                "groups",
+                "get",
+                "--name",
+                "Team A",
+                "--owners",
+                "--counts",
+            ],
         )
     )
 
@@ -250,7 +276,7 @@ def test_from_file_skips_comments_and_removes_duplicates(
 
 
 def test_an_unmatched_display_name_exits_4(runner: Any, cli: Any, named_groups: Any) -> None:
-    result = failed(runner.invoke(cli, ["azure", "groups", "get", "Nope"]), 4)
+    result = failed(runner.invoke(cli, ["azure", "groups", "get", "--name", "Nope"]), 4)
 
     assert "Nope" in result.output
 
@@ -258,7 +284,7 @@ def test_an_unmatched_display_name_exits_4(runner: Any, cli: Any, named_groups: 
 def test_ignore_missing_downgrades_a_miss_to_success(
     runner: Any, cli: Any, named_groups: Any
 ) -> None:
-    ok(runner.invoke(cli, ["azure", "groups", "get", "Nope", "--ignore-missing"]))
+    ok(runner.invoke(cli, ["azure", "groups", "get", "--name", "Nope", "--ignore-missing"]))
 
 
 def test_no_names_at_all_is_a_usage_error(runner: Any, cli: Any, named_groups: Any) -> None:
@@ -292,7 +318,9 @@ def member_routes(graph: Any) -> Any:
 def test_members_csv_uses_the_default_member_columns(
     runner: Any, cli: Any, member_routes: Any
 ) -> None:
-    result = ok(runner.invoke(cli, ["-o", "csv", "azure", "groups", "members", "Team A"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "csv", "azure", "groups", "members", "--group", "Team A"])
+    )
 
     assert lines(result.stdout)[:2] == [
         "displayName,userPrincipalName,id",
@@ -302,14 +330,28 @@ def test_members_csv_uses_the_default_member_columns(
 
 def test_the_alias_and_command_prefixes_resolve(runner: Any, cli: Any, member_routes: Any) -> None:
     """`az gr mem` is `azure groups members`, and it has to work end to end."""
-    result = ok(runner.invoke(cli, ["-o", "csv", "az", "gr", "mem", "Team A", "--transitive"]))
+    result = ok(
+        runner.invoke(cli, ["-o", "csv", "az", "gr", "mem", "--group", "Team A", "--transitive"])
+    )
 
     assert f"Ann,ann@{TENANT},u1" in result.stdout
 
 
 def test_owners_are_returned_instead_of_members(runner: Any, cli: Any, member_routes: Any) -> None:
     result = ok(
-        runner.invoke(cli, ["-o", "ndjson", "azure", "groups", "members", "Team A", "--owners"])
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "groups",
+                "members",
+                "--group",
+                "Team A",
+                "--owners",
+            ],
+        )
     )
 
     assert json.loads(lines(result.stdout)[0])["id"] == "o1"

@@ -52,18 +52,23 @@ def test_query_help_documents_the_key_condition(ddb: Callable[..., Any]) -> None
         ("scan",),
         ("query",),
         ("get",),
-        ("get", TABLE),
+        ("get", "--table", TABLE),
     ],
     ids=["describe", "scan", "query", "get-no-args", "get-table-only"],
 )
-def test_missing_required_arguments_are_usage_errors(
+def test_missing_required_options_are_usage_errors(
     ddb: Callable[..., Any], args: tuple[str, ...]
 ) -> None:
     failed(ddb(*args), 2)
 
 
+def test_the_table_option_is_named_in_the_error(ddb: Callable[..., Any]) -> None:
+    """Every ddb action needs --table, and the message should say which flag is missing."""
+    assert "--table" in failed(ddb("scan"), 2).output
+
+
 def test_query_without_a_key_condition_is_a_usage_error(ddb: Callable[..., Any]) -> None:
-    result = failed(ddb("query", TABLE), 2)
+    result = failed(ddb("query", "--table", TABLE), 2)
     assert "--key" in result.output
 
 
@@ -72,24 +77,24 @@ def test_query_without_a_key_condition_is_a_usage_error(ddb: Callable[..., Any])
 # ---------------------------------------------------------------------------
 def test_a_malformed_json_key_is_rejected(ddb: Callable[..., Any]) -> None:
     """Parsed before any AWS call, so this needs no fake service."""
-    result = failed(ddb("get", TABLE, "{not json"), 2)
+    result = failed(ddb("get", "--table", TABLE, "--key", "{not json"), 2)
     assert "invalid JSON" in result.output
 
 
 def test_a_non_object_json_key_is_rejected(ddb: Callable[..., Any]) -> None:
-    failed(ddb("get", TABLE, '["a"]'), 2)
+    failed(ddb("get", "--table", TABLE, "--key", '["a"]'), 2)
 
 
 def test_too_many_segments_are_rejected(ddb: Callable[..., Any]) -> None:
-    failed(ddb("scan", TABLE, "--segments", "999"), 2)
+    failed(ddb("scan", "--table", TABLE, "--segments", "999"), 2)
 
 
 def test_a_zero_limit_is_rejected(ddb: Callable[..., Any]) -> None:
-    failed(ddb("scan", TABLE, "-n", "0"), 2)
+    failed(ddb("scan", "--table", TABLE, "-n", "0"), 2)
 
 
 def test_an_out_of_range_page_size_is_rejected(ddb: Callable[..., Any]) -> None:
-    failed(ddb("scan", TABLE, "--page-size", "5000"), 2)
+    failed(ddb("scan", "--table", TABLE, "--page-size", "5000"), 2)
 
 
 def test_an_unknown_action_is_a_usage_error(ddb: Callable[..., Any]) -> None:

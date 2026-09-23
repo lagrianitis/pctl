@@ -7,11 +7,11 @@ import click
 from ...config import AppContext
 from ...options import aws_options, columns_option, output_options
 from ...output import Renderer, summarise
-from .common import read_options
+from .common import read_options, table_option
 
 
 @click.command(name="query")
-@click.argument("table")
+@table_option
 @aws_options
 @read_options
 @click.option(
@@ -44,8 +44,8 @@ def command(
     Prefer query over scan whenever the partition key is known.
 
     \b
-      pctl aws ddb query my-table --key "pk = :pk" --values '{":pk":"tenant#42"}'
-      pctl aws ddb query my-table --index gsi1 --key "gsi1pk = :p" \\
+      pctl aws ddb query --table my-table --key "pk = :pk" --values '{":pk":"tenant#42"}'
+      pctl aws ddb query --table my-table --index gsi1 --key "gsi1pk = :p" \\
           --values '{":p":"ACTIVE"}' --desc -n 10
     """
     from .client import ScanRequest, make_client, query, serialize_values

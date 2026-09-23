@@ -50,7 +50,7 @@ def test_raw_requires_a_path(azure: Callable[..., Any]) -> None:
 
 def test_raw_rejects_a_malformed_param(azure: Callable[..., Any]) -> None:
     """Rejected during parsing, before any token is requested."""
-    result = failed(azure("raw", "users", "--param", "broken"), 2)
+    result = failed(azure("raw", "--path", "users", "--param", "broken"), 2)
     assert "KEY=VALUE" in result.output
 
 

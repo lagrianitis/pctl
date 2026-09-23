@@ -48,6 +48,80 @@ DEFAULT_MEMBER_SELECT: tuple[str, ...] = (
     "userPrincipalName",
     "mail",
 )
+DEFAULT_SERVICE_PRINCIPAL_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "appId",
+    "servicePrincipalType",
+    "accountEnabled",
+    "appRoleAssignmentRequired",
+    "tags",
+)
+# Entitlement management sits under identityGovernance, not at the root, and supports a
+# narrower set of OData parameters than the directory collections: $select, $filter and
+# $expand only. Notably NOT $search or $count, so the advanced-query header and
+# $count=true that _list_params adds would make Graph reject the request.
+EAM_BASE = "identityGovernance/entitlementManagement"
+
+# An accessPackageAssignmentRequest relates to accessPackage, assignment and requestor.
+# It has no `target` - that is on the accessPackageAssignment a request produces - and
+# expanding a property the type does not have makes Graph reject the whole request with
+# 400 rather than ignore it. Named once so the two callers cannot drift.
+ASSIGNMENT_REQUEST_EXPAND = "accessPackage,requestor"
+
+DEFAULT_ACCESS_PACKAGE_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "description",
+    "isHidden",
+    "createdDateTime",
+    "modifiedDateTime",
+)
+DEFAULT_CATALOG_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "description",
+    "catalogType",
+    "state",
+    "isExternallyVisible",
+    "createdDateTime",
+)
+
+DEFAULT_APPLICATION_SELECT: tuple[str, ...] = (
+    "id",
+    "appId",
+    "displayName",
+    "signInAudience",
+    "publisherDomain",
+    "createdDateTime",
+    "identifierUris",
+    "tags",
+)
+DEFAULT_USER_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "userPrincipalName",
+    "mail",
+    "jobTitle",
+    "department",
+    "officeLocation",
+    "accountEnabled",
+)
+DEFAULT_OWNER_SELECT: tuple[str, ...] = (
+    "id",
+    "displayName",
+    "userPrincipalName",
+    "mail",
+)
+# appRoleAssignment does not support $select, so this is the render order rather than a
+# server-side projection. Graph returns the whole object either way.
+DEFAULT_ASSIGNMENT_COLUMNS: tuple[str, ...] = (
+    "principalDisplayName",
+    "principalType",
+    "appRoleId",
+    "createdDateTime",
+    "id",
+)
 
 # `$search`, `$count` and `endsWith` filters require the advanced query API.
 ADVANCED_QUERY_HEADERS = {"ConsistencyLevel": "eventual"}
@@ -210,8 +284,15 @@ class GraphClient:
         *,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> httpx.Response:
-        """Send an authorized request, retrying throttling and transient failures."""
+        """Send an authorized request, retrying throttling and transient failures.
+
+        Retrying the writes this client makes is safe. Adding an owner is a reference
+        POST that Graph rejects as a duplicate rather than applying twice, and removing
+        one is a DELETE on a specific reference, so a retry after a timeout cannot
+        produce a second owner or remove an unintended one.
+        """
         target = url if url.startswith("http") else f"{self.config.base_url}/{url.lstrip('/')}"
         last_error: str = ""
         for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -221,6 +302,7 @@ class GraphClient:
                         method,
                         target,
                         params=params,
+                        json=json,
                         headers=await self._authorized_headers(headers),
                     )
                 except (httpx.TimeoutException, httpx.TransportError) as exc:
@@ -233,10 +315,19 @@ class GraphClient:
             if response.status_code == 401:
                 # Token may have been revoked or the cached copy is stale.
                 if attempt == 1:
-                    self._log("got 401, discarding cached token and retrying")
+                    self._log(f"401 from {method} {target}, discarding cached token and retrying")
                     self.clear_cached_token()
                     continue
-                raise AuthError(f"Graph rejected the token: {_describe(response)}")
+                # Name the request. A command may make several before failing, and
+                # "Graph rejected the token" on its own does not say which one did.
+                # Graph uses 401 for an invalid or expired token and 403 for a missing
+                # permission, so a persistent 401 is not a consent problem.
+                raise AuthError(
+                    f"Graph rejected the token for {method} {target}: {_describe(response)}\n"
+                    "A fresh token was already tried. Graph returns 401 for an invalid or "
+                    "expired token and 403 for a missing permission, so check the tenant, "
+                    "client ID and secret rather than the app's API permissions."
+                )
 
             if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
                 retry_after = response.headers.get("Retry-After")
@@ -248,9 +339,20 @@ class GraphClient:
                 continue
 
             if response.status_code >= 400:
-                raise UpstreamError(
-                    f"Graph returned {response.status_code} for {target}: {_describe(response)}"
+                message = (
+                    f"Graph returned {response.status_code} for {method} {target}: "
+                    f"{_describe(response)}"
                 )
+                if response.status_code == 403:
+                    message += (
+                        "\nThis is a consent problem, not an authentication one. Grant the "
+                        "app registration the required application permission and admin-"
+                        "consent it.\nThen discard the cached token with `pctl azure token "
+                        "--clear-cache`: a token issued before consent does not carry the "
+                        "new role, and this one is cached for up to an hour."
+                    )
+                raise UpstreamError(message)
+            self._log(f"{response.status_code} {method} {target}")
             return response
 
         raise UpstreamError(
@@ -346,17 +448,23 @@ class GraphClient:
             params["$count"] = "true"
         return params, headers
 
-    def list_groups(
+    # -- collections ------------------------------------------------------
+    # `groups` and `servicePrincipals` are both OData collections of directory
+    # objects, so listing, counting and display-name lookup differ only in the path
+    # and the default $select. These three take the collection; the named methods
+    # below are the readable spellings callers actually use.
+    def list_collection(
         self,
+        collection: str,
         *,
-        select: Sequence[str] | None = DEFAULT_GROUP_SELECT,
+        select: Sequence[str] | None = None,
         filter_expr: str | None = None,
         search: str | None = None,
         order_by: str | None = None,
         limit: int | None = None,
         page_size: int = GRAPH_MAX_PAGE_SIZE,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Stream every group in the tenant (or those matching a filter/search)."""
+        """Stream every item in an OData collection, following pagination."""
         params, headers = self._list_params(
             select=select,
             filter_expr=filter_expr,
@@ -365,25 +473,26 @@ class GraphClient:
             page_size=page_size,
             count=False,
         )
-        return self.paginate("groups", params=params, headers=headers, limit=limit)
+        return self.paginate(collection, params=params, headers=headers, limit=limit)
 
-    async def count_groups(self, *, filter_expr: str | None = None) -> int:
+    async def count_collection(self, collection: str, *, filter_expr: str | None = None) -> int:
         """Ask Graph for a count without transferring the objects."""
         params: dict[str, Any] = {"$count": "true", "$top": 1, "$select": "id"}
         if filter_expr:
             params["$filter"] = filter_expr
-        payload = await self.get_json("groups", params=params, headers=ADVANCED_QUERY_HEADERS)
+        payload = await self.get_json(collection, params=params, headers=ADVANCED_QUERY_HEADERS)
         return int(payload.get("@odata.count", 0))
 
-    async def find_groups_by_display_name(
+    async def find_by_display_name(
         self,
+        collection: str,
         display_name: str,
         *,
         mode: str = "exact",
         select: Sequence[str] | None = None,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Resolve a display name to zero or more groups.
+        """Resolve a display name to zero or more items in a collection.
 
         `mode` is one of `exact` (`displayName eq`), `prefix` (`startswith`) or
         `search` (Graph full-text `$search`, which also matches substrings).
@@ -411,8 +520,556 @@ class GraphClient:
         )
         return [
             item
-            async for item in self.paginate("groups", params=params, headers=headers, limit=limit)
+            async for item in self.paginate(collection, params=params, headers=headers, limit=limit)
         ]
+
+    # -- groups -----------------------------------------------------------
+    def list_groups(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_GROUP_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream every group in the tenant (or those matching a filter/search)."""
+        return self.list_collection(
+            "groups",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_groups(self, *, filter_expr: str | None = None) -> int:
+        """Ask Graph for a group count without transferring the objects."""
+        return await self.count_collection("groups", filter_expr=filter_expr)
+
+    async def find_groups_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name to zero or more groups."""
+        return await self.find_by_display_name(
+            "groups", display_name, mode=mode, select=select, limit=limit
+        )
+
+    # -- service principals (Enterprise Applications) ---------------------
+    def list_service_principals(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_SERVICE_PRINCIPAL_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream service principals, which the portal calls Enterprise Applications."""
+        return self.list_collection(
+            "servicePrincipals",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_service_principals(self, *, filter_expr: str | None = None) -> int:
+        """Ask Graph for a service principal count without transferring the objects."""
+        return await self.count_collection("servicePrincipals", filter_expr=filter_expr)
+
+    async def find_service_principals_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name to zero or more service principals."""
+        return await self.find_by_display_name(
+            "servicePrincipals", display_name, mode=mode, select=select, limit=limit
+        )
+
+    # -- entitlement management -------------------------------------------
+    def _governance_params(
+        self,
+        *,
+        select: Sequence[str] | None,
+        filter_expr: str | None,
+        expand: Sequence[str] | None,
+        page_size: int,
+    ) -> dict[str, Any]:
+        """Query parameters for an entitlement management collection.
+
+        Deliberately not `_list_params`. That one adds `$count=true` and the
+        advanced-query header for search and ordering, and entitlement management
+        supports neither, so reusing it would turn a working query into a 400.
+        """
+        params: dict[str, Any] = {"$top": min(page_size, GRAPH_MAX_PAGE_SIZE)}
+        if select:
+            params["$select"] = ",".join(select)
+        if filter_expr:
+            params["$filter"] = filter_expr
+        if expand:
+            params["$expand"] = ",".join(expand)
+        return params
+
+    def list_governance(
+        self,
+        collection: str,
+        *,
+        select: Sequence[str] | None = None,
+        filter_expr: str | None = None,
+        expand: Sequence[str] | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream an entitlement management collection, following pagination.
+
+        `collection` is relative to `identityGovernance/entitlementManagement`, so
+        "accessPackages" and "catalogs" rather than full paths.
+        """
+        return self.paginate(
+            f"{EAM_BASE}/{collection}",
+            params=self._governance_params(
+                select=select, filter_expr=filter_expr, expand=expand, page_size=page_size
+            ),
+            limit=limit,
+        )
+
+    async def get_governance(
+        self,
+        collection: str,
+        object_id: str,
+        *,
+        select: Sequence[str] | None = None,
+        expand: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
+        """One object from an entitlement management collection, by ID."""
+        params: dict[str, Any] = {}
+        if select:
+            params["$select"] = ",".join(select)
+        if expand:
+            params["$expand"] = ",".join(expand)
+        return await self.get_json(f"{EAM_BASE}/{collection}/{object_id}", params=params or None)
+
+    async def find_governance_by_display_name(
+        self,
+        collection: str,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        expand: Sequence[str] | None = None,
+        limit: int | None = 2,
+    ) -> list[dict[str, Any]]:
+        """Resolve a display name within an entitlement management collection.
+
+        Only `exact` and `prefix` are server-side here. There is no `search` mode,
+        because `$search` is not supported on these collections; a substring match has to
+        be done by the caller after fetching, and saying so is better than sending a
+        query Graph will reject.
+        """
+        literal = escape_odata(display_name)
+        match mode:
+            case "exact":
+                filter_expr = f"displayName eq '{literal}'"
+            case "prefix":
+                filter_expr = f"startswith(displayName,'{literal}')"
+            case _:
+                raise ValueError(
+                    f"unsupported match mode for entitlement management: {mode}. "
+                    "Graph supports eq and startswith here, but not $search."
+                )
+        return [
+            item
+            async for item in self.list_governance(
+                collection, select=select, filter_expr=filter_expr, expand=expand, limit=limit
+            )
+        ]
+
+    async def create_assignment_request(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Create an accessPackageAssignmentRequest.
+
+        Assignments are not written directly: adding and removing access both go through
+        a request that Graph then processes, so the response describes a request in flight
+        rather than a finished assignment. Its `state` moves through `submitted` and
+        `delivering` to `delivered` after this call returns.
+
+        The v1.0 shape is `requestType: adminAdd | adminRemove` with an `assignment`
+        object. Beta used `AdminAdd` and `accessPackageAssignment`, so a body copied from
+        a beta example will be rejected here.
+        """
+        response = await self.request("POST", f"{EAM_BASE}/assignmentRequests", json=body)
+        return response.json() if response.content else {}
+
+    async def delete_access_package(self, package_id: str) -> None:
+        """Delete an access package. Irreversible, and refused while assignments exist.
+
+        Graph rejects the delete if the package has any accessPackageAssignment, so the
+        caller checks for them first and explains what to remove rather than passing a
+        bare 400 back to someone who then has to guess.
+
+        Takes an ID rather than a name on purpose: the caller resolves the name to exactly
+        one package, so an ambiguous pattern can never reach a delete.
+        """
+        await self.request("DELETE", f"{EAM_BASE}/accessPackages/{package_id}")
+
+    async def get_assignment_request(self, request_id: str) -> dict[str, Any]:
+        """One accessPackageAssignmentRequest, for polling a write to completion.
+
+        Expands `requestor`, not `target`. A request has no `target`: its relationships are
+        `accessPackage`, `assignment` and `requestor`, and `target` belongs to the
+        accessPackageAssignment the request produces. Asking for it makes Graph reject the
+        whole request with 400 "Could not find a property named 'target'", which took out
+        both `eam get-request` and every `--wait`.
+        """
+        return await self.get_json(
+            f"{EAM_BASE}/assignmentRequests/{request_id}",
+            params={"$expand": ASSIGNMENT_REQUEST_EXPAND},
+        )
+
+    def list_assignment_requests(
+        self,
+        *,
+        filter_expr: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Assignment requests, current and historical, newest first where Graph allows."""
+        return self.list_governance(
+            "assignmentRequests",
+            filter_expr=filter_expr,
+            expand=tuple(ASSIGNMENT_REQUEST_EXPAND.split(",")),
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def find_assignment(
+        self, package_id: str, target_id: str, *, states: Sequence[str] | None = None
+    ) -> dict[str, Any] | None:
+        """The existing assignment of one access package to one principal, if any.
+
+        Used to make the writes idempotent: adding an assignment someone already has, or
+        removing one they do not, should be reported rather than sent.
+
+        `states` narrows to assignments worth acting on. An Expired assignment is not
+        access, so it should not stop a fresh add.
+        """
+        literal_package = escape_odata(package_id)
+        literal_target = escape_odata(target_id)
+        clauses = [
+            f"accessPackage/id eq '{literal_package}'",
+            f"target/objectId eq '{literal_target}'",
+        ]
+        if states:
+            joined = " or ".join(f"state eq '{escape_odata(state)}'" for state in states)
+            clauses.append(f"({joined})")
+        matches = [
+            item
+            async for item in self.list_governance(
+                "assignments", filter_expr=" and ".join(clauses), expand=("target",), limit=1
+            )
+        ]
+        return matches[0] if matches else None
+
+    def list_assignment_policies(
+        self, package_id: str, *, limit: int | None = None
+    ) -> AsyncIterator[dict[str, Any]]:
+        """The assignment policies governing one access package.
+
+        An adminAdd request must name a policy, so this is how a caller who only knows the
+        package finds one.
+        """
+        literal = escape_odata(package_id)
+        return self.list_governance(
+            "assignmentPolicies",
+            select=("id", "displayName", "allowedTargetScope"),
+            filter_expr=f"accessPackage/id eq '{literal}'",
+            limit=limit,
+        )
+
+    # -- applications (app registrations) ---------------------------------
+    def list_applications(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream application registrations, which the portal calls App registrations."""
+        return self.list_collection(
+            "applications",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def count_applications(self, *, filter_expr: str | None = None) -> int:
+        return await self.count_collection("applications", filter_expr=filter_expr)
+
+    async def find_applications_by_display_name(
+        self,
+        display_name: str,
+        *,
+        mode: str = "exact",
+        select: Sequence[str] | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        return await self.find_by_display_name(
+            "applications", display_name, mode=mode, select=select, limit=limit
+        )
+
+    async def get_application(
+        self, object_id: str, *, select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT
+    ) -> dict[str, Any]:
+        """One application by its directory object ID, not its appId."""
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"applications/{object_id}", params=params)
+
+    async def find_application_by_app_id(
+        self, app_id: str, *, select: Sequence[str] | None = DEFAULT_APPLICATION_SELECT
+    ) -> dict[str, Any] | None:
+        """One application by its appId, the client ID people copy from the portal.
+
+        An application has two GUIDs: `id` is its directory object, `appId` is the client
+        ID it shares with its service principal. The portal shows the appId far more
+        prominently, so a bare GUID is tried as an appId before an object ID.
+        """
+        literal = escape_odata(app_id)
+        matches = [
+            item
+            async for item in self.list_collection(
+                "applications", select=select, filter_expr=f"appId eq '{literal}'", limit=1
+            )
+        ]
+        return matches[0] if matches else None
+
+    async def find_service_principal_by_app_id(
+        self, app_id: str, *, select: Sequence[str] | None = None
+    ) -> dict[str, Any] | None:
+        """The service principal that instantiates an application in this tenant.
+
+        The two objects are joined by `appId`, never by object ID: an application and its
+        service principal have different `id` values, which is the single most common
+        source of confusion when working with both.
+        """
+        literal = escape_odata(app_id)
+        matches = [
+            item
+            async for item in self.list_collection(
+                "servicePrincipals",
+                select=select or DEFAULT_SERVICE_PRINCIPAL_SELECT,
+                filter_expr=f"appId eq '{literal}'",
+                limit=1,
+            )
+        ]
+        return matches[0] if matches else None
+
+    # -- users ------------------------------------------------------------
+    async def get_user(
+        self, user_id: str, *, select: Sequence[str] | None = DEFAULT_USER_SELECT
+    ) -> dict[str, Any]:
+        """One user by object ID or userPrincipalName.
+
+        Graph accepts either in the path, so a UPN needs no lookup first.
+        """
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"users/{user_id}", params=params)
+
+    def list_users(
+        self,
+        *,
+        select: Sequence[str] | None = DEFAULT_USER_SELECT,
+        filter_expr: str | None = None,
+        search: str | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        page_size: int = GRAPH_MAX_PAGE_SIZE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream users, or those matching a filter or search."""
+        return self.list_collection(
+            "users",
+            select=select,
+            filter_expr=filter_expr,
+            search=search,
+            order_by=order_by,
+            limit=limit,
+            page_size=page_size,
+        )
+
+    async def get_service_principal(
+        self, sp_id: str, *, select: Sequence[str] | None = None
+    ) -> dict[str, Any]:
+        params = {"$select": ",".join(select)} if select else None
+        return await self.get_json(f"servicePrincipals/{sp_id}", params=params)
+
+    async def app_role_assignments(
+        self,
+        sp_id: str,
+        *,
+        outbound: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """App role assignments for a service principal.
+
+        Two different questions share one object type, so the direction matters:
+
+        - `appRoleAssignedTo` (default) answers "who has access to this Enterprise
+          Application", and `principalDisplayName` is the assigned user or group.
+        - `appRoleAssignments` (`outbound=True`) answers "what is this service
+          principal itself assigned to", and `principalDisplayName` is the service
+          principal.
+
+        No `$select`: Graph rejects it on these relations, and the objects are small.
+        """
+        relation = "appRoleAssignments" if outbound else "appRoleAssignedTo"
+        params: dict[str, Any] = {"$top": GRAPH_MAX_PAGE_SIZE}
+        return [
+            item
+            async for item in self.paginate(
+                f"servicePrincipals/{sp_id}/{relation}", params=params, limit=limit
+            )
+        ]
+
+    # -- service principal owners -----------------------------------------
+    def owners(
+        self,
+        sp_id: str,
+        *,
+        select: Sequence[str] | None = DEFAULT_OWNER_SELECT,
+        limit: int | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream the owners of a service principal.
+
+        Owners are users or other service principals, so the response is a mixed
+        collection of directory objects. `@odata.type` is requested implicitly by Graph
+        and is the only reliable way to tell them apart.
+        """
+        params: dict[str, Any] = {"$top": GRAPH_MAX_PAGE_SIZE}
+        if select:
+            params["$select"] = ",".join(select)
+        return self.paginate(f"servicePrincipals/{sp_id}/owners", params=params, limit=limit)
+
+    def directory_object_ref(self, object_id: str) -> str:
+        """The `@odata.id` a reference write expects.
+
+        Built from the configured base URL rather than hardcoded, so pointing the client
+        at a different Graph endpoint keeps the body consistent with the request.
+        """
+        return f"{self.config.base_url}/directoryObjects/{object_id}"
+
+    async def add_owner(self, sp_id: str, object_id: str) -> None:
+        """Add a directory object as an owner of a service principal.
+
+        Graph returns 204 with no body. Callers are expected to have checked the current
+        owners first: this does not swallow a duplicate, because a 400 here means the
+        caller's view of the owners was stale and that is worth surfacing.
+        """
+        await self.request(
+            "POST",
+            f"servicePrincipals/{sp_id}/owners/$ref",
+            json={"@odata.id": self.directory_object_ref(object_id)},
+        )
+
+    async def remove_owner(self, sp_id: str, object_id: str) -> None:
+        """Remove an owner from a service principal.
+
+        Note the `/$ref` suffix: without it Graph deletes the owning *object* rather than
+        the ownership link, which for a user means deleting the user.
+        """
+        await self.request("DELETE", f"servicePrincipals/{sp_id}/owners/{object_id}/$ref")
+
+    # -- provisioning (synchronization) -----------------------------------
+    async def synchronization_jobs(self, sp_id: str) -> list[dict[str, Any]]:
+        """The provisioning jobs configured on a service principal.
+
+        Empty means provisioning was never set up, which is a different problem from a
+        wrong job ID and is reported differently by the caller.
+
+        An application with no provisioning may have no `synchronization` segment at all,
+        in which case Graph answers 404 rather than an empty collection. Both mean the
+        same thing here, so the 404 becomes an empty list. Only 404: a 403 means the token
+        lacks Synchronization.ReadWrite.All, and reporting that as "provisioning is not
+        enabled" would send the caller to the portal to fix a consent problem.
+        """
+        try:
+            payload = await self.get_json(f"servicePrincipals/{sp_id}/synchronization/jobs")
+        except UpstreamError as exc:
+            # Matches the prefix `request` builds, so a 404 inside the URL cannot trip it.
+            if "Graph returned 404 for GET" in str(exc):
+                return []
+            raise
+        return list(payload.get("value") or [])
+
+    async def synchronization_rules(self, sp_id: str, job_id: str) -> list[dict[str, Any]]:
+        """The synchronization rules declared in a job's schema.
+
+        provisionOnDemand has to name a rule, and rules live in the schema rather than on
+        the job, so finding one costs a second round trip. The schema is fetched whole and
+        is large: it carries every attribute mapping for the connector, which is why the
+        caller resolves the rule once per run rather than per subject.
+        """
+        payload = await self.get_json(
+            f"servicePrincipals/{sp_id}/synchronization/jobs/{job_id}/schema"
+        )
+        return list(payload.get("synchronizationRules") or [])
+
+    async def provision_on_demand(
+        self, sp_id: str, job_id: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Provision one set of subjects immediately, without waiting for the sync cycle.
+
+        Unlike the rest of this client's writes, the interesting part of the response is
+        not the HTTP status. Graph answers 200 with a stringKeyStringValuePair whose
+        `key` and `value` are themselves JSON *strings*, and the provisioning verdict
+        (Success, Skipped, Failure) is inside `key`. A 200 here does not mean the subject
+        was provisioned.
+
+        Graph rate limits this action to 5 requests per 10 seconds, far tighter than the
+        rest of the API, so callers send subjects one at a time rather than concurrently.
+        """
+        response = await self.request(
+            "POST",
+            f"servicePrincipals/{sp_id}/synchronization/jobs/{job_id}/provisionOnDemand",
+            json=body,
+        )
+        return response.json() if response.content else {}
+
+    async def app_role_names(self, sp_id: str) -> dict[str, str]:
+        """Map appRoleId to its display name, for labelling assignments.
+
+        The roles live on the service principal itself, so one extra request turns
+        every opaque GUID in an assignment into something readable.
+        """
+        payload = await self.get_json(f"servicePrincipals/{sp_id}", params={"$select": "appRoles"})
+        roles = payload.get("appRoles") or []
+        names = {
+            role["id"]: role.get("displayName") or role.get("value") or role["id"]
+            for role in roles
+            if isinstance(role, dict) and role.get("id")
+        }
+        # The all-zero GUID is Graph's stand-in for "default access", which is what an
+        # assignment carries when the app exposes no roles of its own.
+        names.setdefault("00000000-0000-0000-0000-000000000000", "Default Access")
+        return names
 
     async def get_group(
         self, group_id: str, *, select: Sequence[str] | None = None
