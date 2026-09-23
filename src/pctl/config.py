@@ -121,7 +121,9 @@ class AzureConfig:
         shell history or `ps` output: use the environment or `--secret-id`.
         """
         resolved_id = client_id or _env("AZURE_CLIENT_ID", "PCTL_CLIENT_ID")
-        resolved_secret = client_secret or _env("AZURE_CLIENT_SECRET", "PCTL_CLIENT_SECRET")
+        resolved_secret = client_secret or _env(
+            "AZURE_CLIENT_SECRET", "PCTL_CLIENT_SECRET"
+        )
         resolved_tenant = tenant_id or _env("AZURE_TENANT_ID", "PCTL_TENANT_ID")
 
         resolved_secret_id = secret_id or _env("PCTL_AZURE_SECRET_ID")
@@ -148,7 +150,9 @@ class AzureConfig:
             client_secret=resolved_secret,
             scope=scope or _env("PCTL_GRAPH_SCOPE") or DEFAULT_GRAPH_SCOPE,
             authority=_env("PCTL_AUTHORITY") or DEFAULT_AUTHORITY,
-            base_url=(_env("PCTL_GRAPH_BASE_URL") or DEFAULT_GRAPH_BASE_URL).rstrip("/"),
+            base_url=(_env("PCTL_GRAPH_BASE_URL") or DEFAULT_GRAPH_BASE_URL).rstrip(
+                "/"
+            ),
             use_token_cache=not (no_cache or _env_flag("PCTL_NO_TOKEN_CACHE")),
         )
 

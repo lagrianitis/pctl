@@ -203,7 +203,9 @@ class Renderer:
                 self._csv_buffer, fieldnames=header, extrasaction="ignore", restval=""
             )
             self._csv.writeheader()
-        self._csv.writerow({key: _scalar(record.get(key)) for key in self.columns or ()})
+        self._csv.writerow(
+            {key: _scalar(record.get(key)) for key in self.columns or ()}
+        )
         if self._csv_buffer.tell() > 32_768:
             self._drain_csv()
 
@@ -238,7 +240,9 @@ class Renderer:
             "  ".join("-" * width for width in widths),
         ]
         lines.extend(
-            "  ".join(text.ljust(widths[i]) for i, text in enumerate(row_cells)).rstrip()
+            "  ".join(
+                text.ljust(widths[i]) for i, text in enumerate(row_cells)
+            ).rstrip()
             for row_cells in cells
         )
         self._emit(("\n".join(lines) + "\n").encode())

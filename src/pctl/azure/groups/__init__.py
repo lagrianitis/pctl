@@ -21,9 +21,18 @@ from .common import (
 )
 
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
-    "list": ("pctl.azure.groups.list:command", "List every group in the tenant, paginated."),
-    "get": ("pctl.azure.groups.get:command", "Show details for groups by display name."),
-    "members": ("pctl.azure.groups.members:command", "Stream a group's members or owners."),
+    "list": (
+        "pctl.azure.groups.list:command",
+        "List every group in the tenant, paginated.",
+    ),
+    "get": (
+        "pctl.azure.groups.get:command",
+        "Show details for groups by display name.",
+    ),
+    "members": (
+        "pctl.azure.groups.members:command",
+        "Stream a group's members or owners.",
+    ),
 }
 
 

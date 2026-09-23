@@ -50,7 +50,9 @@ def command(
     async def _run() -> int:
         async with graph_client(app) as client:
             target = await resolve_one(client, name, mode=match_mode)
-            app.log(f"resolved '{name}' to {target.get('displayName')} ({target['id']})")
+            app.log(
+                f"resolved '{name}' to {target.get('displayName')} ({target['id']})"
+            )
             renderer = Renderer(app.output, columns=columns)
             async for owner in client.owners(target["id"], limit=limit):
                 renderer.write(owner)

@@ -37,8 +37,14 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.service_principals:service_principals",
         "Service principals, known in the portal as Enterprise Applications.",
     ),
-    "token": ("pctl.azure.token:command", "Acquire an access token for Microsoft Graph."),
-    "raw": ("pctl.azure.raw:command", "Call any Graph path, with auth and pagination handled."),
+    "token": (
+        "pctl.azure.token:command",
+        "Acquire an access token for Microsoft Graph.",
+    ),
+    "raw": (
+        "pctl.azure.raw:command",
+        "Call any Graph path, with auth and pagination handled.",
+    ),
 }
 
 # The portal and Graph disagree on every one of these names, so accept both spellings.

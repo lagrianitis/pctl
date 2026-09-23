@@ -34,7 +34,9 @@ DEFAULT_EXPAND = ("target", "accessPackage")
     type=click.Choice(ASSIGNMENT_STATES),
     help="Only assignments in this state. Delivered means access is live.",
 )
-@click.option("--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression.")
+@click.option(
+    "--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression."
+)
 @click.option(
     "--target",
     metavar="TEXT",
@@ -45,8 +47,12 @@ DEFAULT_EXPAND = ("target", "accessPackage")
     is_flag=True,
     help="Skip expanding target and accessPackage, leaving the raw relationship IDs.",
 )
-@click.option("--select", metavar="FIELDS", help="Comma-separated Graph fields to request.")
-@click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N assignments.")
+@click.option(
+    "--select", metavar="FIELDS", help="Comma-separated Graph fields to request."
+)
+@click.option(
+    "-n", "--limit", type=click.IntRange(min=1), help="Stop after N assignments."
+)
 @click.option(
     "--page-size",
     type=click.IntRange(1, GRAPH_MAX_PAGE_SIZE),
@@ -136,7 +142,9 @@ def command(
     summarise(run(_run()), "assignment", quiet=app.quiet)
 
 
-def _matching_target(items: list[dict[str, object]], needle: str) -> list[dict[str, object]]:
+def _matching_target(
+    items: list[dict[str, object]], needle: str
+) -> list[dict[str, object]]:
     """Assignments whose target display name or email contains the needle.
 
     Both fields are checked because a person is as likely to be looked up by address as by
@@ -147,6 +155,7 @@ def _matching_target(items: list[dict[str, object]], needle: str) -> list[dict[s
     by_email = [
         item
         for item in items
-        if wanted in str(item.get("targetEmail") or "").casefold() and item not in by_name
+        if wanted in str(item.get("targetEmail") or "").casefold()
+        and item not in by_name
     ]
     return [*by_name, *by_email]

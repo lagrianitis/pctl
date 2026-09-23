@@ -13,7 +13,14 @@ from ...output import Renderer
 from .. import graph_client
 from .common import request_outcome, wait_for_request
 
-COLUMNS = ["id", "requestType", "state", "outcome", "targetDisplayName", "accessPackageName"]
+COLUMNS = [
+    "id",
+    "requestType",
+    "state",
+    "outcome",
+    "targetDisplayName",
+    "accessPackageName",
+]
 
 
 @click.command(name="get-request")
@@ -79,7 +86,9 @@ def command(
     async def _run() -> dict[str, Any]:
         async with graph_client(app) as client:
             if wait:
-                return await wait_for_request(client, request_id, timeout=wait_timeout, log=app.log)
+                return await wait_for_request(
+                    client, request_id, timeout=wait_timeout, log=app.log
+                )
             return await client.get_assignment_request(request_id)
 
     found = run(_run())
@@ -109,7 +118,9 @@ def _report(record: dict[str, Any], *, fail_on_pending: bool, quiet: bool) -> No
     state = record.get("state")
     if outcome == "done":
         if not quiet:
-            click.secho(f"Request {record.get('id')} is delivered.", err=True, fg="green")
+            click.secho(
+                f"Request {record.get('id')} is delivered.", err=True, fg="green"
+            )
         return
     if outcome == "failed":
         raise UpstreamError(f"Request {record.get('id')} did not apply: state {state}.")

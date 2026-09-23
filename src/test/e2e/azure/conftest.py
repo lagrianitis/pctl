@@ -56,6 +56,8 @@ def graph() -> Iterator[Any]:
 
     with respx.mock(assert_all_called=False) as router:
         router.post(TOKEN_URL, name="token").mock(
-            return_value=httpx.Response(200, json={"access_token": FAKE_JWT, "expires_in": 3600})
+            return_value=httpx.Response(
+                200, json={"access_token": FAKE_JWT, "expires_in": 3600}
+            )
         )
         yield router

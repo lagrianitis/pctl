@@ -22,7 +22,9 @@ def empty_groups(graph: Any) -> Any:
     """An empty `/groups` response, for commands run only to trigger authentication."""
     import httpx
 
-    graph.get(f"{GRAPH}/groups").mock(return_value=httpx.Response(200, json={"value": []}))
+    graph.get(f"{GRAPH}/groups").mock(
+        return_value=httpx.Response(200, json={"value": []})
+    )
     return graph
 
 
@@ -87,7 +89,9 @@ def test_clear_cache_empties_the_directory(
     assert not list(azure_env.glob("tokens/*.json"))
 
 
-def test_no_token_cache_reauthenticates_every_run(runner: Any, cli: Any, empty_groups: Any) -> None:
+def test_no_token_cache_reauthenticates_every_run(
+    runner: Any, cli: Any, empty_groups: Any
+) -> None:
     for _ in range(2):
         ok(runner.invoke(cli, ["azure", "groups", "list", "--no-token-cache"]))
 

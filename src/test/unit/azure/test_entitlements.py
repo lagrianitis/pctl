@@ -28,7 +28,9 @@ def test_surrounding_whitespace_is_tolerated() -> None:
     assert request_outcome("  delivered  ") == "done"
 
 
-@pytest.mark.parametrize("state", ["denied", "canceled", "cancelled", "deliveryFailed", "failed"])
+@pytest.mark.parametrize(
+    "state", ["denied", "canceled", "cancelled", "deliveryFailed", "failed"]
+)
 def test_terminal_failures_are_classified_as_failed(state: str) -> None:
     assert request_outcome(state) == "failed"
 
@@ -40,7 +42,14 @@ def test_partial_delivery_is_its_own_outcome() -> None:
 
 @pytest.mark.parametrize(
     "state",
-    ["submitted", "pendingApproval", "accepted", "delivering", "scheduled", "pendingNotBefore"],
+    [
+        "submitted",
+        "pendingApproval",
+        "accepted",
+        "delivering",
+        "scheduled",
+        "pendingNotBefore",
+    ],
 )
 def test_in_flight_states_are_pending(state: str) -> None:
     assert request_outcome(state) == "pending"

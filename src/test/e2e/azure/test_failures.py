@@ -57,7 +57,9 @@ def test_a_bad_client_secret_exits_3(runner: Any, cli: Any, graph: Any) -> None:
 
     # --no-token-cache, otherwise a token cached by an earlier command in the same test
     # would be reused and the token endpoint never reached.
-    result = failed(runner.invoke(cli, ["azure", "groups", "list", "--no-token-cache"]), 3)
+    result = failed(
+        runner.invoke(cli, ["azure", "groups", "list", "--no-token-cache"]), 3
+    )
 
     assert "AADSTS7000215" in result.output
 

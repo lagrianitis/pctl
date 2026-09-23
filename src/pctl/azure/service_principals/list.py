@@ -18,8 +18,12 @@ from .common import DEFAULT_LIST_COLUMNS
     metavar="FIELDS",
     help="Comma-separated Graph fields to request. Fewer fields is faster.",
 )
-@click.option("--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression.")
-@click.option("--search", metavar="TEXT", help="Full-text search on displayName (substring).")
+@click.option(
+    "--filter", "filter_expr", metavar="ODATA", help="Raw OData $filter expression."
+)
+@click.option(
+    "--search", metavar="TEXT", help="Full-text search on displayName (substring)."
+)
 @click.option(
     "--starts-with",
     metavar="PREFIX",
@@ -30,8 +34,12 @@ from .common import DEFAULT_LIST_COLUMNS
     metavar="GUID",
     help="Find the service principal for an application (client) ID.",
 )
-@click.option("--order-by", metavar="FIELD", help="Server-side ordering, e.g. displayName.")
-@click.option("-n", "--limit", type=click.IntRange(min=1), help="Stop after N service principals.")
+@click.option(
+    "--order-by", metavar="FIELD", help="Server-side ordering, e.g. displayName."
+)
+@click.option(
+    "-n", "--limit", type=click.IntRange(min=1), help="Stop after N service principals."
+)
 @click.option(
     "--page-size",
     type=click.IntRange(1, GRAPH_MAX_PAGE_SIZE),
@@ -80,7 +88,9 @@ def command(
     async def _run() -> int:
         async with graph_client(app) as client:
             if count_only:
-                click.echo(await client.count_service_principals(filter_expr=filter_expr))
+                click.echo(
+                    await client.count_service_principals(filter_expr=filter_expr)
+                )
                 return -1
             renderer = Renderer(app.output, columns=table_columns)
             async for item in client.list_service_principals(

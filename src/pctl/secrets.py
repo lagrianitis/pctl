@@ -16,7 +16,12 @@ DEFAULT_SECRET_REGION = "eu-central-1"
 
 # Accept the common spellings so the same secret works across tooling.
 _CLIENT_ID_KEYS = ("client_id", "clientId", "azure_client_id", "appId")
-_CLIENT_SECRET_KEYS = ("client_secret", "clientSecret", "azure_client_secret", "password")
+_CLIENT_SECRET_KEYS = (
+    "client_secret",
+    "clientSecret",
+    "azure_client_secret",
+    "password",
+)
 _TENANT_KEYS = ("tenant_id", "tenantId", "azure_tenant_id", "tenant")
 
 
@@ -32,7 +37,9 @@ def load_azure_secret(
 
     region = region or DEFAULT_SECRET_REGION
     try:
-        session = boto3.session.Session(profile_name=profile or None, region_name=region)
+        session = boto3.session.Session(
+            profile_name=profile or None, region_name=region
+        )
         response = session.client("secretsmanager").get_secret_value(SecretId=secret_id)
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code", "")

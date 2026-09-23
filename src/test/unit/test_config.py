@@ -87,7 +87,9 @@ def test_flag_beats_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert (config.tenant_id, config.client_id) == ("from-flag", "flag-client")
 
 
-def test_pctl_prefixed_env_is_accepted_as_a_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pctl_prefixed_env_is_accepted_as_a_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("PCTL_TENANT_ID", "from-pctl-env")
     assert AzureConfig.resolve().tenant_id == "from-pctl-env"
 
@@ -111,9 +113,14 @@ def test_defaults_are_graph_v1_and_the_default_scope() -> None:
     assert config.scope == DEFAULT_GRAPH_SCOPE
 
 
-def test_base_url_override_loses_its_trailing_slash(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_base_url_override_loses_its_trailing_slash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("PCTL_GRAPH_BASE_URL", "https://graph.microsoft.com/beta/")
-    assert AzureConfig.resolve(tenant_id="tid").base_url == "https://graph.microsoft.com/beta"
+    assert (
+        AzureConfig.resolve(tenant_id="tid").base_url
+        == "https://graph.microsoft.com/beta"
+    )
 
 
 def test_authority_override_is_honoured(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -125,12 +132,16 @@ def test_authority_override_is_honoured(monkeypatch: pytest.MonkeyPatch) -> None
 def test_has_client_secret_requires_both_id_and_secret() -> None:
     assert not AzureConfig.resolve(tenant_id="t", client_id="c").has_client_secret
     assert not AzureConfig.resolve(tenant_id="t", client_secret="s").has_client_secret
-    assert AzureConfig.resolve(tenant_id="t", client_id="c", client_secret="s").has_client_secret
+    assert AzureConfig.resolve(
+        tenant_id="t", client_id="c", client_secret="s"
+    ).has_client_secret
 
 
 def test_secret_is_kept_out_of_the_repr() -> None:
     """A config object may be logged; the secret must not ride along."""
-    config = AzureConfig.resolve(tenant_id="t", client_id="c", client_secret="super-secret")
+    config = AzureConfig.resolve(
+        tenant_id="t", client_id="c", client_secret="super-secret"
+    )
     assert "super-secret" not in repr(config)
 
 
@@ -152,7 +163,9 @@ def test_env_flag_disables_the_cache(monkeypatch: pytest.MonkeyPatch, raw: str) 
 
 
 @pytest.mark.parametrize("raw", ["0", "false", "no", "", "off"])
-def test_other_env_values_leave_the_cache_on(monkeypatch: pytest.MonkeyPatch, raw: str) -> None:
+def test_other_env_values_leave_the_cache_on(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
     monkeypatch.setenv("PCTL_NO_TOKEN_CACHE", raw)
     assert AzureConfig.resolve(tenant_id="t").use_token_cache is True
 
@@ -165,7 +178,9 @@ def secret_loader(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Record calls to the Secrets Manager loader instead of hitting AWS."""
     calls: list[dict[str, Any]] = []
 
-    def fake_load(secret_id: str, *, region: str | None, profile: str | None) -> dict[str, str]:
+    def fake_load(
+        secret_id: str, *, region: str | None, profile: str | None
+    ) -> dict[str, str]:
         calls.append({"secret_id": secret_id, "region": region, "profile": profile})
         return {
             "client_id": "secret-client",
@@ -212,7 +227,9 @@ def test_env_secret_wins_and_skips_the_network_call(
     assert secret_loader == []
 
 
-def test_explicit_tenant_survives_the_secret_lookup(secret_loader: list[dict[str, Any]]) -> None:
+def test_explicit_tenant_survives_the_secret_lookup(
+    secret_loader: list[dict[str, Any]]
+) -> None:
     config = AzureConfig.resolve(tenant_id="explicit", secret_id="s")
     assert config.tenant_id == "explicit"
     assert config.client_secret == "secret-value"
@@ -236,7 +253,9 @@ def test_aws_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.endpoint_url == "http://localhost:8000"
 
 
-def test_aws_region_falls_back_to_aws_default_region(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_aws_region_falls_back_to_aws_default_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
     assert AwsConfig.resolve().region == "us-west-2"
 
@@ -258,7 +277,9 @@ def test_app_context_defaults() -> None:
 
 def test_app_context_derives_provider_configs() -> None:
     app = AppContext()
-    app.creds.update({"tenant_id": "t", "client_id": "c", "profile": "p", "region": "r"})
+    app.creds.update(
+        {"tenant_id": "t", "client_id": "c", "profile": "p", "region": "r"}
+    )
     assert app.azure().tenant_id == "t"
     assert app.aws().profile == "p"
     assert app.aws().region == "r"

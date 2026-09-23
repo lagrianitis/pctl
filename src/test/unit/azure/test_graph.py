@@ -50,7 +50,12 @@ def test_escaping_keeps_a_quoted_name_inside_its_literal() -> None:
 # ---------------------------------------------------------------------------
 def test_page_size_is_capped_at_the_graph_maximum(graph_client: GraphClient) -> None:
     params, _ = graph_client._list_params(
-        select=None, filter_expr=None, search=None, order_by=None, page_size=5000, count=False
+        select=None,
+        filter_expr=None,
+        search=None,
+        order_by=None,
+        page_size=5000,
+        count=False,
     )
     assert params["$top"] == GRAPH_MAX_PAGE_SIZE
 
@@ -83,14 +88,21 @@ def test_a_plain_filter_needs_no_special_headers(graph_client: GraphClient) -> N
 def test_search_requests_the_advanced_query_api(graph_client: GraphClient) -> None:
     """`$search` only works with ConsistencyLevel: eventual and $count=true."""
     params, headers = graph_client._list_params(
-        select=None, filter_expr=None, search="platform", order_by=None, page_size=999, count=False
+        select=None,
+        filter_expr=None,
+        search="platform",
+        order_by=None,
+        page_size=999,
+        count=False,
     )
     assert params["$search"] == '"displayName:platform"'
     assert params["$count"] == "true"
     assert headers == ADVANCED_QUERY_HEADERS
 
 
-def test_an_explicitly_quoted_search_is_passed_through(graph_client: GraphClient) -> None:
+def test_an_explicitly_quoted_search_is_passed_through(
+    graph_client: GraphClient,
+) -> None:
     params, _ = graph_client._list_params(
         select=None,
         filter_expr=None,
@@ -102,7 +114,9 @@ def test_an_explicitly_quoted_search_is_passed_through(graph_client: GraphClient
     assert params["$search"] == '"mail:aws"'
 
 
-def test_ordering_alongside_a_filter_needs_the_advanced_api(graph_client: GraphClient) -> None:
+def test_ordering_alongside_a_filter_needs_the_advanced_api(
+    graph_client: GraphClient,
+) -> None:
     _, headers = graph_client._list_params(
         select=None,
         filter_expr="startswith(displayName,'aws')",
