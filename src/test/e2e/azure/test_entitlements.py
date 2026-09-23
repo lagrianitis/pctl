@@ -588,3 +588,233 @@ def test_an_invalid_state_is_rejected_before_any_request(
     failed(runner.invoke(cli, ["azure", "eam", "list-assignments", "--state", "delivered"]), 2)
 
     assert seen == []
+
+
+# ---------------------------------------------------------------------------
+# add-assignment / remove-assignment
+# ---------------------------------------------------------------------------
+POLICY_ID = "2264bf65-76ba-417b-a27d-54d291f0cbc8"
+ANN_ID = "u-ann"
+DAVE_ID = "u-dave"
+
+
+@pytest.fixture
+def writable(governance: Any, seen: list[str]) -> Any:
+    """One policy, Ann already assigned, Dave resolvable but unassigned."""
+    import httpx
+
+    def policies(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(
+            200,
+            json={
+                "value": [
+                    {"id": POLICY_ID, "displayName": "Direct assignment"},
+                ]
+            },
+        )
+
+    def assignments(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        url = unquote_plus(str(request.url))
+        if f"target/objectId eq '{ANN_ID}'" in url:
+            return httpx.Response(200, json={"value": [{"id": "asg-ann", "state": "Delivered"}]})
+        return httpx.Response(200, json={"value": []})
+
+    def users(request: httpx.Request) -> httpx.Response:
+        url = unquote_plus(str(request.url))
+        if "ann@example.com" in url:
+            return httpx.Response(
+                200, json={"value": [{"id": ANN_ID, "displayName": "Ann Example"}]}
+            )
+        if "dave@example.com" in url:
+            return httpx.Response(
+                200, json={"value": [{"id": DAVE_ID, "displayName": "Dave Example"}]}
+            )
+        return httpx.Response(200, json={"value": []})
+
+    governance.get(f"{EAM}/assignmentPolicies").mock(side_effect=policies)
+    governance.get(f"{EAM}/assignments").mock(side_effect=assignments)
+    governance.get(f"{GRAPH}/users").mock(side_effect=users)
+    governance.post(f"{EAM}/assignmentRequests", name="request").mock(
+        return_value=httpx.Response(201, json={"id": "req-1", "state": "submitted"})
+    )
+    return governance
+
+
+def test_adding_by_email_posts_an_admin_add_request(runner: Any, cli: Any, writable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "add-assignment",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
+        )
+    )
+
+    assert writable["request"].call_count == 1
+    assert json.loads(lines(result.stdout)[0])["status"] == "requested"
+
+
+def test_the_add_body_uses_the_v1_shape(runner: Any, cli: Any, writable: Any) -> None:
+    """v1.0 wants adminAdd and `assignment`; beta's AdminAdd/accessPackageAssignment fails."""
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+        )
+    )
+
+    body = json.loads(writable["request"].calls[0].request.content)
+    assert body["requestType"] == "adminAdd"
+    assert body["assignment"] == {
+        "targetId": DAVE_ID,
+        "assignmentPolicyId": POLICY_ID,
+        "accessPackageId": PACKAGE_ID,
+    }
+
+
+def test_an_existing_assignment_is_not_re_requested(runner: Any, cli: Any, writable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "add-assignment",
+                "AWS Platform Access",
+                "ann@example.com",
+            ],
+        )
+    )
+
+    assert writable["request"].call_count == 0
+    assert json.loads(lines(result.stdout)[0])["status"] == "already-assigned"
+
+
+def test_an_existing_assignment_says_so_on_stderr(runner: Any, cli: Any, writable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "ann@example.com"]
+        )
+    )
+
+    assert "already has" in result.stderr
+
+
+def test_expired_assignments_do_not_block_a_fresh_add(
+    runner: Any, cli: Any, writable: Any, seen: list[str]
+) -> None:
+    """An expired assignment is not access, so the state filter must exclude it."""
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "dave@example.com"]
+        )
+    )
+
+    lookup = next(url for url in seen if "target/objectId" in unquote_plus(url))
+    decoded = unquote_plus(lookup)
+    assert "state eq 'Delivered'" in decoded
+    assert "Expired" not in decoded
+
+
+def test_several_emails_are_assigned_in_one_call(runner: Any, cli: Any, writable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "add-assignment",
+                "AWS Platform Access",
+                "--emails",
+                "dave@example.com,ann@example.com",
+            ],
+        )
+    )
+
+    statuses = {
+        json.loads(line)["target"]: json.loads(line)["status"] for line in lines(result.stdout)
+    }
+    assert statuses == {"Dave Example": "requested", "Ann Example": "already-assigned"}
+    assert writable["request"].call_count == 1
+
+
+def test_an_unresolvable_email_exits_4_without_writing(
+    runner: Any, cli: Any, writable: Any
+) -> None:
+    result = failed(
+        runner.invoke(
+            cli, ["azure", "eam", "add-assignment", "AWS Platform Access", "nobody@example.com"]
+        ),
+        4,
+    )
+
+    assert writable["request"].call_count == 0
+    assert "nobody@example.com" in result.output
+
+
+def test_removing_posts_an_admin_remove_naming_the_assignment(
+    runner: Any, cli: Any, writable: Any
+) -> None:
+    """adminRemove references the existing assignment, not the policy that created it."""
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "remove-assignment",
+                "AWS Platform Access",
+                "ann@example.com",
+            ],
+        )
+    )
+
+    body = json.loads(writable["request"].calls[0].request.content)
+    assert body == {"requestType": "adminRemove", "assignment": {"id": "asg-ann"}}
+    assert json.loads(lines(result.stdout)[0])["status"] == "removal-requested"
+
+
+def test_removing_someone_unassigned_writes_nothing(runner: Any, cli: Any, writable: Any) -> None:
+    result = ok(
+        runner.invoke(
+            cli,
+            [
+                "-o",
+                "ndjson",
+                "azure",
+                "eam",
+                "remove-assignment",
+                "AWS Platform Access",
+                "dave@example.com",
+            ],
+        )
+    )
+
+    assert writable["request"].call_count == 0
+    assert json.loads(lines(result.stdout)[0])["status"] == "not-assigned"
+
+
+def test_remove_needs_no_policy_lookup(
+    runner: Any, cli: Any, writable: Any, seen: list[str]
+) -> None:
+    """Only adminAdd names a policy, so removal must not pay for that request."""
+    ok(
+        runner.invoke(
+            cli, ["azure", "eam", "remove-assignment", "AWS Platform Access", "ann@example.com"]
+        )
+    )
+
+    assert not any("assignmentPolicies" in url for url in seen)

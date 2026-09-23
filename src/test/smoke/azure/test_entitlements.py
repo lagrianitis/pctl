@@ -110,3 +110,57 @@ def test_get_catalog_without_an_identifier_is_a_usage_error(eam: Callable[..., A
 
 def test_an_invalid_page_size_is_rejected(eam: Callable[..., Any]) -> None:
     failed(eam("list-packages", "--page-size", "0"), 2)
+
+
+# ---------------------------------------------------------------------------
+# the two assignment writes
+# ---------------------------------------------------------------------------
+def test_add_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
+    assert "ReadWrite" in ok(eam("add-assignment", "--help")).stdout
+
+
+def test_remove_assignment_help_names_the_write_permission(eam: Callable[..., Any]) -> None:
+    assert "ReadWrite" in ok(eam("remove-assignment", "--help")).stdout
+
+
+def test_add_assignment_help_documents_idempotency(eam: Callable[..., Any]) -> None:
+    assert "Idempotent" in ok(eam("add-assignment", "--help")).stdout
+
+
+def test_add_assignment_help_warns_the_request_is_asynchronous(
+    eam: Callable[..., Any],
+) -> None:
+    """Access does not exist the moment the command exits, which surprises people."""
+    assert "asynchronously" in ok(eam("add-assignment", "--help")).stdout
+
+
+def test_remove_assignment_help_warns_the_request_is_asynchronous(
+    eam: Callable[..., Any],
+) -> None:
+    assert "asynchronously" in ok(eam("remove-assignment", "--help")).stdout
+
+
+def test_add_assignment_offers_a_policy_option(eam: Callable[..., Any]) -> None:
+    assert "--policy" in ok(eam("add-assignment", "--help")).stdout
+
+
+def test_remove_assignment_has_no_policy_option(eam: Callable[..., Any]) -> None:
+    """adminRemove names the assignment, so a policy would be meaningless."""
+    assert "--policy" not in ok(eam("remove-assignment", "--help")).stdout
+
+
+def test_both_writes_accept_comma_separated_emails(eam: Callable[..., Any]) -> None:
+    for action in ("add-assignment", "remove-assignment"):
+        assert "--emails" in ok(eam(action, "--help")).stdout
+
+
+def test_add_assignment_needs_a_package(eam: Callable[..., Any]) -> None:
+    failed(eam("add-assignment"), 2)
+
+
+def test_add_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
+    failed(eam("add-assignment", "some-package"), 2)
+
+
+def test_remove_assignment_needs_at_least_one_person(eam: Callable[..., Any]) -> None:
+    failed(eam("remove-assignment", "some-package"), 2)
