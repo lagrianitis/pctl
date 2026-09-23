@@ -44,7 +44,8 @@ Graph application permissions needed, all admin-consented:
 
 | permission | needed for |
 | --- | --- |
-| `EntitlementManagement.Read.All` | the `eam` service |
+| `EntitlementManagement.Read.All` | the `eam` read actions |
+| `EntitlementManagement.ReadWrite.All` | `eam add-assignment`, `remove-assignment` |
 | `Group.Read.All` | `groups list`, `get`, `members` |
 | `User.Read.All` | `users get`, group members, and owners by name or address |
 | `Application.Read.All` **or** `Directory.Read.All` | `apps list`, `get`; `sp list`, `get`, `assignments`, `owners` |
@@ -198,6 +199,37 @@ them — a column cannot reach `target.displayName`. The nested objects stay int
 pctl -o ndjson azure eam list-assignments --access-package "$PKG" --state Delivered \
   | jq -r '[.targetDisplayName, .targetEmail] | @tsv'
 ```
+
+#### Granting and revoking access
+
+```bash
+pctl azure eam add-assignment    "AWS Platform Access" ann@company.com
+pctl azure eam add-assignment    "$PKG" --emails ann@company.com,bob@company.com
+pctl azure eam remove-assignment "$PKG" --emails ann@company.com,bob@company.com
+```
+
+Each target is an email address, a display name or a user object ID; an address is matched
+against `userPrincipalName` and `mail`. These two commands need
+`EntitlementManagement.ReadWrite.All`.
+
+**Assignments are not written directly.** Both commands create an
+[accessPackageAssignmentRequest](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-post-assignmentrequests)
+which Graph then processes, so they are **asynchronous**: the command returns a
+`requestId` and the state at submission, not finished access. Confirm with
+`list-assignments` afterwards.
+
+**`add-assignment` needs a policy**, because an `adminAdd` must say which rules govern the
+assignment. If the package has exactly one policy it is used without asking; if it has
+several the command refuses and lists them, since picking arbitrarily would grant access
+under the wrong approval and expiry rules. `--policy` names one. `remove-assignment` needs
+none — an `adminRemove` references the existing assignment instead.
+
+Both are **idempotent**: current assignments are read first, so re-running reports
+`already-assigned` or `not-assigned` on exit 0 rather than sending a duplicate request.
+An `Expired` assignment does not block a fresh add, because an expired assignment is not
+access. Each person gets a result row with a `status` of `requested`, `already-assigned`,
+`removal-requested` or `not-assigned`, and one unresolvable address does not stop the rest
+— the command exits 4 at the end unless `--ignore-missing`.
 
 `get-catalog` and `get-package` take a display name or an object ID, and `--catalog`
 accepts a catalog name and resolves it to the ID the filter needs. That costs one extra
@@ -448,7 +480,8 @@ src/pctl/
 │   │   ├── runner.py        list/get bodies shared by both collections
 │   │   ├── list_packages.py · get_package.py    actions
 │   │   ├── list_catalogs.py · get_catalog.py    actions
-│   │   └── list_assignments.py                  action
+│   │   ├── list_assignments.py                  action
+│   │   └── add_assignment.py · remove_assignment.py   actions (write)
 │   ├── applications/      service (exposed as `apps`)
 │   │   ├── __init__.py      `apps` group
 │   │   ├── common.py        resolve_application: appId before object ID
