@@ -8,7 +8,7 @@ from typing import Any
 import click
 
 from ...config import AppContext
-from ...errors import ConfigError, NotFoundError
+from ...errors import NotFoundError
 from ...options import (
     azure_options,
     columns_option,
@@ -96,11 +96,14 @@ def command(
             app.log(f"resolving {len(wanted)} identifier(s)")
 
             async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
+                # Only NotFoundError is collected, for the reason `users get` gives: an
+                # ambiguous identifier is a usage error the caller has to resolve, and
+                # --ignore-missing must not be able to skip past it.
                 try:
                     found = await resolve_application(
                         client, identifier, mode=match_mode, select=fields
                     )
-                except (NotFoundError, ConfigError) as exc:
+                except NotFoundError as exc:
                     return identifier, str(exc)
                 found["_query"] = identifier
                 return found

@@ -71,10 +71,10 @@ def command(
     rather than sent as a request. No policy is needed, unlike add-assignment: an
     adminRemove names the existing assignment rather than the rules that created it.
 
-    This creates an adminRemove request, which Graph applies afterwards, so without --wait
-    access may still be live when the command returns. That matters more here than for
-    add: if you are revoking access in response to an incident, exit 0 without --wait does
-    not mean the access is gone.
+    This creates an adminRemove request, which Graph applies asynchronously after this
+    command returns, so without --wait access may still be live. That matters more here
+    than for add: if you are revoking access in response to an incident, exit 0 without
+    --wait does not mean the access is gone.
 
     --wait polls each request until it is delivered and exits 5 if any is not, bounded by
     --wait-timeout.

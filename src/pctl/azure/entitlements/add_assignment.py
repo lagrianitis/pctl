@@ -80,8 +80,8 @@ def command(
     add, because an expired assignment is not access.
 
     This creates an adminAdd request rather than writing an assignment directly, so Graph
-    applies it afterwards. Without --wait the command reports the state at submission,
-    which is not yet access.
+    applies it asynchronously after this command returns. Without --wait the command
+    reports the state at submission, which is not yet access.
 
     --wait polls each request until it is delivered and exits 5 if any is not, so a
     pipeline can depend on the access actually existing. A request can stall in
