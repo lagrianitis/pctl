@@ -178,6 +178,25 @@ pctl azure eam get-catalog "AWS Platform"             # by name or by ID
 pctl azure eam list-packages --catalog "AWS Platform" # scope by catalog name
 pctl azure eam list-packages --contains incident -o json
 pctl azure eam get-package "AWS Platform Access" --with-policies -o json
+
+# who has this access, and is it live?
+pctl azure eam list-assignments --access-package "AWS Platform Access" --state Delivered
+```
+
+`list-assignments` answers "who is assigned to this package". `--access-package` takes a
+display name and resolves it to the ID the filter needs; `--state` narrows to one of
+`Delivering`, `PartiallyDelivered`, `Delivered`, `Expired`, `DeliveryFailed`, capitalised
+exactly as Graph expects. Together they produce
+`$filter=accessPackage/id eq '…' and state eq 'Delivered'`.
+
+`target` and `accessPackage` are expanded by default, and their names lifted to
+`targetDisplayName`, `targetEmail` and `accessPackageName` so a table or CSV can address
+them — a column cannot reach `target.displayName`. The nested objects stay intact for
+`json` and `ndjson`. `--no-expand` leaves the raw relationship IDs.
+
+```bash
+pctl -o ndjson azure eam list-assignments --access-package "$PKG" --state Delivered \
+  | jq -r '[.targetDisplayName, .targetEmail] | @tsv'
 ```
 
 `get-catalog` and `get-package` take a display name or an object ID, and `--catalog`
@@ -192,8 +211,8 @@ they run:
 
 | option | where it runs |
 | --- | --- |
-| `--name`, `--starts-with`, `--filter`, `--catalog` | server-side `$filter` |
-| `--contains`, `--match contains` | **locally**, after fetching the collection |
+| `--name`, `--starts-with`, `--filter`, `--catalog`, `--access-package`, `--state` | server-side `$filter` |
+| `--contains`, `--match contains`, `--target` | **locally**, after fetching the collection |
 
 `--contains` exists because Graph has no substring operator on these collections. Every
 page is fetched regardless, so it narrows what is rendered rather than what is
@@ -428,7 +447,8 @@ src/pctl/
 │   │   ├── common.py        match modes, local contains filter, catalog resolution
 │   │   ├── runner.py        list/get bodies shared by both collections
 │   │   ├── list_packages.py · get_package.py    actions
-│   │   └── list_catalogs.py · get_catalog.py    actions
+│   │   ├── list_catalogs.py · get_catalog.py    actions
+│   │   └── list_assignments.py                  action
 │   ├── applications/      service (exposed as `apps`)
 │   │   ├── __init__.py      `apps` group
 │   │   ├── common.py        resolve_application: appId before object ID
