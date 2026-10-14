@@ -21,6 +21,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.oauth.token:command",
         "Fetch a token with client credentials, for machines.",
     ),
+    "login": (
+        "pctl.oauth.login:command",
+        "Log in through the browser and fetch a user token.",
+    ),
 }
 
 
@@ -43,6 +47,12 @@ def oauth(ctx: click.Context) -> None:
       --audience        OAUTH_AUDIENCE
       --scope           OAUTH_SCOPE
       --secret-id       PCTL_OAUTH_SECRET_ID  read the client from AWS Secrets Manager
+
+    \b
+    Browser login (login) also takes:
+      --authorize-url   OAUTH_AUTHORIZE_URL   or discovered from --issuer
+      --redirect-uri    OAUTH_REDIRECT_URI    must be registered on the client
+      --login-timeout   OAUTH_LOGIN_TIMEOUT   seconds to wait for the browser
     """
     ctx.ensure_object(AppContext)
 

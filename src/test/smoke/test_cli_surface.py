@@ -66,6 +66,7 @@ COMMAND_PATHS: list[list[str]] = [
     ["aws", "ddb", "get"],
     ["oauth"],
     ["oauth", "token"],
+    ["oauth", "login"],
     ["commands"],
     ["tree"],
     ["completion"],
@@ -83,6 +84,7 @@ LAZY_PATHS = [
     ["aws", "ddb", "scan"],
     ["oauth"],
     ["oauth", "token"],
+    ["oauth", "login"],
 ]
 PROVIDER_MODULES = ("boto3", "botocore", "httpx", "uvloop", "h2")
 

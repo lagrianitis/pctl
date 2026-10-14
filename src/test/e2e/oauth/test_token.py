@@ -24,6 +24,8 @@ from helpers import (
     OAUTH_TOKEN_URL,
     failed,
     ok,
+    reply,
+    unreachable,
 )
 
 pytestmark = pytest.mark.e2e
@@ -34,20 +36,6 @@ BASE = ["--token-url", OAUTH_TOKEN_URL, *CREDENTIALS]
 
 def token(runner: Any, cli: Any, *args: str) -> Any:
     return runner.invoke(cli, ["oauth", "token", *args])
-
-
-def reply(status: int = 200, **kwargs: Any) -> Any:
-    """A fake provider response. httpx is imported here to keep collection cheap."""
-    import httpx
-
-    return httpx.Response(status, **kwargs)
-
-
-def unreachable() -> Any:
-    """The error httpx raises when the provider cannot be connected to."""
-    import httpx
-
-    return httpx.ConnectError("no route")
 
 
 # ---------------------------------------------------------------------------

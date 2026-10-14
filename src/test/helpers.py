@@ -79,6 +79,20 @@ OAUTH_CLIENT_ID = "pctl-test-client"
 OAUTH_AUDIENCE = "https://api.example.test"
 
 
+def reply(status: int = 200, **kwargs: Any) -> Any:
+    """A fake provider response. httpx is imported here to keep collection cheap."""
+    import httpx
+
+    return httpx.Response(status, **kwargs)
+
+
+def unreachable() -> Any:
+    """The error httpx raises when the provider cannot be connected to."""
+    import httpx
+
+    return httpx.ConnectError("no route")
+
+
 def graph_group(index: int) -> dict[str, Any]:
     """One Graph group payload, named `aws-team-<index>` so ordering is assertable."""
     return {
