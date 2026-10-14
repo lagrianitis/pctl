@@ -1,11 +1,13 @@
 # pctl
 
-One fast CLI for the platform's providers. Today it covers two:
+One fast CLI for the platform's providers. Today it covers three:
 
 - **Microsoft Graph** (`pctl azure`) - get a token, list every Entra ID group across
   paginated results, and pull details for a single group or a user-defined list of
   groups by display name.
 - **AWS DynamoDB** (`pctl aws`) - read items from a table via scan, query or get-item.
+- **OAuth 2.0** (`pctl oauth`) - fetch a JWT from Auth0, Okta, Keycloak or any compatible
+  provider: client credentials for machines, a browser login for people.
 
 The command line is **case → service → action** (`pctl aws ddb scan`), and the source
 tree mirrors it, so adding a provider such as Confluent means adding a case package
@@ -76,7 +78,7 @@ instance credentials all behave as they do with the AWS CLI.
 ## Usage
 
 ```
-pctl [global options] <azure|aws> ...
+pctl [global options] <azure|aws|oauth> ...
 ```
 
 Global options work before or after the subcommand: `-o/--output`, `-q/--quiet`,
@@ -605,6 +607,53 @@ pctl aws ddb scan --table my-table --endpoint-url http://localhost:8000   # loca
 Expression values are plain JSON; pctl converts them to DynamoDB's typed format.
 DynamoDB-typed JSON is also accepted as-is.
 
+### OAuth tokens
+
+A JWT from any OAuth 2.0 provider. `auth` and `auth0` are aliases for `oauth`.
+
+```bash
+# a machine: the client credentials grant
+export OAUTH_CLIENT_SECRET=...                    # prefer this to --client-secret
+pctl oauth token --issuer https://idp.example.com \
+    --client-id my-client --audience https://api.example.com
+curl -H "Authorization: Bearer $(pctl oauth token --raw)" https://api.example.com/things
+pctl oauth token --decode -o json | jq .claims    # signature unchecked
+
+# a person: the authorization code flow with PKCE, through the browser
+pctl oauth login --issuer https://idp.example.com --client-id my-client \
+    --redirect-uri http://127.0.0.1:8765/callback
+```
+
+The token is masked unless `--raw` is passed. Every setting is a flag **and** an
+environment variable, and the flag wins:
+
+| flag               | variable               | meaning                                            |
+| ------------------ | ---------------------- | -------------------------------------------------- |
+| `--issuer`         | `OAUTH_ISSUER`         | endpoints are discovered from it                   |
+| `--token-url`      | `OAUTH_TOKEN_URL`      | token endpoint, which skips discovery              |
+| `--authorize-url`  | `OAUTH_AUTHORIZE_URL`  | login only: authorization endpoint                 |
+| `--client-id`      | `OAUTH_CLIENT_ID`      |                                                    |
+| `--client-secret`  | `OAUTH_CLIENT_SECRET`  | required for `token`, optional for `login`         |
+| `--audience`       | `OAUTH_AUDIENCE`       | the API the token is for                           |
+| `--scope`          | `OAUTH_SCOPE`          | `login` defaults to `openid profile email`         |
+| `--redirect-uri`   | `OAUTH_REDIRECT_URI`   | login only: must be registered on the client       |
+| `--login-timeout`  | `OAUTH_LOGIN_TIMEOUT`  | login only: seconds to wait for the browser        |
+| `--secret-id`      | `PCTL_OAUTH_SECRET_ID` | read the client from an AWS Secrets Manager secret |
+| `--no-token-cache` | `PCTL_NO_TOKEN_CACHE`  | `token` only                                       |
+
+Name the provider with `--issuer`, or give `--token-url` (and `--authorize-url` for
+`login`) to skip the discovery request.
+
+**`login` has two ways back from the browser.** A loopback redirect such as
+`http://127.0.0.1:8765/callback` is caught by pctl itself on that port. Any other
+registered redirect, such as a hosted callback page, lands somewhere pctl cannot listen:
+copy the address from the address bar, even if the page shows an error, and paste it at
+the prompt.
+
+Machine tokens are cached like `azure token`. A user token is never cached, and no refresh
+token is kept. A rejected credential, a refused login or an unreachable provider exits 3;
+missing configuration exits 2 before anything is sent.
+
 ## Output
 
 | Format   | Streams | Use for                                   |
@@ -642,7 +691,8 @@ src/pctl/
 ├── output.py              Renderer: table / json / ndjson / csv
 ├── errors.py              error types mapped to exit codes
 ├── tokencache.py          on-disk token cache
-├── secrets.py             Azure credentials from AWS Secrets Manager
+├── secrets.py             client credentials from AWS Secrets Manager
+├── jwt.py                 masking a token and reading its claims
 ├── azure/                 case
 │   ├── __init__.py          `azure` group + graph_client() shared by all actions
 │   ├── common.py            directory lookups shared by `users` and `sp`
@@ -687,6 +737,14 @@ src/pctl/
 │       ├── add_owner.py     action (write)
 │       ├── remove_owner.py  action (write)
 │       └── provision.py     action (write): provision on demand
+├── oauth/                 case
+│   ├── __init__.py          `oauth` group
+│   ├── client.py            token endpoint transport: discovery, grants, cache
+│   ├── common.py            token record and how it is shown
+│   ├── token.py             action (case-level): client credentials
+│   ├── login.py             action (case-level): browser login
+│   ├── browser.py           PKCE, the authorize URL, redirect checks
+│   └── loopback.py          one-shot listener for a loopback redirect
 └── aws/                   case
     ├── __init__.py          `aws` group
     └── dynamodb/          service (exposed as `ddb`)
@@ -799,8 +857,12 @@ src/test/
   `PCTL_NO_TOKEN_CACHE=1`.
 - `pctl azure token --raw` prints a bearer token to stdout. Treat it as a secret
   and avoid it in shell history or CI logs.
-- Client secrets are read from the environment only, never from a CLI flag, so
-  they do not land in `ps` output or shell history.
+- Azure client secrets are read from the environment only, never from a CLI flag, so
+  they do not land in `ps` output or shell history. `pctl oauth --client-secret` is the
+  one deliberate exception: it exists so every `oauth` setting works as a flag, and a
+  flag is visible in shell history and the process list. Prefer `OAUTH_CLIENT_SECRET` or
+  `--secret-id`.
+- `pctl oauth login` never writes a token to disk, and keeps no refresh token.
 - `--decode` shows JWT claims without verifying the signature. It is for
   inspection, not for authorization decisions.
 

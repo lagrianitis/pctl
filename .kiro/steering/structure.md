@@ -9,12 +9,13 @@ src/pctl/
 ├── cli.py                 root group, global flags, completion, LAZY_COMMANDS case table
 ├── lazy.py                PctlGroup: lazy imports, aliases, prefix matching
 ├── surface.py             `pctl commands` and `pctl tree`: walks the lazy tables
+├── jwt.py                 masking a token and reading its claims, shared by azure and oauth
 ├── config.py              AppContext, AzureConfig, AwsConfig, OutputFormat
 ├── options.py             shared click options (output, azure, aws, columns)
 ├── output.py              Renderer: table / json / ndjson / csv
 ├── errors.py              PctlError subclasses mapped to exit codes
 ├── tokencache.py          on-disk token cache (0600 in a 0700 dir)
-├── secrets.py             Azure credentials from AWS Secrets Manager
+├── secrets.py             client credentials from AWS Secrets Manager
 ├── azure/                 case
 │   ├── __init__.py          `azure` group + graph_client() shared by its actions
 │   ├── graph.py             Graph transport: token, retries, pagination
@@ -34,6 +35,14 @@ src/pctl/
 │   └── entitlements/      service (exposed as `eam`): packages, catalogs, assignments,
 │       │                    requests
 │       └── runner.py        list/get bodies shared by packages and catalogs
+├── oauth/                 case (case-level actions only, like azure token)
+│   ├── __init__.py          `oauth` group (aliases `auth`, `auth0`)
+│   ├── client.py            token endpoint transport: discovery, grants, machine-token cache
+│   ├── common.py            token record, --raw/--decode, how a token is shown
+│   ├── token.py             action: client credentials
+│   ├── login.py             action: browser login
+│   ├── browser.py           PKCE, authorize URL, redirect checks (pure)
+│   └── loopback.py          one-shot listener for a loopback redirect, imported lazily
 └── aws/                   case
     ├── __init__.py          `aws` group
     └── dynamodb/          service (exposed as `ddb`)
@@ -47,11 +56,13 @@ src/test/
 ├── helpers.py             constants and static sample data (TENANT, TABLE, FAKE_JWT)
 ├── unit/                  pure functions, no I/O. One module per shared component,
 │   │                        then one package per case
-│   ├── test_config.py · test_errors.py · test_lazy.py · test_surface.py
+│   ├── test_config.py · test_errors.py · test_lazy.py · test_surface.py · test_jwt.py
 │   ├── test_options.py · test_output.py · test_tokencache.py
 │   ├── azure/           case
 │   │   ├── conftest.py      fixtures shared by this case's tests
 │   │   └── test_graph.py · test_common.py · test_entitlements.py · ...
+│   ├── oauth/           case
+│   │   └── test_browser.py  PKCE, authorize URL, redirect checks
 │   └── aws/             case
 │       ├── conftest.py
 │       └── test_dynamodb.py
@@ -62,6 +73,9 @@ src/test/
 │   ├── azure/           case
 │   │   ├── conftest.py
 │   │   └── test_groups.py · test_users.py · test_token.py · ...   one per service
+│   ├── oauth/           case
+│   │   ├── conftest.py
+│   │   └── test_token.py · test_login.py    one per case-level action
 │   └── aws/             case
 │       ├── conftest.py
 │       └── test_dynamodb.py
@@ -71,6 +85,9 @@ src/test/
     │   ├── conftest.py      Graph via respx: the `graph` router and its env scoping
     │   ├── test_groups.py · test_users.py · test_token.py · test_raw.py · ...
     │   └── test_failures.py error paths for the case
+    ├── oauth/           case
+    │   ├── conftest.py      provider via respx, plus `user` (plays the browser) and `free_port`
+    │   └── test_token.py · test_login.py
     └── aws/             case
         ├── conftest.py      DynamoDB via moto: `aws_env`, `ddb_table`, `ddb`
         ├── test_dynamodb.py

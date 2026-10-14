@@ -38,8 +38,9 @@ Resolved in this order, first match wins:
 4. `DefaultAzureCredential`, if `azure-identity` is installed — `az login`, managed
    identity, workload identity
 
-**A client secret is never a flag.** Flags land in shell history and in `ps` output, so
-there is no `--client-secret`. `--secret-id` names a secret; it does not carry one.
+**A Graph client secret is never a flag.** Flags land in shell history and in `ps` output,
+so `azure` has no `--client-secret`. `--secret-id` names a secret; it does not carry one.
+For OAuth tokens, see [OAuth](OAuth).
 
 ```bash
 export AZURE_TENANT_ID=contoso.onmicrosoft.com
