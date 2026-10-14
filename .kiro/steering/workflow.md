@@ -90,9 +90,10 @@ change is concerned. Allow the `.kiro/steering` listing
   vendored copies.
 - If something the task genuinely needs is ignored, say so and let the user decide. Do not
   un-ignore it, and do not edit `.gitignore` to make room for it.
-  **Anything prefixed `IGNORE-` does not exist.** Any file or directory whose name starts
-  with `IGNORE-`, and everything beneath it at any depth, is completely out of bounds unless
-  the user names it in the request.
+
+**Anything prefixed `IGNORE-` does not exist.** Any file or directory whose name starts
+with `IGNORE-`, and everything beneath it at any depth, is completely out of bounds unless
+the user names it in the request.
 
 - Do not read, edit, create, delete, move or stage it.
 - Do not search it, and exclude it from every glob and grep. It must not appear in results.

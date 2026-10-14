@@ -1,16 +1,27 @@
 # Product
 
-`pctl` is a fast command-line tool for the AWS Platform team that reads from
-multiple cloud and SaaS providers behind one consistent interface.
+`pctl` is a fast command-line tool for the AWS Platform team that reads from, and for a
+small set of Entra ID operations writes to, multiple cloud and SaaS providers behind one
+consistent interface.
 
 ## What it covers today
 
-- **Microsoft Graph** (`pctl azure`) — acquire and cache Entra ID tokens, list every
-  group in the tenant across paginated results, resolve groups by display name, and
-  stream members or owners. A `raw` escape hatch calls any Graph path with auth,
-  retries and pagination handled.
+- **Microsoft Graph** (`pctl azure`) — acquire and cache Entra ID tokens, and a `raw`
+  escape hatch that calls any Graph path with auth, retries and pagination handled.
+  Services, with portal-name aliases such as `enterprise-apps` and `access-packages`:
+  - `groups` — list every group across paginated results, resolve by display name, and
+    stream members or owners.
+  - `users` — find a user by email, display name or object ID.
+  - `apps` — list and get application registrations.
+  - `sp` — list and get service principals (Enterprise Applications), read app role
+    assignments and owners, add or remove an owner, and provision users or groups.
+  - `eam` — entitlement management: list and get access packages and catalogs, list,
+    add and remove assignments by email, delete a package, and check an assignment
+    request.
 - **AWS DynamoDB** (`pctl aws ddb`) — list and describe tables, and read items via
-  scan (including parallel segments), query or get-item.
+  scan (including parallel segments), query or get-item. Read-only.
+- **Discovery** — `pctl commands` lists every command in one greppable table,
+  `pctl tree` draws the hierarchy, and `pctl completion` prints the shell completion line.
 
 ## Design intent
 
@@ -25,6 +36,10 @@ multiple cloud and SaaS providers behind one consistent interface.
   4 not found, 5 upstream, 130 interrupted, 141 broken pipe.
 - **Secrets stay out of argv.** Client secrets are read from the environment or AWS
   Secrets Manager, never from a CLI flag.
+- **Writes are explicit and refuse to guess.** The few commands that change the tenant
+  (`add-owner`, `remove-owner`, `provision`, `add-assignment`, `remove-assignment`,
+  `delete-package`) are their own named actions, never a flag on a read, and an
+  ambiguous name is rejected with exit 2 rather than resolved to the first match.
 
 ## Audience
 

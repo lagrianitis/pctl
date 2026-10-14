@@ -4,7 +4,7 @@ inclusion: manual
 
 # Feature Issue Template
 
-Use this template for every feature or milestone-task issue. All four sections are
+Use this template for every feature or milestone-task issue. All five sections are
 required; fill them rather than leaving placeholder text. Title follows `[Area] ` — the
 area being the case or component touched, for example `[azure] `, `[aws ddb] `,
 `[output] `.
@@ -81,10 +81,12 @@ body:
 ## When filling it in
 
 - **Deliverables** name concrete paths. For a new action that means the action module,
-  the `LAZY_SUBCOMMANDS` entry, and the mirrored test module in each tier, per
-  `structure.md`.
+  the `LAZY_SUBCOMMANDS` entry, the line in `COMMAND_PATHS` in
+  `smoke/test_cli_surface.py`, and the mirrored test module in each of the `unit`, `smoke`
+  and `e2e` tiers that applies, per `structure.md`.
 - **Acceptance Criteria** are checkable conditions, not restated objectives. Include the
   verification that applies: `uv run ruff check .` clean, `uv run pytest -n auto` green
   with zero warnings, and README updated if behaviour changed.
 - **Target Release** matches the version in `pyproject.toml` or the next planned tag.
-  Releases here are tag-triggered, so this is what the tag will be.
+  Releases are published on GitHub and the `tag` CI job then creates the tag from
+  `pyproject.toml`, so this is what the tag will be.

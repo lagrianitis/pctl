@@ -16,39 +16,50 @@ Every project must be documented well enough that another engineer can understan
 Must contain:
 
 1. **What**: One-paragraph description of what this project does and why
-2. **Architecture**: ASCII diagram or link to architecture diagram
-3. **Prerequisites**: Exact tools and versions needed (Node 20+, Python 3.12+, AWS CLI v2, CDK v2)
-4. **Quick Start**: Numbered steps to go from clone to running locally
-5. **Deploy**: Exact commands to deploy to AWS with expected outputs
-6. **Environment Variables**: Table of all env vars with descriptions and example values
-7. **API Reference**: Endpoints, methods, request/response examples
-8. **Cleanup**: How to tear down all resources
+2. **Install**: Exact tools and versions needed (Python 3.14+, uv), and the install
+   commands, including the optional `fast` and `azure` extras
+3. **Configure**: Every environment variable, with a description and an example value,
+   pointing at `.env.example` rather than repeating secrets
+4. **Usage**: One section per command group with runnable examples, plus how to find a
+   command (`pctl commands`, `pctl tree`)
+5. **Output and exit codes**: The formats, the stdout/stderr split and the exit-code table
+6. **Layout**: The case → service → action tree, kept consistent with `structure.md`
+7. **Development**: Setup, the three test tiers and how to run them
+8. **Security notes**: Token caching, what is masked, where credentials may come from
 
-### Architecture Diagrams
+### Where else documentation lives
 
-- Use diagram MCPs (Mermaid, PlantUML, or draw.io) to generate architecture diagrams
-- Every project must have at least one architecture diagram showing:
-  - Data flow between components
-  - Network boundaries (VPC, subnets, public/private)
-- Store diagrams in `docs/` directory as both source (`.mmd`, `.puml`) and rendered (`.png`)
-- Update diagrams when architecture changes
+- `docs/wiki/` — user-facing pages, one per command group, plus `Common-Options`,
+  `Output-and-Exit-Codes`, `Permissions` and `Troubleshooting`. A command, flag or
+  required Graph permission that changes means the matching page changes.
+- `docs/milestones/`, `docs/releases/` — one file per version, written from
+  `docs/templates/milestone.md` and `docs/templates/release-notes.md`.
+- `docs/plans/` — the PR plan for a version, recording divergences rather than leaving
+  the plan wrong.
+
+### Diagrams
+
+- A diagram is worth adding when the data flow or command layout is hard to follow in
+  prose. For this CLI the tree in `structure.md` and the README `Layout` section usually
+  carry it; there is no network or VPC boundary to draw.
+- Prefer text sources (Mermaid, ASCII) kept in the markdown they illustrate, so they are
+  reviewed in the diff. Update them when the structure changes.
 
 ### Inline Documentation
 
 - Every module must have a top-level docstring explaining its purpose
 - Complex business logic must have comments explaining WHY, not WHAT
-- API endpoints must have OpenAPI/Swagger documentation
-- CDK constructs must have comments explaining the infrastructure intent
+- Command docstrings are `--help` text: keep their `\b` examples accurate
 
 ### Decision Records
 
 - For significant technical decisions, create a lightweight ADR in `docs/decisions/`
 - Format: Context → Decision → Consequences
-- Examples: "Why DynamoDB over RDS", "Why Lambda over ECS"
+- Examples: "Why Graph v1.0 over beta for entitlement management", "Why moto over Stubber"
 
 ## When Creating or Modifying Code
 
 1. Update the README if behavior changes
-2. Update architecture diagrams if services/flow changes
-3. Add/update inline documentation for new functions
-4. Generate API docs if endpoints change
+2. Update the matching `docs/wiki/` page if a command, flag or permission changes
+3. Update the Layout tree if a package or module is added
+4. Add/update inline documentation for new functions
