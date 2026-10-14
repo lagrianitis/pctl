@@ -173,7 +173,7 @@ def secret_loader(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
             "tenant_id": "secret-tenant",
         }
 
-    monkeypatch.setattr("pctl.secrets.load_azure_secret", fake_load)
+    monkeypatch.setattr("pctl.secrets.load_client_secret", fake_load)
     return calls
 
 

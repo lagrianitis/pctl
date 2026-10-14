@@ -126,9 +126,9 @@ class AzureConfig:
 
         resolved_secret_id = secret_id or _env("PCTL_AZURE_SECRET_ID")
         if resolved_secret_id and not resolved_secret:
-            from .secrets import load_azure_secret
+            from .secrets import load_client_secret
 
-            from_secret = load_azure_secret(
+            from_secret = load_client_secret(
                 resolved_secret_id,
                 region=secret_region or _env("PCTL_SECRET_REGION"),
                 profile=aws_profile,

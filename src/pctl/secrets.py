@@ -1,9 +1,10 @@
-"""Load Azure credentials from AWS Secrets Manager.
+"""Load client credentials from AWS Secrets Manager.
 
 The platform already keeps its Entra ID app registration in Secrets Manager (a JSON
 secret with `client_id` and `client_secret`), so pctl can read from there instead of
-requiring the secret in the environment. boto3 is imported lazily, so this costs
-nothing unless `--secret-id` is used.
+requiring the secret in the environment. Any OAuth client stored the same way works too,
+which is why the loader is not named for one provider. boto3 is imported lazily, so this
+costs nothing unless `--secret-id` is used.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ _CLIENT_SECRET_KEYS = ("client_secret", "clientSecret", "azure_client_secret", "
 _TENANT_KEYS = ("tenant_id", "tenantId", "azure_tenant_id", "tenant")
 
 
-def load_azure_secret(
+def load_client_secret(
     secret_id: str,
     *,
     region: str | None = None,
