@@ -10,6 +10,7 @@ its callback runs later.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import click
@@ -17,6 +18,9 @@ import click
 from .config import AppContext, OutputFormat
 
 OUTPUT_CHOICES = [fmt.value for fmt in OutputFormat]
+
+# Shorter than this and a login could not finish before the wait gave up.
+MIN_LOGIN_TIMEOUT = 0.1
 
 
 def _set_attr(name: str, transform: Callable[[Any], Any] | None = None) -> Callable[..., Any]:
@@ -183,6 +187,125 @@ def aws_options(func: Any) -> Any:
         help="Shared-config profile.  [env: AWS_PROFILE]",
     )(func)
     return func
+
+
+@dataclass(frozen=True, slots=True)
+class _CredOption:
+    """One setting that can be given as a flag or as an environment variable."""
+
+    flag: str
+    metavar: str
+    envvar: str
+    text: str
+
+
+def _cred_option(spec: _CredOption, **extra: Any) -> Any:
+    """Build the click option for a setting and store its value in `AppContext.creds`.
+
+    Giving the variable to click as `envvar` is what makes a flag win over it: click
+    consults the command line first and the variable only when the flag is absent.
+    """
+    return click.option(
+        spec.flag,
+        metavar=spec.metavar,
+        default=None,
+        expose_value=False,
+        callback=_set_cred,
+        envvar=spec.envvar,
+        help=f"{spec.text}  [env: {spec.envvar}]",
+        **extra,
+    )
+
+
+# Declared as data because the `oauth` commands take a dozen settings, each available as
+# a flag and as a variable.
+_OAUTH_OPTIONS = [
+    _CredOption(
+        "--issuer",
+        "URL",
+        "OAUTH_ISSUER",
+        "Provider base URL. The token and authorize endpoints are discovered from "
+        "<issuer>/.well-known/openid-configuration.",
+    ),
+    _CredOption("--token-url", "URL", "OAUTH_TOKEN_URL", "Token endpoint. Skips discovery."),
+    _CredOption("--client-id", "ID", "OAUTH_CLIENT_ID", "OAuth client id."),
+    _CredOption(
+        "--client-secret",
+        "SECRET",
+        "OAUTH_CLIENT_SECRET",
+        "Client secret. A flag lands in shell history and the process list, so prefer the "
+        "variable or --secret-id.",
+    ),
+    _CredOption("--audience", "API", "OAUTH_AUDIENCE", "API the token is for."),
+    _CredOption("--scope", "SCOPES", "OAUTH_SCOPE", "Space-separated scopes to request."),
+    _CredOption(
+        "--secret-id",
+        "NAME",
+        "PCTL_OAUTH_SECRET_ID",
+        "Read client_id/client_secret from an AWS Secrets Manager JSON secret.",
+    ),
+    _CredOption(
+        "--secret-region",
+        "REGION",
+        "PCTL_SECRET_REGION",
+        "Region holding the secret.  [default: eu-central-1]",
+    ),
+]
+
+_OAUTH_LOGIN_OPTIONS = [
+    _CredOption(
+        "--authorize-url", "URL", "OAUTH_AUTHORIZE_URL", "Authorization endpoint. Skips discovery."
+    ),
+    _CredOption(
+        "--redirect-uri",
+        "URI",
+        "OAUTH_REDIRECT_URI",
+        "Redirect registered on the client. A loopback address such as "
+        "http://127.0.0.1:8765/callback is caught automatically; any other value means "
+        "pasting the address back from the browser.",
+    ),
+]
+
+
+def _apply(func: Any, specs: list[_CredOption]) -> Any:
+    """Decorate in reverse, so `--help` lists the options in the order they are declared."""
+    for spec in reversed(specs):
+        func = _cred_option(spec)(func)
+    return func
+
+
+def oauth_options(func: Any) -> Any:
+    """Add the settings every `oauth` command needs: provider, client, audience, scope.
+
+    A client secret is accepted as a flag here, unlike `azure`. That is a deliberate
+    exception recorded in `security.md`, and the help text steers people to the variable.
+    """
+    return _apply(func, _OAUTH_OPTIONS)
+
+
+def oauth_login_options(func: Any) -> Any:
+    """Add the settings only the browser login uses."""
+    timeout = _CredOption(
+        "--login-timeout",
+        "SECONDS",
+        "OAUTH_LOGIN_TIMEOUT",
+        "How long to wait for the browser.  [default: 300]",
+    )
+    func = _cred_option(timeout, type=click.FloatRange(min=MIN_LOGIN_TIMEOUT))(func)
+    return _apply(func, _OAUTH_LOGIN_OPTIONS)
+
+
+def oauth_cache_option(func: Any) -> Any:
+    """Add `--no-token-cache`, for the flow that caches. A user login never does."""
+    return click.option(
+        "--no-token-cache",
+        is_flag=True,
+        default=None,
+        expose_value=False,
+        callback=_set_cred,
+        envvar="PCTL_NO_TOKEN_CACHE",
+        help="Do not read or write the on-disk token cache.  [env: PCTL_NO_TOKEN_CACHE]",
+    )(func)
 
 
 def read_names(names: tuple[str, ...], from_file: str | None) -> list[str]:

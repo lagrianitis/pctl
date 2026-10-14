@@ -70,6 +70,14 @@ CLIENT_ID = "00000000-0000-0000-0000-000000000000"
 FAKE_JWT = "header.eyJhcHAiOiAicGN0bCJ9.signature"
 FAKE_SECRET = "not-a-real-secret"
 
+# A provider that exists nowhere: `.test` is reserved, so nothing here can ever resolve.
+OAUTH_ISSUER = "https://idp.example.test"
+OAUTH_TOKEN_URL = f"{OAUTH_ISSUER}/oauth/token"
+OAUTH_AUTHORIZE_URL = f"{OAUTH_ISSUER}/authorize"
+OAUTH_DISCOVERY_URL = f"{OAUTH_ISSUER}/.well-known/openid-configuration"
+OAUTH_CLIENT_ID = "pctl-test-client"
+OAUTH_AUDIENCE = "https://api.example.test"
+
 
 def graph_group(index: int) -> dict[str, Any]:
     """One Graph group payload, named `aws-team-<index>` so ordering is assertable."""

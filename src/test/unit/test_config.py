@@ -1,9 +1,10 @@
 """Unit tests for `pctl.config`.
 
 Credential resolution has a documented precedence (flag, then environment, then AWS
-Secrets Manager) and a security property: a client secret must never be accepted from
-argv. Both are asserted here, along with the Secrets Manager path being skipped
-entirely when it is not needed, since consulting it costs a network round trip.
+Secrets Manager) and a security property: an Azure client secret must never be accepted
+from argv. `oauth` is the one deliberate exception, recorded in `security.md`. Both are
+asserted here, along with the Secrets Manager path being skipped entirely when it is not
+needed, since consulting it costs a network round trip.
 """
 
 from __future__ import annotations
@@ -16,9 +17,11 @@ from pctl.config import (
     DEFAULT_AUTHORITY,
     DEFAULT_GRAPH_BASE_URL,
     DEFAULT_GRAPH_SCOPE,
+    DEFAULT_LOGIN_TIMEOUT,
     AppContext,
     AwsConfig,
     AzureConfig,
+    OAuthConfig,
     OutputFormat,
 )
 from pctl.errors import ConfigError
@@ -289,3 +292,114 @@ def test_log_writes_to_stderr_when_verbose(capsys: pytest.CaptureFixture[str]) -
 def test_quiet_silences_verbose_logging(capsys: pytest.CaptureFixture[str]) -> None:
     AppContext(verbose=True, quiet=True).log("suppressed")
     assert capsys.readouterr().err == ""
+
+
+# ---------------------------------------------------------------------------
+# oauth
+# ---------------------------------------------------------------------------
+OAUTH_CREDS = {"client_id": "client", "token_url": "https://idp.example.test/oauth/token"}
+
+
+def test_oauth_needs_a_client_id() -> None:
+    with pytest.raises(ConfigError, match="OAUTH_CLIENT_ID"):
+        OAuthConfig.resolve({"token_url": "https://idp.example.test/oauth/token"})
+
+
+def test_oauth_needs_an_issuer_or_a_token_url() -> None:
+    with pytest.raises(ConfigError, match="OAUTH_ISSUER"):
+        OAuthConfig.resolve({"client_id": "client"})
+
+
+@pytest.mark.parametrize("provider", [{"issuer": "https://idp.example.test"}, OAUTH_CREDS])
+def test_oauth_accepts_either_way_of_naming_the_provider(provider: dict[str, str]) -> None:
+    assert OAuthConfig.resolve({"client_id": "client", **provider}).client_id == "client"
+
+
+def test_oauth_carries_every_setting_through() -> None:
+    config = OAuthConfig.resolve(
+        {
+            **OAUTH_CREDS,
+            "issuer": "https://idp.example.test",
+            "authorize_url": "https://idp.example.test/authorize",
+            "client_secret": "s3cret",
+            "audience": "https://api.example.test",
+            "scope": "read write",
+            "redirect_uri": "http://127.0.0.1:8765/callback",
+            "login_timeout": 45.0,
+        }
+    )
+
+    assert config.client_secret == "s3cret"
+    assert config.audience == "https://api.example.test"
+    assert config.scope == "read write"
+    assert config.redirect_uri == "http://127.0.0.1:8765/callback"
+    assert config.authorize_url == "https://idp.example.test/authorize"
+    assert config.login_timeout == 45.0
+
+
+def test_oauth_defaults() -> None:
+    config = OAuthConfig.resolve(OAUTH_CREDS)
+
+    assert config.login_timeout == DEFAULT_LOGIN_TIMEOUT
+    assert config.use_token_cache is True
+    assert config.client_secret is None
+
+
+def test_oauth_can_turn_the_token_cache_off() -> None:
+    assert OAuthConfig.resolve({**OAUTH_CREDS, "no_token_cache": True}).use_token_cache is False
+
+
+def test_the_client_secret_stays_out_of_repr() -> None:
+    """A config in a traceback or a debug log must not print the secret."""
+    config = OAuthConfig.resolve({**OAUTH_CREDS, "client_secret": "s3cret"})
+
+    assert "s3cret" not in repr(config)
+
+
+def test_oauth_client_credentials_need_a_secret() -> None:
+    with pytest.raises(ConfigError, match="OAUTH_CLIENT_SECRET"):
+        OAuthConfig.resolve(OAUTH_CREDS).require_client_secret()
+
+
+def test_oauth_returns_the_secret_when_there_is_one() -> None:
+    config = OAuthConfig.resolve({**OAUTH_CREDS, "client_secret": "s3cret"})
+
+    assert config.require_client_secret() == "s3cret"
+
+
+def test_oauth_secret_id_supplies_the_client(secret_loader: list[dict[str, Any]]) -> None:
+    config = OAuthConfig.resolve({"token_url": "https://t.example.test", "secret_id": "client"})
+
+    assert (config.client_id, config.client_secret) == ("secret-client", "secret-value")
+    assert secret_loader[0]["secret_id"] == "client"
+
+
+def test_oauth_client_id_flag_beats_the_one_in_the_secret(
+    secret_loader: list[dict[str, Any]],
+) -> None:
+    config = OAuthConfig.resolve({**OAUTH_CREDS, "secret_id": "client"})
+
+    assert config.client_id == "client"
+    assert config.client_secret == "secret-value"
+
+
+def test_oauth_secret_given_directly_skips_secrets_manager(
+    secret_loader: list[dict[str, Any]],
+) -> None:
+    """A secret in hand must not cost a network round trip."""
+    OAuthConfig.resolve({**OAUTH_CREDS, "client_secret": "s3cret", "secret_id": "client"})
+
+    assert secret_loader == []
+
+
+def test_oauth_secret_region_is_passed_through(secret_loader: list[dict[str, Any]]) -> None:
+    OAuthConfig.resolve({**OAUTH_CREDS, "secret_id": "client", "secret_region": "us-east-1"})
+
+    assert secret_loader[0]["region"] == "us-east-1"
+
+
+def test_app_context_derives_the_oauth_config() -> None:
+    app = AppContext()
+    app.creds.update(OAUTH_CREDS)
+
+    assert app.oauth().client_id == "client"
