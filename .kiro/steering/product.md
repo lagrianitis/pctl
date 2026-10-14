@@ -35,7 +35,8 @@ consistent interface.
 - **Scriptable exit codes.** 0 success, 1 generic, 2 usage/config, 3 auth,
   4 not found, 5 upstream, 130 interrupted, 141 broken pipe.
 - **Secrets stay out of argv.** Client secrets are read from the environment or AWS
-  Secrets Manager, never from a CLI flag.
+  Secrets Manager, not from a CLI flag. The one exception is `pctl oauth --client-secret`,
+  a deliberate choice recorded in `security.md`.
 - **Writes are explicit and refuse to guess.** The few commands that change the tenant
   (`add-owner`, `remove-owner`, `provision`, `add-assignment`, `remove-assignment`,
   `delete-package`) are their own named actions, never a flag on a read, and an

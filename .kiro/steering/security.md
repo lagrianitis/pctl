@@ -32,9 +32,16 @@ assumption. Do not commit them, and do not echo them into job logs.
 
 ### Rules that follow from this
 
-- **Never accept a secret as a CLI flag.** Flags land in shell history and `ps`
+- **Do not accept a secret as a CLI flag.** Flags land in shell history and `ps`
   output. Secrets come from the environment or a secret manager. `--secret-id` names
   a secret; it is not the secret. Follow the same pattern for any new provider.
+- **The one deliberate exception is `pctl oauth --client-secret`.** The owner chose to
+  allow it, knowing the cost, so that every `oauth` setting can be given as a flag as well
+  as an environment variable, with the flag winning. It is the only such flag: `azure`
+  still has none, and a new provider does not get one on the strength of this. The
+  environment variable and `--secret-id` remain the documented way, and the flag's help
+  text says why. Never log the value, keep it out of `repr`, and never echo it back in
+  output.
 - **Config files may reference, never contain.** A secret's identifier, ARN or
   environment variable name is fine; its value is not.
 - `.env.example` holds placeholder names with empty or obviously fake values, and is
