@@ -78,9 +78,9 @@ uv run ruff format .
 # tests
 uv run pytest                          # live output, easier to debug
 uv run pytest -n auto                  # full run across CPUs
-uv run python src/test/smoke/run_all.py         # end-to-end smoke suite
-uv run python src/test/smoke/azure_graph.py     # Graph only
-uv run python src/test/smoke/aws_dynamodb.py    # DynamoDB only
+uv run pytest -m unit                  # pure functions, no I/O
+uv run pytest -m smoke                 # CLI surface only, under a second
+uv run pytest -m e2e                   # argv to the wire, providers faked
 ```
 
 ## Containers
@@ -116,7 +116,7 @@ usually a straight rename; `docker-compose` becomes `podman compose`.
 Fake AWS at the wire, never at the object level.
 
 1. **Default: `moto`.** Wrap the test or fixture in `mock_aws` and drive real `boto3`
-   clients against it, as `ddb_table` in `src/test/conftest.py` does. Tests then
+   clients against it, as `ddb_table` in `src/test/e2e/aws/conftest.py` does. Tests then
    exercise the same serialisation, pagination and error shapes as production.
 2. **Fallback: `botocore.stub.Stubber`**, and only when moto does not support the
    service or operation. Stub the client, queue responses with
@@ -141,10 +141,11 @@ functions that tests call themselves.
 
 - Put the fixture in the nearest `conftest.py` that covers every consumer: shared
   across tiers goes in `src/test/conftest.py`, used by one tier only goes in that
-  tier's `conftest.py`.
+  tier's `conftest.py`, and used by one case goes in that case's `conftest.py`.
 - Build on existing fixtures by requesting them as parameters rather than repeating
-  their setup — that is how `ddb_table` depends on `aws_env`, and `graph` on
-  `graph_env`.
+  their setup — that is how `ddb_table` depends on `aws_env`.
+- Environment isolation is an **autouse** fixture per case (`aws_env`, `azure_env`), so
+  no e2e test can fall through to a developer's real profile or tenant.
 - Resources that need teardown use `yield`, so cleanup runs even when a test fails.
 - Keep fixtures **per-test scoped** unless there is a measured reason not to.
   `pytest-xdist` runs tests across processes in an unspecified order, and several
@@ -157,14 +158,22 @@ functions that tests call themselves.
 - Give each fixture a docstring saying what it yields and any gotcha for its
   consumers.
 
-- `testpaths = ["src/test"]`, `asyncio_mode = "auto"`,
-  `addopts = "-ra --strict-markers --strict-config"`.
-- `src/test/smoke/*` are **standalone scripts run directly**, not collected by
-  pytest. They drive the real CLI through `click.testing.CliRunner` and fake only the
-  provider boundary: Graph via `respx`, DynamoDB via `moto`. No credentials, no
-  network, no tenant, no AWS account.
-- Smoke checks are _counted_, not asserted, so one failure does not mask the rest.
-- Two gotchas when writing smoke checks: read data from `result.stdout` (click 8.2+
+- `testpaths = ["src/test"]`, `pythonpath = ["src/test"]` (so `from helpers import ...`
+  works from every tier), `asyncio_mode = "auto"`,
+  `addopts = "-ra --strict-markers --strict-config --import-mode=importlib"`. The
+  importlib mode is what lets `unit/aws/test_dynamodb.py` and `smoke/aws/test_dynamodb.py`
+  share a name without `__init__.py` files.
+- Three tiers, each registered as a marker and set per module with
+  `pytestmark = pytest.mark.<tier>`:
+  - `unit`: pure functions, no I/O and no mocks.
+  - `smoke`: the CLI surface only. No provider is faked because none is reached, and it
+    must stay under a second.
+  - `e2e`: the real command path through `click.testing.CliRunner`, faking only the
+    provider boundary: Graph via `respx`, DynamoDB via `moto`.
+- Nothing in any tier needs credentials, network, a tenant or an AWS account. There is no
+  `live` tier today; adding one means registering the marker and gating it so a bare
+  `uv run pytest` never reaches a real provider.
+- Two gotchas when writing e2e and smoke tests: read data from `result.stdout` (click 8.2+
   merges stderr into `result.output`, and this CLI writes summaries to stderr), and
   decode request URLs with `unquote_plus` before matching (httpx percent-encodes
   OData names like `%24filter` and encodes spaces as `+`).
@@ -184,7 +193,7 @@ so speed is correctness in practice.
   at module scope, exactly as `conftest.py` does.
 - **Never wait on real time or a real network.** Collapse retry backoff with the
   `no_sleep` fixture, and fake the provider boundary with moto and respx. No `sleep`
-  calls, no polling loops, no live endpoints outside the `live` tier.
+  calls, no polling loops, no live endpoints.
 - **Reuse work, but not state.** Fixtures stay per-test for xdist safety; make setup
   cheap rather than widening scope. If a fixture is genuinely expensive and provably
   read-only, propose a wider scope and explain the tradeoff first.
@@ -220,8 +229,8 @@ scroll past.
 - The only acceptable suppression is a **warning you assert on deliberately**, scoped
   to that test with `pytest.warns(...)` or a narrowly targeted `filterwarnings` marker
   naming the exact category and message. Add a comment saying why.
-- The same applies to the smoke scripts: a check that passes while emitting warnings
-  is not a passing check.
+- The same applies to every tier: a test that passes while emitting warnings is not a
+  passing test.
 
 If a warning comes from a dependency and genuinely cannot be fixed at the call site,
 say so explicitly and propose the narrowest scoped filter rather than adding a global
@@ -229,6 +238,21 @@ ignore.
 
 ## CI
 
-GitLab CI (`.gitlab-ci.yml`) with stages `mr-review`, `test`, `deploy`. Releases are
-tag-triggered and build release notes from the changelog API. Runner images and the
-PyPI mirror come from Artifactory.
+GitHub Actions (`.github/workflows/ci.yml`); `origin` is `github.com`. Jobs:
+
+- `lint`: pull requests and pushes to `main`. Installs with
+  `uv sync --frozen --no-install-project` and runs `ruff check` and `ruff format --check`
+  through `uv run --no-sync`, so lint never builds the package.
+- `test`: pull requests only. `uv sync --frozen --extra fast --extra azure`, then
+  `uv run pytest -n auto`.
+- `tag`: when a release is **published**. Checks the release tag against
+  `[project].version` in `pyproject.toml`, rejects a version already tagged on another
+  commit, then creates the tag. Releases are release-triggered, not tag-triggered: bump
+  the version before publishing the release.
+- `wiki-changes` and `wiki`: pull requests and published releases, not pushes to `main`.
+  When `docs/wiki/` changed (always, on a release), validate the pages and mirror them
+  into the GitHub wiki repository. A pull request only reports the diff; a release pushes
+  it. See `documentation.md`, "Wiki".
+
+The `.gitlab/` issue and merge request templates are kept in sync with their `.github/`
+counterparts, but the repository has no GitLab pipeline.

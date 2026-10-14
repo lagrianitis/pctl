@@ -71,11 +71,12 @@ duplicating it per forge would only create two things to drift.
 
 ## Per forge
 
-- **GitLab** — releases are tag-triggered. `.gitlab-ci.yml` builds `release_notes.md` in
-  the `prepare_release_notes` job and the `create-release` job publishes the release.
-  Pass the filled template as the release description rather than an inline string.
-- **GitHub** — `gh release create <tag> --notes-file <file>`, using the filled template
-  as the notes file. Use `--draft` when it needs review first.
+- **GitHub** (the primary forge) — `gh release create <tag> --notes-file <file>`, using
+  the filled template as the notes file. Use `--draft` when it needs review first. The
+  `tag` job in `.github/workflows/ci.yml` runs when the release is published and fails if
+  the tag differs from `[project].version`, so bump the version first.
+- **GitLab** — the repository has no GitLab pipeline. If a release is cut there, create
+  it by hand with `glab release create <tag> --notes-file <file>`.
 
 Never write release notes inline on the command line: the headings, emoji and blank
 lines do not survive shell quoting.

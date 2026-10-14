@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import click
 
-from . import __version__
 from .config import AppContext, OutputFormat
 from .lazy import PctlGroup
 
@@ -38,7 +37,7 @@ CONTEXT_SETTINGS = {
     context_settings=CONTEXT_SETTINGS,
     invoke_without_command=False,
 )
-@click.version_option(__version__, "-V", "--version", prog_name="pctl")
+@click.version_option(None, "-V", "--version", package_name="pctl", prog_name="pctl")
 @click.option(
     "-o",
     "--output",

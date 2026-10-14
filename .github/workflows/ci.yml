@@ -65,6 +65,110 @@ jobs:
       - name: Tests
         run: uv run pytest -n auto
 
+  wiki-changes:
+    # A workflow-level `paths:` filter would also skip lint and test, so the docs/wiki
+    # check lives in a job of its own. A release always counts as changed: the sync
+    # below is idempotent, so publishing with nothing to change pushes nothing, and the
+    # wiki can never fall behind because an earlier run saw no diff.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      # Full history so the pull request's base commit is available to diff against.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs/wiki changes
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || ! git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- docs/wiki; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  wiki:
+    # docs/wiki in this repo is the source of truth; the GitHub wiki repository is a
+    # mirror of it. On a pull request this validates the pages and reports what would
+    # change in the wiki, and pushes nothing: a wiki has one live version, so there is
+    # nothing to preview into. A published release pushes the docs/wiki of the release
+    # tag, so the wiki always describes a version someone can actually install.
+    needs: wiki-changes
+    if: needs.wiki-changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Wiki links are page names without an extension, so a link to a page that does not
+      # exist is only a dead link once published. Subdirectories are rejected because a
+      # wiki page is addressed by its file name alone.
+      - name: Validate pages
+        run: |
+          status=0
+          [ -f docs/wiki/Home.md ] || { echo "::error::docs/wiki/Home.md is missing"; status=1; }
+          nested="$(find docs/wiki -mindepth 2 -type f)"
+          if [ -n "$nested" ]; then
+            echo "::error::The wiki is flat; move these files into docs/wiki: ${nested}"
+            status=1
+          fi
+          for page in docs/wiki/*.md; do
+            while IFS= read -r target; do
+              [ -f "docs/wiki/${target}.md" ] || {
+                echo "::error file=${page}::broken wiki link: ${target}"
+                status=1
+              }
+            done < <(grep -oE '\]\([^)#: ]+[)#]' "$page" | sed -E 's/^\]\(//; s/[)#]$//' | sort -u)
+          done
+          exit "$status"
+
+      # The token travels in a request header rather than the clone URL, so it never lands
+      # in .git/config or in a remote URL printed by git.
+      - name: Sync wiki
+        run: |
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::${auth}"
+          wiki_git() { git -c "http.extraheader=AUTHORIZATION: basic ${auth}" "$@"; }
+
+          if ! wiki_git clone --quiet "https://github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "::error::Cannot clone the wiki. Enable Wikis in the repository settings and save one page in the Wiki tab once: that creates the wiki repository."
+            exit 1
+          fi
+
+          rsync -a --delete --exclude '.git' docs/wiki/ wiki/
+          git -C wiki add --all
+
+          {
+            echo "### Wiki changes"
+            if git -C wiki diff --cached --quiet; then
+              echo "The wiki already matches docs/wiki."
+            else
+              echo '```'
+              git -C wiki status --short
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if git -C wiki diff --cached --quiet; then
+            exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" != release ]; then
+            echo "Pull request: dry run, nothing pushed."
+            exit 0
+          fi
+
+          git -C wiki -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "docs: sync wiki from ${GITHUB_SHA::7}"
+          wiki_git -C wiki push origin HEAD
+
   tag:
     # Published releases only: version check and tagging happen nowhere else.
     if: github.event_name == 'release'

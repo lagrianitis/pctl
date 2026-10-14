@@ -18,11 +18,14 @@ continue from step 5.
 
 - feat | fix | refactor | docs | test | chore | perf
 
-4. Write a concise body with:
+4. Fill the body from the PR template (see "PR Body Template" below), keeping every
+   heading:
 
 - Summary: What and why (2-3 sentences)
 - Changes: Key modifications (bullet list)
-- Testing: How it was verified
+- Validation: tick only what was actually done, and say plainly that nothing was executed
+  locally (`workflow.md`); CI is the validator
+- Related Issues, Milestone, Target Release: real values, or state they are not yet known
 
 5. Run gh pr create against the already-pushed branch — never push it yourself
 
