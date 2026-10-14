@@ -249,6 +249,10 @@ GitHub Actions (`.github/workflows/ci.yml`); `origin` is `github.com`. Jobs:
   `[project].version` in `pyproject.toml`, rejects a version already tagged on another
   commit, then creates the tag. Releases are release-triggered, not tag-triggered: bump
   the version before publishing the release.
+- `wiki-changes` and `wiki`: pull requests and published releases, not pushes to `main`.
+  When `docs/wiki/` changed (always, on a release), validate the pages and mirror them
+  into the GitHub wiki repository. A pull request only reports the diff; a release pushes
+  it. See `documentation.md`, "Wiki".
 
 The `.gitlab/` issue and merge request templates are kept in sync with their `.github/`
 counterparts, but the repository has no GitLab pipeline.
