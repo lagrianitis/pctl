@@ -224,10 +224,12 @@ _OAUTH_OPTIONS = [
         "--issuer",
         "URL",
         "OAUTH_ISSUER",
-        "Provider base URL. The token and authorize endpoints are discovered from "
-        "<issuer>/.well-known/openid-configuration.",
+        "Provider base URL. The endpoints are <issuer>/oauth/token and <issuer>/authorize "
+        "unless the two URL options below name them.",
     ),
-    _CredOption("--token-url", "URL", "OAUTH_TOKEN_URL", "Token endpoint. Skips discovery."),
+    _CredOption(
+        "--token-url", "URL", "OAUTH_TOKEN_URL", "Token endpoint, instead of <issuer>/oauth/token."
+    ),
     _CredOption("--client-id", "ID", "OAUTH_CLIENT_ID", "OAuth client id."),
     _CredOption(
         "--client-secret",
@@ -254,7 +256,10 @@ _OAUTH_OPTIONS = [
 
 _OAUTH_LOGIN_OPTIONS = [
     _CredOption(
-        "--authorize-url", "URL", "OAUTH_AUTHORIZE_URL", "Authorization endpoint. Skips discovery."
+        "--authorize-url",
+        "URL",
+        "OAUTH_AUTHORIZE_URL",
+        "Authorization endpoint, instead of <issuer>/authorize.",
     ),
     _CredOption(
         "--redirect-uri",

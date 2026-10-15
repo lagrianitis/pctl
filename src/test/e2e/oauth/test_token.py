@@ -19,7 +19,6 @@ from helpers import (
     FAKE_SECRET,
     OAUTH_AUDIENCE,
     OAUTH_CLIENT_ID,
-    OAUTH_DISCOVERY_URL,
     OAUTH_ISSUER,
     OAUTH_TOKEN_URL,
     failed,
@@ -158,56 +157,45 @@ def test_the_alias_runs_the_same_command(runner: Any, cli: Any, provider: Any) -
 
 
 # ---------------------------------------------------------------------------
-# discovery
+# endpoints
 # ---------------------------------------------------------------------------
-def discovery(provider: Any, **document: str) -> Any:
-    return provider.get(OAUTH_DISCOVERY_URL).mock(
-        return_value=reply(200, json={"token_endpoint": OAUTH_TOKEN_URL, **document})
-    )
-
-
-def test_the_endpoint_is_discovered_from_the_issuer(runner: Any, cli: Any, provider: Any) -> None:
-    route = discovery(provider)
-
+def test_the_token_endpoint_is_the_issuer_plus_oauth_token(
+    runner: Any, cli: Any, provider: Any
+) -> None:
+    """Only the token request is mocked, so any other request would fail the test."""
     result = ok(token(runner, cli, "--issuer", OAUTH_ISSUER, *CREDENTIALS, "--raw"))
 
     assert result.stdout.strip() == FAKE_JWT
-    assert route.call_count == 1
+    assert provider["token"].call_count == 1
 
 
 def test_a_trailing_slash_on_the_issuer_is_tolerated(runner: Any, cli: Any, provider: Any) -> None:
-    """Auth0 publishes its issuer with one, and the document path must not double up."""
-    route = discovery(provider)
-
+    """Auth0 publishes its issuer with one, and the path must not double the slash."""
     ok(token(runner, cli, "--issuer", f"{OAUTH_ISSUER}/", *CREDENTIALS))
 
+    assert provider["token"].call_count == 1
+
+
+def test_a_token_url_beats_the_issuer(runner: Any, cli: Any, provider: Any) -> None:
+    other = "https://other.example.test/token"
+    route = provider.post(other).mock(
+        return_value=reply(200, json={"access_token": FAKE_JWT, "expires_in": 3600})
+    )
+
+    ok(token(runner, cli, "--issuer", OAUTH_ISSUER, "--token-url", other, *CREDENTIALS))
+
     assert route.call_count == 1
+    assert provider["token"].call_count == 0
 
 
-def test_naming_the_token_url_skips_discovery(runner: Any, cli: Any, provider: Any) -> None:
-    route = discovery(provider)
-
-    ok(token(runner, cli, "--issuer", OAUTH_ISSUER, *BASE))
-
-    assert route.call_count == 0
-
-
-def test_a_broken_discovery_document_is_a_usage_error(runner: Any, cli: Any, provider: Any) -> None:
-    provider.get(OAUTH_DISCOVERY_URL).mock(return_value=reply(404))
-
-    result = failed(token(runner, cli, "--issuer", OAUTH_ISSUER, *CREDENTIALS), 2)
-
-    assert "discovery" in result.output
-
-
-def test_a_discovery_document_without_a_token_endpoint_is_a_usage_error(
-    runner: Any, cli: Any, provider: Any
+def test_the_issuer_can_come_from_the_variable(
+    runner: Any, cli: Any, provider: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    provider.get(OAUTH_DISCOVERY_URL).mock(return_value=reply(200, json={}))
+    monkeypatch.setenv("OAUTH_ISSUER", OAUTH_ISSUER)
 
-    result = failed(token(runner, cli, "--issuer", OAUTH_ISSUER, *CREDENTIALS), 2)
+    ok(token(runner, cli, *CREDENTIALS))
 
-    assert "token endpoint" in result.output
+    assert provider["token"].call_count == 1
 
 
 # ---------------------------------------------------------------------------

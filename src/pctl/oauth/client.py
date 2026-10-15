@@ -1,8 +1,8 @@
 """Token endpoint transport for the `oauth` case.
 
 Actions never talk to the provider directly: they ask this client for a token. It owns
-endpoint discovery, the form-encoded requests RFC 6749 specifies, the mapping of provider
-failures onto the documented exit codes, and the on-disk cache for machine tokens.
+where the endpoints are, the form-encoded requests RFC 6749 specifies, the mapping of
+provider failures onto the documented exit codes, and the on-disk cache for machine tokens.
 
 Synchronous on purpose. A token is one request, so there is no concurrency to win and no
 event loop to start, which keeps `oauth token` as quick as the provider allows. `httpx`
@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ..config import OAuthConfig
 from ..errors import AuthError, ConfigError
@@ -23,7 +23,8 @@ from ..tokencache import CachedToken, TokenCache, cache_key
 if TYPE_CHECKING:
     import httpx
 
-DISCOVERY_PATH = "/.well-known/openid-configuration"
+TOKEN_PATH = "/oauth/token"
+AUTHORIZE_PATH = "/authorize"
 CONNECT_TIMEOUT = 10.0
 ERROR_BODY_LIMIT = 200
 
@@ -44,7 +45,6 @@ class OAuthClient:
         self.timeout = timeout
         self._log = log
         self._http: httpx.Client | None = None
-        self._endpoints: Endpoints | None = None
 
     def __enter__(self) -> OAuthClient:
         import httpx
@@ -69,43 +69,18 @@ class OAuthClient:
     def endpoints(self, *, authorize: bool = False) -> Endpoints:
         """The token endpoint, and the authorize endpoint when `authorize` is set.
 
-        Explicit URLs win. The issuer's discovery document is fetched only when a needed
-        endpoint is missing, so naming both URLs costs no extra request.
+        An explicit URL wins. Otherwise each endpoint is the issuer plus its conventional
+        path, `/oauth/token` and `/authorize`, which is how Auth0 lays them out. No request
+        is made: a provider with a different layout is reached by naming its URLs.
         """
-        cached = self._endpoints
-        if cached is None or (authorize and not cached.authorize_url):
-            cached = self._endpoints = self._resolve_endpoints(authorize)
-        return cached
-
-    def _resolve_endpoints(self, authorize: bool) -> Endpoints:
-        token_url, authorize_url = self.config.token_url, self.config.authorize_url
-        missing = not token_url or (authorize and not authorize_url)
-        if self.config.issuer and missing:
-            document = self._discover(self.config.issuer)
-            token_url = token_url or document.get("token_endpoint")
-            authorize_url = authorize_url or document.get("authorization_endpoint")
+        base = (self.config.issuer or "").rstrip("/")
+        token_url = self.config.token_url or (base + TOKEN_PATH if base else None)
+        authorize_url = self.config.authorize_url or (base + AUTHORIZE_PATH if base else None)
         if not token_url:
-            raise ConfigError("No token endpoint. Pass --token-url or an --issuer to discover it.")
+            raise ConfigError("No token endpoint. Pass --token-url or an --issuer.")
         if authorize and not authorize_url:
-            raise ConfigError(
-                "No authorize endpoint. Pass --authorize-url or an --issuer to discover it."
-            )
+            raise ConfigError("No authorize endpoint. Pass --authorize-url or an --issuer.")
         return Endpoints(token_url, authorize_url)
-
-    def _discover(self, issuer: str) -> dict[str, Any]:
-        import httpx
-
-        url = issuer.rstrip("/") + DISCOVERY_PATH
-        self._log(f"discovering endpoints at {url}")
-        try:
-            response = self.http.get(url)
-            response.raise_for_status()
-            document = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ConfigError(f"Could not read the discovery document at {url}: {exc}") from exc
-        if not isinstance(document, dict):
-            raise ConfigError(f"The discovery document at {url} is not a JSON object.")
-        return document
 
     # -- grants -----------------------------------------------------------
     def client_credentials(self) -> CachedToken:
@@ -145,7 +120,7 @@ class OAuthClient:
     def _cache_key(self) -> str:
         """Identify a token by who asked for what, never by the secret.
 
-        Built from configuration alone so a cache hit costs no discovery request.
+        Built from configuration alone, so a cache hit needs nothing resolved first.
         """
         config = self.config
         return cache_key(

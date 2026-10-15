@@ -163,12 +163,12 @@ class AzureConfig:
 
 @dataclass(slots=True)
 class OAuthConfig:
-    """Client settings for an OAuth 2.0 provider such as Auth0, Okta or Keycloak.
+    """Client settings for an OAuth 2.0 provider, Auth0 by default.
 
-    The provider is described by an `issuer` (endpoints are then discovered) or by
-    explicit `token_url` and `authorize_url`. `client_secret` is optional because a
-    browser login can use a public client, and is checked by `require_client_secret` for
-    the machine-to-machine flow that cannot.
+    The provider is described by an `issuer`, from which the endpoints follow Auth0's
+    layout, or by explicit `token_url` and `authorize_url` for a provider that differs.
+    `client_secret` is optional because a browser login can use a public client, and is
+    checked by `require_client_secret` for the machine-to-machine flow that cannot.
     """
 
     client_id: str
@@ -233,8 +233,8 @@ def _require_oauth_settings(client_id: str | None, creds: Mapping[str, Any]) -> 
         raise ConfigError("Missing client id. Set OAUTH_CLIENT_ID or pass --client-id.")
     if not (creds.get("token_url") or creds.get("issuer")):
         raise ConfigError(
-            "Missing provider. Set OAUTH_ISSUER or pass --issuer to discover the "
-            "endpoints, or give the token endpoint with OAUTH_TOKEN_URL or --token-url."
+            "Missing provider. Set OAUTH_ISSUER or pass --issuer, or give the token "
+            "endpoint with OAUTH_TOKEN_URL or --token-url."
         )
 
 

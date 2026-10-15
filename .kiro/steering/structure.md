@@ -37,7 +37,7 @@ src/pctl/
 │       └── runner.py        list/get bodies shared by packages and catalogs
 ├── oauth/                 case (case-level actions only, like azure token)
 │   ├── __init__.py          `oauth` group (aliases `auth`, `auth0`)
-│   ├── client.py            token endpoint transport: discovery, grants, machine-token cache
+│   ├── client.py            token endpoint transport: endpoints, grants, machine-token cache
 │   ├── common.py            token record, --raw/--decode, how a token is shown
 │   ├── token.py             action: client credentials
 │   ├── login.py             action: browser login
@@ -62,7 +62,7 @@ src/test/
 │   │   ├── conftest.py      fixtures shared by this case's tests
 │   │   └── test_graph.py · test_common.py · test_entitlements.py · ...
 │   ├── oauth/           case
-│   │   └── test_browser.py  PKCE, authorize URL, redirect checks
+│   │   └── test_browser.py · test_client.py  PKCE and redirect checks, endpoint rules
 │   └── aws/             case
 │       ├── conftest.py
 │       └── test_dynamodb.py

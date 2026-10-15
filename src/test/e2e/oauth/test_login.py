@@ -25,7 +25,6 @@ from helpers import (
     OAUTH_AUDIENCE,
     OAUTH_AUTHORIZE_URL,
     OAUTH_CLIENT_ID,
-    OAUTH_DISCOVERY_URL,
     OAUTH_ISSUER,
     OAUTH_TOKEN_URL,
     failed,
@@ -189,18 +188,10 @@ def test_a_confidential_client_sends_its_secret(
     assert sent(provider["token"])["client_secret"] == FAKE_SECRET
 
 
-def test_the_endpoints_are_discovered_from_the_issuer(
+def test_the_endpoints_follow_from_the_issuer(
     runner: Any, cli: Any, provider: Any, user: Any, free_port: int
 ) -> None:
-    provider.get(OAUTH_DISCOVERY_URL).mock(
-        return_value=reply(
-            200,
-            json={
-                "token_endpoint": OAUTH_TOKEN_URL,
-                "authorization_endpoint": OAUTH_AUTHORIZE_URL,
-            },
-        )
-    )
+    """The login page is <issuer>/authorize and the code goes to <issuer>/oauth/token."""
     user.reply = {}
 
     ok(
@@ -216,6 +207,29 @@ def test_the_endpoints_are_discovered_from_the_issuer(
     )
 
     assert user.opened[0].startswith(f"{OAUTH_AUTHORIZE_URL}?")
+    assert provider["token"].call_count == 1
+
+
+def test_an_authorize_url_beats_the_issuer(
+    runner: Any, cli: Any, provider: Any, user: Any, free_port: int
+) -> None:
+    user.reply = {}
+
+    ok(
+        login(
+            runner,
+            cli,
+            "--issuer",
+            OAUTH_ISSUER,
+            "--authorize-url",
+            "https://other.example.test/login",
+            *CLIENT,
+            "--redirect-uri",
+            loopback(free_port),
+        )
+    )
+
+    assert user.opened[0].startswith("https://other.example.test/login?")
 
 
 def test_a_flag_beats_the_redirect_variable(

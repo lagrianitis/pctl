@@ -36,11 +36,11 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
 )
 @click.pass_context
 def oauth(ctx: click.Context) -> None:
-    """OAuth 2.0: fetch a JWT from Auth0, Okta, Keycloak or any compatible provider.
+    """OAuth 2.0: fetch a JWT from Auth0, or from any provider whose URLs you name.
 
     \b
     Every setting is a flag and an environment variable. A flag wins:
-      --issuer          OAUTH_ISSUER          discover the endpoints from here
+      --issuer          OAUTH_ISSUER          endpoints are <issuer>/oauth/token and /authorize
       --token-url       OAUTH_TOKEN_URL       or name the token endpoint directly
       --client-id       OAUTH_CLIENT_ID
       --client-secret   OAUTH_CLIENT_SECRET   prefer the variable: a flag is in your history
@@ -50,7 +50,7 @@ def oauth(ctx: click.Context) -> None:
 
     \b
     Browser login (login) also takes:
-      --authorize-url   OAUTH_AUTHORIZE_URL   or discovered from --issuer
+      --authorize-url   OAUTH_AUTHORIZE_URL   or <issuer>/authorize
       --redirect-uri    OAUTH_REDIRECT_URI    must be registered on the client
       --login-timeout   OAUTH_LOGIN_TIMEOUT   seconds to wait for the browser
     """

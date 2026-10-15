@@ -74,7 +74,6 @@ FAKE_SECRET = "not-a-real-secret"
 OAUTH_ISSUER = "https://idp.example.test"
 OAUTH_TOKEN_URL = f"{OAUTH_ISSUER}/oauth/token"
 OAUTH_AUTHORIZE_URL = f"{OAUTH_ISSUER}/authorize"
-OAUTH_DISCOVERY_URL = f"{OAUTH_ISSUER}/.well-known/openid-configuration"
 OAUTH_CLIENT_ID = "pctl-test-client"
 OAUTH_AUDIENCE = "https://api.example.test"
 

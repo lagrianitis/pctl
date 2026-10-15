@@ -20,8 +20,8 @@ consistent interface.
     request.
 - **AWS DynamoDB** (`pctl aws ddb`) — list and describe tables, and read items via
   scan (including parallel segments), query or get-item. Read-only.
-- **OAuth 2.0** (`pctl oauth`, aliases `auth` and `auth0`) — a JWT from Auth0, Okta,
-  Keycloak or any compatible provider. `token` is the client credentials grant for
+- **OAuth 2.0** (`pctl oauth`, aliases `auth` and `auth0`) — a JWT from Auth0, or from any
+  provider whose URLs you name. `token` is the client credentials grant for
   machines and is cached; `login` is the authorization code flow with PKCE through the
   browser for people and is never cached. Every setting is a flag and an environment
   variable, and the flag wins.

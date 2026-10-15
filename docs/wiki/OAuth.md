@@ -1,6 +1,6 @@
 # `pctl oauth`
 
-Fetch a JWT from any OAuth 2.0 provider: Auth0, Okta, Keycloak and the rest. Two commands
+Fetch a JWT from Auth0, or from any OAuth 2.0 provider whose URLs you name. Two commands
 sit directly under `oauth`, with no service in between, because there is nothing to list or
 get, only a token to fetch.
 
@@ -17,20 +17,27 @@ get, only a token to fetch.
 
 Every setting is a flag **and** an environment variable. The flag wins when both are set.
 
-| Flag               | Environment            | Notes                                                       |
-| ------------------ | ---------------------- | ----------------------------------------------------------- |
-| `--issuer URL`     | `OAUTH_ISSUER`         | Provider base URL. Endpoints are discovered from it         |
-| `--token-url URL`  | `OAUTH_TOKEN_URL`      | Token endpoint. Skips discovery                             |
-| `--client-id ID`   | `OAUTH_CLIENT_ID`      | Always required                                             |
-| `--client-secret`  | `OAUTH_CLIENT_SECRET`  | Required for `token`, optional for `login`                  |
-| `--audience API`   | `OAUTH_AUDIENCE`       | The API the token is for                                    |
-| `--scope SCOPES`   | `OAUTH_SCOPE`          | Space-separated. `login` defaults to `openid profile email` |
-| `--secret-id NAME` | `PCTL_OAUTH_SECRET_ID` | Reads `client_id`/`client_secret` from AWS Secrets Manager  |
-| `--secret-region`  | `PCTL_SECRET_REGION`   | Region holding that secret. Default `eu-central-1`          |
+| Flag               | Environment            | Notes                                                                    |
+| ------------------ | ---------------------- | ------------------------------------------------------------------------ |
+| `--issuer URL`     | `OAUTH_ISSUER`         | Provider base URL. Gives `<issuer>/oauth/token` and `<issuer>/authorize` |
+| `--token-url URL`  | `OAUTH_TOKEN_URL`      | Token endpoint, instead of `<issuer>/oauth/token`                        |
+| `--client-id ID`   | `OAUTH_CLIENT_ID`      | Always required                                                          |
+| `--client-secret`  | `OAUTH_CLIENT_SECRET`  | Required for `token`, optional for `login`                               |
+| `--audience API`   | `OAUTH_AUDIENCE`       | The API the token is for                                                 |
+| `--scope SCOPES`   | `OAUTH_SCOPE`          | Space-separated. `login` defaults to `openid profile email`              |
+| `--secret-id NAME` | `PCTL_OAUTH_SECRET_ID` | Reads `client_id`/`client_secret` from AWS Secrets Manager               |
+| `--secret-region`  | `PCTL_SECRET_REGION`   | Region holding that secret. Default `eu-central-1`                       |
 
-Name the provider with `--issuer`, or give `--token-url`. With only an issuer, `pctl` reads
-`<issuer>/.well-known/openid-configuration` once to find the endpoints; naming the URLs
-yourself costs no extra request.
+Name the provider with `--issuer` and the endpoints follow Auth0's layout:
+
+| Endpoint  | Default                | Override          |
+| --------- | ---------------------- | ----------------- |
+| Token     | `<issuer>/oauth/token` | `--token-url`     |
+| Authorize | `<issuer>/authorize`   | `--authorize-url` |
+
+No request is made to find them, and a trailing slash on the issuer is fine. A provider
+that lays its URLs out differently is reached by giving the URLs yourself, which win over
+the issuer. `--token-url` alone is enough for `token`.
 
 ### The client secret as a flag
 
@@ -102,7 +109,7 @@ client needs none.
 
 | Flag              | Environment           | Effect                                                   |
 | ----------------- | --------------------- | -------------------------------------------------------- |
-| `--authorize-url` | `OAUTH_AUTHORIZE_URL` | Authorization endpoint. Skips discovery                  |
+| `--authorize-url` | `OAUTH_AUTHORIZE_URL` | Authorization endpoint, instead of `<issuer>/authorize`  |
 | `--redirect-uri`  | `OAUTH_REDIRECT_URI`  | Redirect registered on the client                        |
 | `--login-timeout` | `OAUTH_LOGIN_TIMEOUT` | Seconds to wait for the browser. Default 300             |
 | `--raw`           |                       | Print only the access token, unmasked                    |

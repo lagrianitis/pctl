@@ -6,8 +6,8 @@ One fast CLI for the platform's providers. Today it covers three:
   paginated results, and pull details for a single group or a user-defined list of
   groups by display name.
 - **AWS DynamoDB** (`pctl aws`) - read items from a table via scan, query or get-item.
-- **OAuth 2.0** (`pctl oauth`) - fetch a JWT from Auth0, Okta, Keycloak or any compatible
-  provider: client credentials for machines, a browser login for people.
+- **OAuth 2.0** (`pctl oauth`) - fetch a JWT from Auth0, or any provider whose URLs you
+  name: client credentials for machines, a browser login for people.
 
 The command line is **case → service → action** (`pctl aws ddb scan`), and the source
 tree mirrors it, so adding a provider such as Confluent means adding a case package
@@ -609,7 +609,8 @@ DynamoDB-typed JSON is also accepted as-is.
 
 ### OAuth tokens
 
-A JWT from any OAuth 2.0 provider. `auth` and `auth0` are aliases for `oauth`.
+A JWT from Auth0, or from any OAuth 2.0 provider whose URLs you name. `auth` and `auth0`
+are aliases for `oauth`.
 
 ```bash
 # a machine: the client credentials grant
@@ -627,22 +628,23 @@ pctl oauth login --issuer https://idp.example.com --client-id my-client \
 The token is masked unless `--raw` is passed. Every setting is a flag **and** an
 environment variable, and the flag wins:
 
-| flag               | variable               | meaning                                            |
-| ------------------ | ---------------------- | -------------------------------------------------- |
-| `--issuer`         | `OAUTH_ISSUER`         | endpoints are discovered from it                   |
-| `--token-url`      | `OAUTH_TOKEN_URL`      | token endpoint, which skips discovery              |
-| `--authorize-url`  | `OAUTH_AUTHORIZE_URL`  | login only: authorization endpoint                 |
-| `--client-id`      | `OAUTH_CLIENT_ID`      |                                                    |
-| `--client-secret`  | `OAUTH_CLIENT_SECRET`  | required for `token`, optional for `login`         |
-| `--audience`       | `OAUTH_AUDIENCE`       | the API the token is for                           |
-| `--scope`          | `OAUTH_SCOPE`          | `login` defaults to `openid profile email`         |
-| `--redirect-uri`   | `OAUTH_REDIRECT_URI`   | login only: must be registered on the client       |
-| `--login-timeout`  | `OAUTH_LOGIN_TIMEOUT`  | login only: seconds to wait for the browser        |
-| `--secret-id`      | `PCTL_OAUTH_SECRET_ID` | read the client from an AWS Secrets Manager secret |
-| `--no-token-cache` | `PCTL_NO_TOKEN_CACHE`  | `token` only                                       |
+| flag               | variable               | meaning                                                   |
+| ------------------ | ---------------------- | --------------------------------------------------------- |
+| `--issuer`         | `OAUTH_ISSUER`         | the endpoints are `<issuer>/oauth/token` and `/authorize` |
+| `--token-url`      | `OAUTH_TOKEN_URL`      | token endpoint, instead of `<issuer>/oauth/token`         |
+| `--authorize-url`  | `OAUTH_AUTHORIZE_URL`  | login only: instead of `<issuer>/authorize`               |
+| `--client-id`      | `OAUTH_CLIENT_ID`      |                                                           |
+| `--client-secret`  | `OAUTH_CLIENT_SECRET`  | required for `token`, optional for `login`                |
+| `--audience`       | `OAUTH_AUDIENCE`       | the API the token is for                                  |
+| `--scope`          | `OAUTH_SCOPE`          | `login` defaults to `openid profile email`                |
+| `--redirect-uri`   | `OAUTH_REDIRECT_URI`   | login only: must be registered on the client              |
+| `--login-timeout`  | `OAUTH_LOGIN_TIMEOUT`  | login only: seconds to wait for the browser               |
+| `--secret-id`      | `PCTL_OAUTH_SECRET_ID` | read the client from an AWS Secrets Manager secret        |
+| `--no-token-cache` | `PCTL_NO_TOKEN_CACHE`  | `token` only                                              |
 
-Name the provider with `--issuer`, or give `--token-url` (and `--authorize-url` for
-`login`) to skip the discovery request.
+Name the provider with `--issuer` and the endpoints follow Auth0's layout, with no request
+made to find them. A provider that lays its URLs out differently is reached by giving
+`--token-url` (and `--authorize-url` for `login`), which win over the issuer.
 
 **`login` has two ways back from the browser.** A loopback redirect such as
 `http://127.0.0.1:8765/callback` is caught by pctl itself on that port. Any other
@@ -739,7 +741,7 @@ src/pctl/
 │       └── provision.py     action (write): provision on demand
 ├── oauth/                 case
 │   ├── __init__.py          `oauth` group
-│   ├── client.py            token endpoint transport: discovery, grants, cache
+│   ├── client.py            token endpoint transport: endpoints, grants, cache
 │   ├── common.py            token record and how it is shown
 │   ├── token.py             action (case-level): client credentials
 │   ├── login.py             action (case-level): browser login
