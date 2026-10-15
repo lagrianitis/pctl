@@ -20,6 +20,11 @@ consistent interface.
     request.
 - **AWS DynamoDB** (`pctl aws ddb`) — list and describe tables, and read items via
   scan (including parallel segments), query or get-item. Read-only.
+- **OAuth 2.0** (`pctl oauth`, aliases `auth` and `auth0`) — a JWT from Auth0, or from any
+  provider whose URLs you name. `token` is the client credentials grant for
+  machines and is cached; `login` is the authorization code flow with PKCE through the
+  browser for people and is never cached. Every setting is a flag and an environment
+  variable, and the flag wins.
 - **Discovery** — `pctl commands` lists every command in one greppable table,
   `pctl tree` draws the hierarchy, and `pctl completion` prints the shell completion line.
 
@@ -35,7 +40,8 @@ consistent interface.
 - **Scriptable exit codes.** 0 success, 1 generic, 2 usage/config, 3 auth,
   4 not found, 5 upstream, 130 interrupted, 141 broken pipe.
 - **Secrets stay out of argv.** Client secrets are read from the environment or AWS
-  Secrets Manager, never from a CLI flag.
+  Secrets Manager, not from a CLI flag. The one exception is `pctl oauth --client-secret`,
+  a deliberate choice recorded in `security.md`.
 - **Writes are explicit and refuse to guess.** The few commands that change the tenant
   (`add-owner`, `remove-owner`, `provision`, `add-assignment`, `remove-assignment`,
   `delete-package`) are their own named actions, never a flag on a read, and an

@@ -33,8 +33,8 @@ names are being resolved, how many requests are in flight, and every retry.
 | `--scope SCOPE`    |                        | Default `https://graph.microsoft.com/.default`             |
 | `--no-token-cache` | `PCTL_NO_TOKEN_CACHE`  | Do not read or write the on-disk token cache               |
 
-**There is no `--client-secret`.** Use `AZURE_CLIENT_SECRET` or `--secret-id`. Flags land in
-shell history and `ps` output.
+**`azure` has no `--client-secret`.** Use `AZURE_CLIENT_SECRET` or `--secret-id`. Flags land
+in shell history and `ps` output. `oauth` is the one exception; see [OAuth](OAuth).
 
 ### AWS — on every `aws` command
 

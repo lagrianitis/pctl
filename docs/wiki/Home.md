@@ -1,7 +1,8 @@
 # pctl
 
 One fast command line for the platform's providers. Today that means **Microsoft Graph**
-(`pctl azure`) and **AWS DynamoDB** (`pctl aws`), behind a single consistent interface.
+(`pctl azure`), **AWS DynamoDB** (`pctl aws`) and **OAuth 2.0 tokens** (`pctl oauth`),
+behind a single consistent interface.
 
 > **This wiki is generated from the repository.** The source of truth is
 > [`docs/wiki/`](https://github.com/lagrianitis/pctl/tree/main/docs/wiki), reviewed in the
@@ -15,8 +16,11 @@ pctl [global options] <case> <service> <action> [options]
                        │       │         │
                        │       │         └── list, get, add-owner, scan …
                        │       └──────────── groups, users, apps, eam, sp, ddb
-                       └──────────────────── azure, aws
+                       └──────────────────── azure, aws, oauth
 ```
+
+`oauth` is the exception to the three levels: it has two actions and no service, like
+`azure token`.
 
 Two rules follow from it, and knowing them saves most of the guessing:
 
@@ -57,6 +61,12 @@ diagnostics, so `pctl ... -o ndjson | jq` is always clean.
 | ------------------------ | ------------------------------------------------ |
 | [DynamoDB](AWS-DynamoDB) | `ddb tables`, `describe`, `scan`, `query`, `get` |
 
+**OAuth 2.0** — `pctl oauth` (aliases `auth`, `auth0`)
+
+| Page                  | Commands                                              |
+| --------------------- | ----------------------------------------------------- |
+| [OAuth tokens](OAuth) | `token` (client credentials), `login` (browser, PKCE) |
+
 ## What writes, and what does not
 
 Most of `pctl` is read-only. Five commands change something, and one of those destroys
@@ -81,9 +91,10 @@ confirmation prompt, and a check that no assignments remain. See
   tokens are cached on disk, Graph pages are prefetched, and payloads are narrowed
   server-side with `$select` and `$top` wherever the API allows it.
 - **Scriptable.** Documented exit codes, four output formats, three of which stream.
-- **Secrets stay out of argv.** A client secret is never a flag. It comes from the
-  environment or AWS Secrets Manager, and `--secret-id` names a secret rather than carrying
-  one.
+- **Secrets stay out of argv.** A client secret comes from the environment or AWS Secrets
+  Manager, and `--secret-id` names a secret rather than carrying one. `pctl oauth
+--client-secret` is the one deliberate exception, and the [OAuth](OAuth) page says why
+  to avoid it.
 - **Writes are idempotent.** Re-running an `add-owner` or an `add-assignment` reports a
   no-op rather than failing, so a pipeline can be safely retried.
 

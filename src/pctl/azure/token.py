@@ -7,6 +7,7 @@ from typing import Any
 import click
 
 from ..config import AppContext
+from ..jwt import decode_claims, mask
 from ..options import azure_options, output_options
 from ..output import Renderer
 from . import graph_client
@@ -45,10 +46,10 @@ def command(ctx: click.Context, raw: bool, decode: bool, clear_cache: bool) -> N
                 "clientId": config.client_id,
                 "scope": config.scope,
                 "expiresInSeconds": cached.expires_in,
-                "accessToken": cached.access_token if raw else _mask(cached.access_token),
+                "accessToken": cached.access_token if raw else mask(cached.access_token),
             }
             if decode:
-                record["claims"] = _decode_claims(cached.access_token)
+                record["claims"] = decode_claims(cached.access_token)
             return record
 
     record = run(_run())
@@ -57,24 +58,3 @@ def command(ctx: click.Context, raw: bool, decode: bool, clear_cache: bool) -> N
         return
     with Renderer(app.output, single=True) as renderer:
         renderer.write(record)
-
-
-def _mask(token: str) -> str:
-    return f"{token[:8]}…{token[-6:]} ({len(token)} chars)" if len(token) > 20 else "…"
-
-
-def _decode_claims(token: str) -> dict[str, Any]:
-    """Decode the JWT payload for inspection. The signature is NOT verified."""
-    import base64
-
-    import orjson
-
-    parts = token.split(".")
-    if len(parts) < 2:
-        return {"error": "not a JWT"}
-    payload = parts[1] + "=" * (-len(parts[1]) % 4)
-    try:
-        claims = orjson.loads(base64.urlsafe_b64decode(payload))
-    except ValueError, orjson.JSONDecodeError:
-        return {"error": "could not decode payload"}
-    return claims if isinstance(claims, dict) else {"value": claims}

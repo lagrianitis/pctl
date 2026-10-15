@@ -18,11 +18,12 @@ from .lazy import PctlGroup
 LAZY_COMMANDS: dict[str, tuple[str, str]] = {
     "azure": ("pctl.azure:azure", "Microsoft Graph: tokens, groups and group members."),
     "aws": ("pctl.aws:aws", "AWS: read items and metadata from DynamoDB."),
+    "oauth": ("pctl.oauth:oauth", "OAuth 2.0: fetch a JWT for a machine or a signed-in user."),
     "commands": ("pctl.surface:commands", "List every command in one flat table."),
     "tree": ("pctl.surface:tree", "Draw the command tree."),
 }
 
-ALIASES = {"az": "azure", "graph": "azure", "ddb": "aws"}
+ALIASES = {"az": "azure", "graph": "azure", "ddb": "aws", "auth": "oauth", "auth0": "oauth"}
 
 CONTEXT_SETTINGS = {
     "help_option_names": ["-h", "--help"],
@@ -91,6 +92,7 @@ def cli(
       pctl azure groups get --name "Team A"     details by display name
       pctl aws ddb scan --table my-table -n 20  items from a table
       pctl aws ddb query --table my-table --key "pk = :pk" --values '{":pk":"a"}'
+      pctl oauth token --issuer https://idp.example.com --client-id ID   machine token
 
     \b
     Output:

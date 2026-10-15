@@ -23,3 +23,7 @@
 **`pctl aws`**
 
 - [DynamoDB](AWS-DynamoDB)
+
+**`pctl oauth`**
+
+- [OAuth tokens](OAuth)
