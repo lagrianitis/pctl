@@ -251,6 +251,16 @@ GitHub Actions (`.github/workflows/ci.yml`); `origin` is `github.com`. Jobs:
   `[project].version` in `pyproject.toml`, rejects a version already tagged on another
   commit, then creates the tag. Releases are release-triggered, not tag-triggered: bump
   the version before publishing the release.
+- `build`: pull requests and published releases. `uv build`, then installs the wheel into
+  a throwaway venv and runs `pctl --version` and `pctl --help`, then uploads `dist/` as the
+  `dist` artifact. Every pull request proves the package builds and installs, so a packaging
+  mistake is found before a release.
+- `publish`: published releases only, after `tag` and `build`. Downloads the `dist`
+  artifact and runs `uv publish --trusted-publishing always` in the `pypi` environment with
+  only `id-token: write`. PyPI trusts the workflow file `ci.yml` and that environment, so
+  there is no stored token, and renaming either breaks publishing. PyPI versions are
+  immutable: a version that has been published can never be replaced, so the release must
+  bump `[project].version` first.
 - `wiki-changes` and `wiki`: pull requests and published releases, not pushes to `main`.
   When `docs/wiki/` changed (always, on a release), validate the pages and mirror them
   into the GitHub wiki repository. A pull request only reports the diff; a release pushes

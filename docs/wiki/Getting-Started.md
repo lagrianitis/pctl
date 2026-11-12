@@ -2,7 +2,18 @@
 
 ## Install
 
-`pctl` needs **Python 3.11 or newer** and is managed with [uv](https://docs.astral.sh/uv/).
+`pctl` needs **Python 3.11 or newer**.
+
+From PyPI, available from v0.4.1:
+
+```bash
+uv tool install pctl
+pipx install pctl
+pip install pctl
+pip install "pctl[fast,azure]"    # with the optional extras
+```
+
+From source, managed with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 git clone https://github.com/lagrianitis/pctl.git

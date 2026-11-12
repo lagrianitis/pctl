@@ -17,6 +17,17 @@ Built on [Click](https://click.palletsprojects.com/) with Python 3.11 or newer.
 
 ## Install
 
+From PyPI, available from v0.4.1:
+
+```bash
+uv tool install pctl
+pipx install pctl
+pip install pctl
+pip install "pctl[fast,azure]"    # with the optional extras
+```
+
+From source:
+
 ```bash
 uv sync --extra fast          # dev install with the optional speed-ups
 uv run pctl --help
