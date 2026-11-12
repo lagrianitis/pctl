@@ -12,8 +12,9 @@ consistent interface.
   - `groups` — list every group across paginated results, resolve by display name, and
     stream members or owners.
   - `users` — find a user by email, display name or object ID.
-  - `apps` — list and get application registrations, and list their client secrets and
-    certificates with the days left and a status, optionally failing when one is close.
+  - `apps` — list and get application registrations, list their client secrets and
+    certificates with the days left and a status (optionally failing when one is close),
+    create a client secret and store its value in AWS Secrets Manager, and remove one.
   - `sp` — list and get service principals (Enterprise Applications), read app role
     assignments and owners, add or remove an owner, and provision users or groups.
   - `eam` — entitlement management: list and get access packages and catalogs, list,
@@ -42,11 +43,15 @@ consistent interface.
   4 not found, 5 upstream, 6 a requested check said no, 130 interrupted, 141 broken pipe.
 - **Secrets stay out of argv.** Client secrets are read from the environment or AWS
   Secrets Manager, not from a CLI flag. The one exception is `pctl oauth --client-secret`,
-  a deliberate choice recorded in `security.md`.
+  a deliberate choice recorded in `security.md`. `apps add-client-secret` is the one place
+  `pctl` writes to Secrets Manager, to keep the value of a secret it just created.
 - **Writes are explicit and refuse to guess.** The few commands that change the tenant
   (`add-owner`, `remove-owner`, `provision`, `add-assignment`, `remove-assignment`,
-  `delete-package`) are their own named actions, never a flag on a read, and an
-  ambiguous name is rejected with exit 2 rather than resolved to the first match.
+  `delete-package`, `add-client-secret`, `remove-client-secret`) are their own named
+  actions, never a flag on a read, and an ambiguous name is rejected with exit 2 rather
+  than resolved to the first match. A destructive one asks for more than a name:
+  `remove-client-secret` takes a key ID only, and needs `--force` for a secret with more
+  than 30 days left.
 
 ## Audience
 

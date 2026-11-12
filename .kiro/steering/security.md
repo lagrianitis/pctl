@@ -42,6 +42,16 @@ assumption. Do not commit them, and do not echo them into job logs.
   environment variable and `--secret-id` remain the documented way, and the flag's help
   text says why. Never log the value, keep it out of `repr`, and never echo it back in
   output.
+- **`pctl azure apps add-client-secret` is the one command that creates a credential and
+  holds its value.** Graph shows the value once, so the command refuses to run unless the
+  value has somewhere to go (`--store-in` a Secrets Manager secret, or `--show-secret`).
+  The value is never accepted as a flag and never written to a config file or the cache.
+  It appears only in the Secrets Manager secret `--store-in` names and, with
+  `--show-secret`, once on stdout. It stays out of the report, the summary, `-v` logging,
+  `repr` and every error message, including the ones that name a Secrets Manager failure.
+  The destination is checked before the secret is created, and a secret that could not be
+  stored is removed again rather than left live with nobody holding it. A create is never
+  retried after an unknown outcome, because a repeat could leave a second secret.
 - **Config files may reference, never contain.** A secret's identifier, ARN or
   environment variable name is fine; its value is not.
 - `.env.example` holds placeholder names with empty or obviously fake values, and is

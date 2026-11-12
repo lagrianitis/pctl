@@ -115,6 +115,11 @@ is not success — see
 [Entitlement management](Azure-Entitlement-Management#knowing-whether-it-applied) and
 [Service principals](Azure-Service-Principals#provision).
 
+**5 when `add-client-secret` cannot tell whether it created the secret.** A server error or a
+dropped connection leaves it unknown, and the request is not repeated, because that could make
+two. Look at `get-client-secrets` before running it again. See
+[Applications](Azure-Applications#what-it-checks-and-what-it-undoes).
+
 ### Scripting against them
 
 ```bash

@@ -87,7 +87,7 @@ prefixes and aliases, so `pctl az gr li` is `pctl azure groups list`.
 
 ### Finding a command
 
-Thirty commands across four levels, so start by searching rather than by drilling into
+There are a lot of commands across four levels, so start by searching rather than by drilling into
 `--help` four times:
 
 ```bash
@@ -195,38 +195,6 @@ differ. An object ID addresses `/users/{id}` directly, with no query. A display 
 `--match`, and an ambiguous name is **refused** rather than guessed — two people can share
 one, and you are about to act on the answer. Several identifiers resolve concurrently, and
 one that matches nothing does not block the others.
-
-### Entitlement management
-
-Read-only. Access packages are bundles of resources governed by policies, held in
-containers called catalogs. `pctl azure entitlement-management` and
-`pctl azure access-packages` both reach `eam`.
-
-```bash
-pctl azure eam list-catalogs                      # usually the first call
-pctl azure eam list-packages --starts-with "AWS "
-pctl azure eam list-packages --contains incident -o json
-pctl azure eam get-package --access-package "AWS Platform Access" --with-policies
-pctl azure eam get-catalog --catalog d4f2d1b6-0a08-4987-9efd-fd8baae9e842
-```
-
-**These collections have a narrower OData surface than the rest of Graph.** `$select`,
-`$filter` and `$expand` work; `$search` and `$count` are
-[not supported](https://learn.microsoft.com/en-us/graph/api/entitlementmanagement-list-accesspackages).
-So there is no `--search` here and no `--count-only`, and the match modes differ:
-
-| option                                | where it runs                              |
-| ------------------------------------- | ------------------------------------------ |
-| `--name`, `--starts-with`, `--filter` | server-side `$filter`                      |
-| `--contains`, `--match contains`      | **locally**, after fetching the collection |
-
-`--contains` exists because Graph has no substring operator on these collections. Every
-page is fetched regardless, so it narrows what is rendered rather than what is
-transferred, and `-n/--limit` is applied after the filter so a cap cannot drop real
-matches.
-
-`--with-policies` expands `assignmentPolicies`, which is where approval and expiry rules
-live.
 
 ### Entitlement management
 
@@ -408,8 +376,9 @@ it. If you only want it out of the catalog, hiding it is reversible and deleting
 
 ### App registrations
 
-Read-only. The portal calls these **App registrations**; their tenant-local instances are
-**Enterprise applications**, which live under `sp` below. `pctl azure app-registrations`
+Read-only, except `add-client-secret` and `remove-client-secret`. The portal calls these
+**App registrations**; their tenant-local instances are **Enterprise applications**, which
+live under `sp` below. `pctl azure app-registrations`
 and `pctl azure applications` both reach `apps`.
 
 ```bash
@@ -417,7 +386,7 @@ pctl azure apps list --search "incident.io"
 pctl azure apps get --app "Company Incident.io SCIM"
 pctl azure apps get --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
 pctl azure apps get --app "Company Incident.io SCIM" --with-sp -o json
-pctl azure apps credentials --app "Company Incident.io SCIM"
+pctl azure apps get-client-secrets --app-name "Company Incident.io SCIM"
 ```
 
 **An application has two GUIDs and they are not interchangeable.** `appId` is the
@@ -440,13 +409,15 @@ application, so it appears under `sp list` and not here.
 
 #### Credentials and when they expire
 
-`apps credentials` lists the client secrets and certificates of one registration, found the
-way `apps get` finds it, with how long each has left:
+`apps get-client-secrets` lists the client secrets and certificates of one registration, with
+how long each has left. Name the app with `--app-name` or `--app-id`, exactly one of the two:
+`--app-id` takes the `appId` and skips the display name search, and `--app-name` takes the
+display name and honours `--match`. An ambiguous name is refused (exit 2) rather than guessed.
 
 ```bash
-pctl azure apps credentials --app "Company Incident.io SCIM"
-pctl azure apps credentials --app "$APP" -o json | jq '.[] | {name, status, daysRemaining}'
-pctl azure apps credentials --app "$APP" --expiring-within 60 --fail-on-expiry   # a check
+pctl azure apps get-client-secrets --app-name "Company Incident.io SCIM"
+pctl azure apps get-client-secrets --app-name "$APP" -o json | jq '.[] | {name, status, daysRemaining}'
+pctl azure apps get-client-secrets --app-name "$APP" --expiring-within 60 --fail-on-expiry   # a check
 ```
 
 Each credential shows `daysRemaining` (whole days, rounded down, negative once it has
@@ -460,6 +431,69 @@ passes.
 **Secret values are never shown.** Graph returns a name, a key ID, the dates and a short
 hint for an existing secret, and the value only once, when it is created. Federated
 credentials are a separate resource and are not listed.
+
+#### Creating a client secret
+
+`apps add-client-secret` creates a client secret and keeps its value, which Graph shows
+exactly once. It refuses to run (exit 2, before any request) unless the value has somewhere
+to go: `--store-in` adds it to an AWS Secrets Manager secret, `--show-secret` prints it, or
+both.
+
+```bash
+pctl azure apps add-client-secret --app-name "Company Incident.io SCIM" \
+    --name terraform --store-in platform/app-credentials
+pctl azure apps add-client-secret --app-id 8f468c48-e9ac-4dd7-973d-9704b9cdd56d \
+    --name ci --valid-for-days 90 --show-secret
+```
+
+With `--store-in`, three keys are added to the JSON object in that secret, and every other key
+is kept. The names are lowercased, with anything other than letters and digits turned into an
+underscore:
+
+| Key                            | Value                         |
+| ------------------------------ | ----------------------------- |
+| `<app>_<name>_client_id`       | the app's `appId`             |
+| `<app>_<name>_client_secret`   | the new value                 |
+| `<app>_<name>_client_exp_date` | when it stops working, in UTC |
+
+So app `Incident SCIM` and secret `terraform` give `incident_scim_terraform_client_id`. The
+Secrets Manager secret must already exist and hold a JSON object, and a key it already has is
+refused unless `--overwrite` is given. `--valid-for-days` is 180 by default and at most 365; a
+tenant policy may allow less, and the stored expiry is the one Graph reports.
+
+It is arranged around not losing the value:
+
+- The destination is checked **before** the secret is created.
+- A name the app already uses is refused, since creating is not idempotent.
+- If storing fails after the secret was created, the secret is **removed again** and the
+  command exits 5. If even that fails, the message carries the key ID to remove by hand.
+- A create is never retried after a server error or a dropped connection, because the secret
+  may exist and a repeat could make a second. Only throttling (429) is retried.
+- The value appears only with `--show-secret`, never in the report, the summary, `-v` output
+  or an error message.
+
+It needs `Application.ReadWrite.All` (or `Directory.ReadWrite.All`) on Graph, and
+`secretsmanager:DescribeSecret`, `GetSecretValue` and `PutSecretValue` on the target secret.
+
+#### Removing a client secret
+
+`apps remove-client-secret` removes one client secret. **It cannot be undone**, and whatever
+still uses the secret stops working at once.
+
+```bash
+pctl azure apps get-client-secrets --app-name "$APP" -o json | jq '.[] | {name, keyId, status}'
+pctl azure apps remove-client-secret --app-name "$APP" --key-id 3f1a9c52-0b7d-4e0e-9a54-1c2d3e4f5a6b
+```
+
+The secret is named by `--key-id` only, never by name, because names are not unique. A key ID
+that belongs to a certificate is refused: Graph needs proof of possession to remove one, so
+only client secrets can be removed.
+
+A secret that has expired, or ends within 30 days, is removed as asked. One with **more than
+30 days left, or no end date**, is refused (exit 2, nothing sent) unless `--force` is given.
+The 30 days are the window `get-client-secrets` calls `expiring`. A copy of the secret kept in
+Secrets Manager is not touched. It needs `Application.ReadWrite.All` or
+`Directory.ReadWrite.All`.
 
 ### Service principals (Enterprise Applications)
 
@@ -746,9 +780,10 @@ src/pctl/
 │   │   └── delete_package.py                    action (destructive)
 │   ├── applications/      service (exposed as `apps`)
 │   │   ├── __init__.py      `apps` group
-│   │   ├── common.py        resolve_application: appId before object ID
-│   │   ├── list.py          action
-│   │   └── get.py           action
+│   │   ├── common.py        resolve_app / resolve_application, status and force rules
+│   │   ├── list.py · get.py                       actions
+│   │   ├── get_client_secrets.py                  action
+│   │   └── add_client_secret.py · remove_client_secret.py   actions (write)
 │   ├── groups/            service
 │   │   ├── __init__.py      `groups` group + match_option, resolve_one, add_relations
 │   │   ├── list.py          action
@@ -889,6 +924,10 @@ src/test/
   one deliberate exception: it exists so every `oauth` setting works as a flag, and a
   flag is visible in shell history and the process list. Prefer `OAUTH_CLIENT_SECRET` or
   `--secret-id`.
+- `pctl azure apps add-client-secret` handles a new secret's value. It is shown only with
+  `--show-secret`, stored only where `--store-in` names, and kept out of every report, log and
+  error message. A value is never accepted as a flag. `--store-in` names a secret, it does not
+  carry one.
 - `pctl oauth login` never writes a token to disk, and keeps no refresh token.
 - `--decode` shows JWT claims without verifying the signature. It is for
   inspection, not for authorization decisions.
