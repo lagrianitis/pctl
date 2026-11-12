@@ -39,6 +39,7 @@ COMMAND_PATHS: list[list[str]] = [
     ["azure", "apps"],
     ["azure", "apps", "list"],
     ["azure", "apps", "get"],
+    ["azure", "apps", "credentials"],
     ["azure", "eam"],
     ["azure", "eam", "list-packages"],
     ["azure", "eam", "get-package"],

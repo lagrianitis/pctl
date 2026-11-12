@@ -25,6 +25,10 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.applications.get:command",
         "Show an app registration by name, appId or object ID.",
     ),
+    "credentials": (
+        "pctl.azure.applications.credentials:command",
+        "List the secrets and certificates of an app registration.",
+    ),
 }
 
 

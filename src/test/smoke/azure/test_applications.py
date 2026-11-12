@@ -72,3 +72,31 @@ def test_an_unknown_match_mode_is_rejected(apps: Callable[..., Any]) -> None:
 
 def test_an_invalid_page_size_is_rejected(apps: Callable[..., Any]) -> None:
     failed(apps("list", "--page-size", "0"), 2)
+
+
+# ---------------------------------------------------------------------------
+# credentials
+# ---------------------------------------------------------------------------
+def test_the_service_help_lists_credentials(apps: Callable[..., Any]) -> None:
+    assert "credentials" in ok(apps("--help")).stdout
+
+
+def test_credentials_requires_an_app(apps: Callable[..., Any]) -> None:
+    failed(apps("credentials"), 2)
+
+
+def test_credentials_takes_no_positional_arguments(apps: Callable[..., Any]) -> None:
+    failed(apps("credentials", "--app", "x", "unexpected"), 2)
+
+
+def test_credentials_help_says_no_secret_value_is_shown(apps: Callable[..., Any]) -> None:
+    stdout = " ".join(ok(apps("credentials", "--help")).stdout.split())
+
+    assert "never returns the value of an existing secret" in stdout
+
+
+def test_credentials_help_documents_how_the_app_is_found(apps: Callable[..., Any]) -> None:
+    stdout = ok(apps("credentials", "--help")).stdout
+
+    assert "--app" in stdout
+    assert "--match" in stdout

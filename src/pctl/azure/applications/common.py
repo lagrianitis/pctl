@@ -7,6 +7,7 @@ using one object's ID against the other's endpoint is the usual way this goes wr
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -18,6 +19,11 @@ if TYPE_CHECKING:
     from ..graph import GraphClient
 
 DEFAULT_LIST_COLUMNS = ["displayName", "appId", "signInAudience", "id"]
+
+# Only what the credentials command reads. Listing the two credential collections is what
+# makes the response carry them, since neither is part of the default application fields.
+CREDENTIAL_SELECT = ("id", "appId", "displayName", "passwordCredentials", "keyCredentials")
+DEFAULT_CREDENTIAL_COLUMNS = ["type", "name", "endDateTime", "keyId"]
 
 
 def match_option(func: Any) -> Any:
@@ -77,3 +83,65 @@ async def resolve_application(
             "Pass the appId instead, so the wrong one cannot be chosen."
         )
     return matches[0]
+
+
+def parse_graph_time(value: str | None) -> datetime | None:
+    """A Graph timestamp as an aware datetime, or None when it is absent or unreadable.
+
+    Graph sends UTC in ISO 8601 and may give seven fractional digits, which
+    `datetime.fromisoformat` accepts on Python 3.11 and later. A value with no zone is
+    taken to be UTC, since that is what Graph means by it.
+    """
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def credential_rows(registration: dict[str, Any]) -> list[dict[str, Any]]:
+    """One row per client secret and per certificate, soonest to expire first.
+
+    Each row is built field by field rather than copied from Graph. That is a safeguard,
+    not tidiness: a response can carry a secret value or a certificate's key material, and
+    a row that copies whatever arrived would print it. A credential with no end date sorts
+    last, where it is least likely to be mistaken for the one about to lapse.
+    """
+    rows = [
+        *(
+            _credential_row(registration, item, "secret")
+            for item in _entries(registration, "passwordCredentials")
+        ),
+        *(
+            _credential_row(registration, item, "certificate")
+            for item in _entries(registration, "keyCredentials")
+        ),
+    ]
+    return sorted(rows, key=_by_expiry)
+
+
+def _entries(registration: dict[str, Any], collection: str) -> list[dict[str, Any]]:
+    """A credential collection, tolerating one that is absent or null."""
+    return registration.get(collection) or []
+
+
+def _credential_row(
+    registration: dict[str, Any], item: dict[str, Any], kind: str
+) -> dict[str, Any]:
+    return {
+        "app": registration.get("displayName"),
+        "appId": registration.get("appId"),
+        "type": kind,
+        "name": item.get("displayName"),
+        "keyId": item.get("keyId"),
+        "startDateTime": item.get("startDateTime"),
+        "endDateTime": item.get("endDateTime"),
+        "hint": item.get("hint") if kind == "secret" else None,
+    }
+
+
+def _by_expiry(row: dict[str, Any]) -> tuple[bool, datetime]:
+    end = parse_graph_time(row["endDateTime"])
+    return end is None, end or datetime.min.replace(tzinfo=UTC)

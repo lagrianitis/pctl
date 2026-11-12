@@ -1,0 +1,185 @@
+"""End-to-end: `pctl azure apps credentials`, against Graph faked with respx.
+
+The listing is read from the application object itself, so the interesting assertions are
+about what is asked for and what is allowed to come back out: the two credential
+collections must be requested, and nothing beyond the chosen fields may be printed even
+when the response carries a secret value or key material.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+from urllib.parse import unquote_plus
+
+import pytest
+
+from helpers import GRAPH, failed, filters, lines, ok
+
+pytestmark = pytest.mark.e2e
+
+APP_OBJECT_ID = "aaaaaaaa-1111-2222-3333-444444444444"
+APP_CLIENT_ID = "8f468c48-e9ac-4dd7-973d-9704b9cdd56d"
+APP_NAME = "ci-deploy-app"
+
+APP = {
+    "id": APP_OBJECT_ID,
+    "appId": APP_CLIENT_ID,
+    "displayName": APP_NAME,
+    "passwordCredentials": [
+        {
+            "displayName": "later",
+            "keyId": "key-later",
+            "startDateTime": "2026-05-12T09:00:00Z",
+            "endDateTime": "2028-05-12T09:00:00Z",
+            "hint": "Dba",
+            "secretText": "LEAKED-SECRET-VALUE",
+            "customKeyIdentifier": None,
+        },
+        {
+            "displayName": "sooner",
+            "keyId": "key-sooner",
+            "startDateTime": "2025-04-20T09:00:00Z",
+            "endDateTime": "2027-04-20T09:00:00.0000000Z",
+            "hint": "paN",
+            "secretText": None,
+        },
+    ],
+    "keyCredentials": [],
+}
+BARE_APP = {
+    "id": "bbbbbbbb-1111-2222-3333-444444444444",
+    "appId": "cccccccc-1111-2222-3333-444444444444",
+    "displayName": "bare",
+}
+OTHER_APP = {**APP, "id": "dddddddd-1111-2222-3333-444444444444", "displayName": "ci-deploy-other"}
+
+
+@pytest.fixture
+def tenant(graph: Any, seen: list[str]) -> Any:
+    """One registration with two secrets, one with none, and a prefix that matches two."""
+    import httpx
+
+    def applications(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        url = unquote_plus(str(request.url)).casefold()
+        if "'bare'" in url:
+            return httpx.Response(200, json={"value": [BARE_APP]})
+        if APP_CLIENT_ID in url or f"'{APP_NAME}'" in url:
+            return httpx.Response(200, json={"value": [APP]})
+        if "startswith" in url and "'ci-deploy-'" in url:
+            return httpx.Response(200, json={"value": [APP, OTHER_APP]})
+        return httpx.Response(200, json={"value": []})
+
+    graph.get(f"{GRAPH}/applications/{APP_OBJECT_ID}").mock(
+        return_value=httpx.Response(200, json=APP)
+    )
+    graph.get(f"{GRAPH}/applications").mock(side_effect=applications)
+    return graph
+
+
+def credentials(runner: Any, cli: Any, *args: str, output: str = "ndjson") -> Any:
+    return runner.invoke(cli, ["-o", output, "azure", "apps", "credentials", *args])
+
+
+# ---------------------------------------------------------------------------
+# what is listed
+# ---------------------------------------------------------------------------
+def test_every_secret_is_a_row_soonest_first(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_NAME))
+
+    rows = [json.loads(line) for line in lines(result.stdout)]
+    assert [row["name"] for row in rows] == ["sooner", "later"]
+    assert {row["type"] for row in rows} == {"secret"}
+
+
+def test_a_row_carries_the_dates_the_key_id_and_the_app(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_NAME))
+
+    row = json.loads(lines(result.stdout)[0])
+    assert row["keyId"] == "key-sooner"
+    assert row["startDateTime"] == "2025-04-20T09:00:00Z"
+    assert row["endDateTime"] == "2027-04-20T09:00:00.0000000Z"
+    assert (row["app"], row["appId"]) == (APP_NAME, APP_CLIENT_ID)
+    assert row["hint"] == "paN"
+
+
+def test_json_is_a_single_document(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_NAME, output="json"))
+
+    assert [row["name"] for row in json.loads(result.stdout)] == ["sooner", "later"]
+
+
+def test_the_default_columns_are_the_ones_that_answer_the_question(
+    runner: Any, cli: Any, tenant: Any
+) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_NAME, output="csv"))
+
+    assert lines(result.stdout)[0] == "type,name,endDateTime,keyId"
+
+
+def test_columns_can_be_chosen(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_NAME, "-c", "name,hint", output="csv"))
+
+    assert lines(result.stdout) == ["name,hint", "sooner,paN", "later,Dba"]
+
+
+# ---------------------------------------------------------------------------
+# what is asked for, and what is never printed
+# ---------------------------------------------------------------------------
+def test_both_credential_collections_are_requested(
+    runner: Any, cli: Any, tenant: Any, seen: list[str]
+) -> None:
+    ok(credentials(runner, cli, "--app", APP_NAME))
+
+    asked = unquote_plus(seen[0])
+    assert "passwordCredentials" in asked
+    assert "keyCredentials" in asked
+
+
+@pytest.mark.parametrize("output", ["table", "json", "ndjson", "csv"])
+def test_a_secret_value_in_the_response_is_never_printed(
+    runner: Any, cli: Any, tenant: Any, output: str
+) -> None:
+    """Graph only sends this at creation, but the command must not depend on that."""
+    result = ok(credentials(runner, cli, "--app", APP_NAME, output=output))
+
+    assert "LEAKED-SECRET-VALUE" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# finding the app
+# ---------------------------------------------------------------------------
+def test_a_guid_is_tried_as_an_app_id_first(
+    runner: Any, cli: Any, tenant: Any, seen: list[str]
+) -> None:
+    ok(credentials(runner, cli, "--app", APP_CLIENT_ID))
+
+    assert filters(seen) == [f"appId eq '{APP_CLIENT_ID}'"]
+
+
+def test_an_object_id_falls_back_to_direct_addressing(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", APP_OBJECT_ID))
+
+    assert [json.loads(line)["name"] for line in lines(result.stdout)] == ["sooner", "later"]
+
+
+def test_an_ambiguous_name_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
+    """Two registrations match, and acting on the wrong one's secrets is the risk."""
+    result = failed(credentials(runner, cli, "--app", "ci-deploy-", "--match", "prefix"), 2)
+
+    assert "Pass the appId" in result.output
+
+
+def test_a_name_that_matches_nothing_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
+    failed(credentials(runner, cli, "--app", "no-such-app"), 4)
+
+
+# ---------------------------------------------------------------------------
+# an app with nothing to list
+# ---------------------------------------------------------------------------
+def test_an_app_with_no_credentials_exits_0_and_says_so(runner: Any, cli: Any, tenant: Any) -> None:
+    result = ok(credentials(runner, cli, "--app", "bare"))
+
+    assert result.stdout.strip() == ""
+    assert "has no client secrets or certificates" in result.stderr
