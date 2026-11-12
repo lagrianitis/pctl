@@ -53,9 +53,6 @@ def challenge_of(verifier: str) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
-# ---------------------------------------------------------------------------
-# a redirect caught on a loopback port
-# ---------------------------------------------------------------------------
 def test_a_loopback_login_returns_the_token(
     runner: Any, cli: Any, provider: Any, user: Any, free_port: int
 ) -> None:
@@ -278,9 +275,6 @@ def test_a_login_never_writes_the_cache(
     assert not list(oauth_env.glob("tokens/*.json"))
 
 
-# ---------------------------------------------------------------------------
-# a redirect that must be refused
-# ---------------------------------------------------------------------------
 def test_a_forged_state_is_refused_and_nothing_is_exchanged(
     runner: Any, cli: Any, provider: Any, user: Any, free_port: int
 ) -> None:
@@ -369,9 +363,6 @@ def test_giving_up_waiting_exits_3(
     assert len(user.opened) == 1
 
 
-# ---------------------------------------------------------------------------
-# configuration that cannot work
-# ---------------------------------------------------------------------------
 def test_a_missing_redirect_exits_2_before_the_browser_opens(
     runner: Any, cli: Any, provider: Any, user: Any
 ) -> None:
@@ -425,9 +416,6 @@ def test_no_authorize_endpoint_exits_2_before_the_browser_opens(
     assert user.opened == []
 
 
-# ---------------------------------------------------------------------------
-# a redirect pasted back, for clients registered with a page pctl cannot listen on
-# ---------------------------------------------------------------------------
 def test_a_pasted_code_is_exchanged(
     runner: Any, cli: Any, provider: Any, user: Any, sent: Callable[[Any], dict[str, str]]
 ) -> None:

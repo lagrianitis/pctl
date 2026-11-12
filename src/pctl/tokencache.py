@@ -17,7 +17,6 @@ from pathlib import Path
 
 import orjson
 
-# Refresh a little before real expiry so a token cannot die mid-request.
 EXPIRY_SKEW_SECONDS = 120
 
 

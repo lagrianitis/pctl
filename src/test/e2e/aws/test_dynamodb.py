@@ -21,9 +21,6 @@ from helpers import ITEM_COUNT, REGION, lines, ok
 pytestmark = pytest.mark.e2e
 
 
-# ---------------------------------------------------------------------------
-# discovery
-# ---------------------------------------------------------------------------
 def test_tables_lists_the_table(ddb: Any, ddb_table: str) -> None:
     result = ok(ddb("tables", output="ndjson"))
 
@@ -45,9 +42,6 @@ def test_describe_summarises_the_key_schema_for_humans(ddb: Any, ddb_table: str)
     assert "sk:RANGE" in result.stdout
 
 
-# ---------------------------------------------------------------------------
-# scan
-# ---------------------------------------------------------------------------
 def test_a_parallel_scan_returns_every_item_exactly_once(ddb: Any, ddb_table: str) -> None:
     """Segments must partition the table, not overlap or drop rows."""
     result = ok(ddb("scan", "--table", ddb_table, "--segments", "4", output="ndjson"))
@@ -121,9 +115,6 @@ def test_an_empty_table_produces_no_rows(ddb: Any, empty_table: str) -> None:
     assert lines(result.stdout) == []
 
 
-# ---------------------------------------------------------------------------
-# query and get
-# ---------------------------------------------------------------------------
 def test_query_by_partition_key_returns_the_match(ddb: Any, ddb_table: str) -> None:
     result = ok(
         ddb(
@@ -190,9 +181,6 @@ def test_get_also_accepts_a_dynamodb_typed_key(ddb: Any, ddb_table: str) -> None
     assert json.loads(result.stdout)["pk"] == "acct#004"
 
 
-# ---------------------------------------------------------------------------
-# rendering
-# ---------------------------------------------------------------------------
 def test_csv_header_and_rows_honour_columns(ddb: Any, ddb_table: str) -> None:
     result = ok(
         ddb(
@@ -220,9 +208,6 @@ def test_table_output_has_a_header_and_a_rule(ddb: Any, ddb_table: str) -> None:
     assert set(rows[1]) <= {"-", " "}
 
 
-# ---------------------------------------------------------------------------
-# aliases and prefixes, end to end rather than help-only
-# ---------------------------------------------------------------------------
 def test_the_dynamodb_service_name_resolves(runner: Any, cli: Any, ddb_table: str) -> None:
     """`ddb` is the exposed name, but the package is `dynamodb` and both must work."""
     ok(

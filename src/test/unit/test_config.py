@@ -27,6 +27,7 @@ from pctl.config import (
 from pctl.errors import ConfigError
 
 pytestmark = pytest.mark.unit
+OAUTH_CREDS = {"client_id": "client", "token_url": "https://idp.example.test/oauth/token"}
 
 
 @pytest.fixture(autouse=True)
@@ -53,9 +54,6 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-# ---------------------------------------------------------------------------
-# output format
-# ---------------------------------------------------------------------------
 def test_output_format_values_are_the_cli_choices() -> None:
     assert [fmt.value for fmt in OutputFormat] == ["table", "json", "ndjson", "csv"]
 
@@ -64,9 +62,6 @@ def test_output_format_accepts_its_own_string() -> None:
     assert OutputFormat("ndjson") is OutputFormat.NDJSON
 
 
-# ---------------------------------------------------------------------------
-# azure: tenant
-# ---------------------------------------------------------------------------
 def test_missing_tenant_is_a_config_error_with_actionable_text() -> None:
     with pytest.raises(ConfigError) as excinfo:
         AzureConfig.resolve()
@@ -100,9 +95,6 @@ def test_env_values_are_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
     assert AzureConfig.resolve().tenant_id == "padded"
 
 
-# ---------------------------------------------------------------------------
-# azure: endpoints and defaults
-# ---------------------------------------------------------------------------
 def test_token_endpoint_is_built_from_authority_and_tenant() -> None:
     config = AzureConfig.resolve(tenant_id="tid")
     assert config.token_endpoint == f"{DEFAULT_AUTHORITY}/tid/oauth2/v2.0/token"
@@ -137,9 +129,6 @@ def test_secret_is_kept_out_of_the_repr() -> None:
     assert "super-secret" not in repr(config)
 
 
-# ---------------------------------------------------------------------------
-# azure: token cache toggle
-# ---------------------------------------------------------------------------
 def test_token_cache_is_on_by_default() -> None:
     assert AzureConfig.resolve(tenant_id="t").use_token_cache is True
 
@@ -160,9 +149,6 @@ def test_other_env_values_leave_the_cache_on(monkeypatch: pytest.MonkeyPatch, ra
     assert AzureConfig.resolve(tenant_id="t").use_token_cache is True
 
 
-# ---------------------------------------------------------------------------
-# azure: AWS Secrets Manager fallback
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def secret_loader(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     """Record calls to the Secrets Manager loader instead of hitting AWS."""
@@ -221,9 +207,6 @@ def test_explicit_tenant_survives_the_secret_lookup(secret_loader: list[dict[str
     assert config.client_secret == "secret-value"
 
 
-# ---------------------------------------------------------------------------
-# aws
-# ---------------------------------------------------------------------------
 def test_aws_config_is_empty_without_configuration() -> None:
     config = AwsConfig.resolve()
     assert (config.profile, config.region, config.endpoint_url) == (None, None, None)
@@ -249,9 +232,6 @@ def test_aws_flags_beat_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert AwsConfig.resolve(profile="from-flag").profile == "from-flag"
 
 
-# ---------------------------------------------------------------------------
-# AppContext
-# ---------------------------------------------------------------------------
 def test_app_context_defaults() -> None:
     app = AppContext()
     assert app.output is OutputFormat.TABLE
@@ -292,12 +272,6 @@ def test_log_writes_to_stderr_when_verbose(capsys: pytest.CaptureFixture[str]) -
 def test_quiet_silences_verbose_logging(capsys: pytest.CaptureFixture[str]) -> None:
     AppContext(verbose=True, quiet=True).log("suppressed")
     assert capsys.readouterr().err == ""
-
-
-# ---------------------------------------------------------------------------
-# oauth
-# ---------------------------------------------------------------------------
-OAUTH_CREDS = {"client_id": "client", "token_url": "https://idp.example.test/oauth/token"}
 
 
 def test_oauth_needs_a_client_id() -> None:

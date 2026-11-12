@@ -9,49 +9,52 @@ These are **application** permissions, granted to the app registration and
 **admin-consented**. Delegated permissions are not used: `pctl` authenticates as the app,
 not as you.
 
-| Permission                                                   | Needed for                                                                                            |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `Group.Read.All`                                             | `groups list`, `groups get`, `groups members`                                                         |
-| `User.Read.All`                                              | `users get`; group members; resolving an owner or assignment target by name or address                |
-| `Application.Read.All` **or** `Directory.Read.All`           | `apps list`, `apps get`; `sp list`, `sp get`, `sp assignments`, `sp owners`                           |
-| `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner` — **nothing else**                                                  |
-| `Synchronization.ReadWrite.All`                              | `sp provision` — **nothing else**                                                                     |
-| `EntitlementManagement.Read.All`                             | `eam list-packages`, `get-package`, `list-catalogs`, `get-catalog`, `list-assignments`, `get-request` |
-| `EntitlementManagement.ReadWrite.All`                        | `eam add-assignment`, `eam remove-assignment`, `eam delete-package`                                   |
+| Permission                                                   | Needed for                                                                                                  |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `Group.Read.All`                                             | `groups list`, `groups get`, `groups members`                                                               |
+| `User.Read.All`                                              | `users get`; group members; resolving an owner or assignment target by name or address                      |
+| `Application.Read.All` **or** `Directory.Read.All`           | `apps list`, `apps get`, `apps get-client-secrets`; `sp list`, `sp get`, `sp assignments`, `sp owners`      |
+| `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner`, `apps add-client-secret`, `apps remove-client-secret` — **nothing else** |
+| `Synchronization.ReadWrite.All`                              | `sp provision` — **nothing else**                                                                           |
+| `EntitlementManagement.Read.All`                             | `eam list-packages`, `get-package`, `list-catalogs`, `get-catalog`, `list-assignments`, `get-request`       |
+| `EntitlementManagement.ReadWrite.All`                        | `eam add-assignment`, `eam remove-assignment`, `eam delete-package`                                         |
 
 `Directory.Read.All` covers every read on its own, if the app already has it. Grant the two
 `ReadWrite` permissions only where those specific commands are actually needed — they are
-broad, and 25 of the 30 commands do not want them.
+broad, and most commands do not want them.
 
 ### Per command
 
-| Command                          | Permission                                                                             | Writes |
-| -------------------------------- | -------------------------------------------------------------------------------------- | ------ |
-| `azure token`                    | none beyond a valid credential                                                         |        |
-| `azure raw`                      | whatever the path you call requires                                                    | maybe  |
-| `azure groups list`              | `Group.Read.All`                                                                       |        |
-| `azure groups get`               | `Group.Read.All`, plus `User.Read.All` for `--members`/`--owners`                      |        |
-| `azure groups members`           | `Group.Read.All` + `User.Read.All`                                                     |        |
-| `azure users get`                | `User.Read.All`                                                                        |        |
-| `azure apps list`                | `Application.Read.All`                                                                 |        |
-| `azure apps get`                 | `Application.Read.All`                                                                 |        |
-| `azure sp list`                  | `Application.Read.All`                                                                 |        |
-| `azure sp get`                   | `Application.Read.All`                                                                 |        |
-| `azure sp assignments`           | `Application.Read.All`                                                                 |        |
-| `azure sp owners`                | `Application.Read.All`                                                                 |        |
-| `azure sp add-owner`             | `Application.ReadWrite.All` + `User.Read.All`                                          | ✅     |
-| `azure sp remove-owner`          | `Application.ReadWrite.All` + `User.Read.All`                                          | ✅     |
-| `azure sp provision`             | `Synchronization.ReadWrite.All` + `User.Read.All`/`Group.Read.All` to resolve subjects | ✅     |
-| `azure eam list-packages`        | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam get-package`          | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam list-catalogs`        | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam get-catalog`          | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam list-assignments`     | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam get-request`          | `EntitlementManagement.Read.All`                                                       |        |
-| `azure eam add-assignment`       | `EntitlementManagement.ReadWrite.All` + `User.Read.All`                                | ✅     |
-| `azure eam remove-assignment`    | `EntitlementManagement.ReadWrite.All` + `User.Read.All`                                | ✅     |
-| `azure eam delete-package`       | `EntitlementManagement.ReadWrite.All`                                                  | 💥     |
-| `commands`, `tree`, `completion` | none, they never call a provider                                                       |        |
+| Command                           | Permission                                                                             | Writes |
+| --------------------------------- | -------------------------------------------------------------------------------------- | ------ |
+| `azure token`                     | none beyond a valid credential                                                         |        |
+| `azure raw`                       | whatever the path you call requires                                                    | maybe  |
+| `azure groups list`               | `Group.Read.All`                                                                       |        |
+| `azure groups get`                | `Group.Read.All`, plus `User.Read.All` for `--members`/`--owners`                      |        |
+| `azure groups members`            | `Group.Read.All` + `User.Read.All`                                                     |        |
+| `azure users get`                 | `User.Read.All`                                                                        |        |
+| `azure apps list`                 | `Application.Read.All`                                                                 |        |
+| `azure apps get`                  | `Application.Read.All`                                                                 |        |
+| `azure apps get-client-secrets`   | `Application.Read.All`                                                                 |        |
+| `azure apps add-client-secret`    | `Application.ReadWrite.All`, plus AWS access to the `--store-in` secret                | ✅     |
+| `azure apps remove-client-secret` | `Application.ReadWrite.All`                                                            | 💥     |
+| `azure sp list`                   | `Application.Read.All`                                                                 |        |
+| `azure sp get`                    | `Application.Read.All`                                                                 |        |
+| `azure sp assignments`            | `Application.Read.All`                                                                 |        |
+| `azure sp owners`                 | `Application.Read.All`                                                                 |        |
+| `azure sp add-owner`              | `Application.ReadWrite.All` + `User.Read.All`                                          | ✅     |
+| `azure sp remove-owner`           | `Application.ReadWrite.All` + `User.Read.All`                                          | ✅     |
+| `azure sp provision`              | `Synchronization.ReadWrite.All` + `User.Read.All`/`Group.Read.All` to resolve subjects | ✅     |
+| `azure eam list-packages`         | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam get-package`           | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam list-catalogs`         | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam get-catalog`           | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam list-assignments`      | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam get-request`           | `EntitlementManagement.Read.All`                                                       |        |
+| `azure eam add-assignment`        | `EntitlementManagement.ReadWrite.All` + `User.Read.All`                                | ✅     |
+| `azure eam remove-assignment`     | `EntitlementManagement.ReadWrite.All` + `User.Read.All`                                | ✅     |
+| `azure eam delete-package`        | `EntitlementManagement.ReadWrite.All`                                                  | 💥     |
+| `commands`, `tree`, `completion`  | none, they never call a provider                                                       |        |
 
 ### Checking what you actually have
 
@@ -141,6 +144,34 @@ If you use `--secret-id` to hold the Graph credentials, the caller also needs:
 
 The secret is a JSON document with `client_id` and `client_secret` keys. See
 [Getting Started](Getting-Started#credentials).
+
+### Storing a new client secret
+
+`azure apps add-client-secret --store-in` is the one place `pctl` writes to AWS. It reads the
+target secret first and then writes it back with the new keys added, so it needs three
+actions on that secret:
+
+| IAM action                      | Why                                               |
+| ------------------------------- | ------------------------------------------------- |
+| `secretsmanager:DescribeSecret` | to refuse a secret that is scheduled for deletion |
+| `secretsmanager:GetSecretValue` | to read the keys already there, and keep them     |
+| `secretsmanager:PutSecretValue` | to write the three new keys                       |
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "secretsmanager:DescribeSecret",
+    "secretsmanager:GetSecretValue",
+    "secretsmanager:PutSecretValue"
+  ],
+  "Resource": "arn:aws:secretsmanager:eu-central-1:123456789012:secret:platform/app-credentials-*"
+}
+```
+
+The trailing `-*` is there because Secrets Manager appends a random suffix to a secret's ARN.
+The secret must already exist: `pctl` never creates one. If the key is encrypted with a
+customer managed KMS key, the caller also needs `kms:Decrypt` and `kms:GenerateDataKey` on it.
 
 ## Related
 

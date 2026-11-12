@@ -15,7 +15,7 @@ src/pctl/
 ├── output.py              Renderer: table / json / ndjson / csv
 ├── errors.py              PctlError subclasses mapped to exit codes
 ├── tokencache.py          on-disk token cache (0600 in a 0700 dir)
-├── secrets.py             client credentials from AWS Secrets Manager
+├── secrets.py             client credentials from Secrets Manager; SecretObject adds keys
 ├── azure/                 case
 │   ├── __init__.py          `azure` group + graph_client() shared by its actions
 │   ├── graph.py             Graph transport: token, retries, pagination
@@ -29,7 +29,8 @@ src/pctl/
 │   │   ├── get.py           action
 │   │   └── members.py       action
 │   ├── users/             service: get
-│   ├── applications/      service (exposed as `apps`): list, get
+│   ├── applications/      service (exposed as `apps`): list, get, get-client-secrets,
+│   │                        add-client-secret, remove-client-secret
 │   ├── service_principals/ service (exposed as `sp`): list, get, assignments, owners,
 │   │                        add-owner, remove-owner, provision
 │   └── entitlements/      service (exposed as `eam`): packages, catalogs, assignments,

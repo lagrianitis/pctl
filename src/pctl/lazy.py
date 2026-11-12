@@ -32,7 +32,6 @@ class PctlGroup(click.Group):
         self._lazy: dict[str, tuple[str, str]] = dict(lazy_subcommands or {})
         self._aliases: dict[str, str] = dict(aliases or {})
 
-    # -- introspection ----------------------------------------------------
     @property
     def lazy_subcommands(self) -> dict[str, tuple[str, str]]:
         """The lazy table: name -> (import target, short help).
@@ -51,7 +50,6 @@ class PctlGroup(click.Group):
         """Alternative spellings: alias -> real command name."""
         return dict(self._aliases)
 
-    # -- resolution -------------------------------------------------------
     def list_commands(self, ctx: click.Context) -> list[str]:
         return sorted({*super().list_commands(ctx), *self._lazy})
 
@@ -99,7 +97,6 @@ class PctlGroup(click.Group):
             ctx.fail(f"'{cmd_name}' is ambiguous: {', '.join(sorted(candidates))}")
         return None
 
-    # -- help -------------------------------------------------------------
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         rows: list[tuple[str, str]] = []
         reverse_aliases: dict[str, list[str]] = {}
@@ -124,5 +121,4 @@ class PctlGroup(click.Group):
                 formatter.write_dl(rows)
 
 
-# Backwards-friendly alias: the group is primarily about lazy loading.
 LazyGroup = PctlGroup

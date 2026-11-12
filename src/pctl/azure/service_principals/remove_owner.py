@@ -20,8 +20,6 @@ from .common import (
     resolve_owners,
 )
 
-# Microsoft's guidance is that a service principal should keep at least two owners, so
-# that losing one person does not orphan the application.
 RECOMMENDED_MINIMUM_OWNERS = 2
 
 

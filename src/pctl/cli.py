@@ -12,9 +12,6 @@ import click
 from .config import AppContext, OutputFormat
 from .lazy import PctlGroup
 
-# One entry per case, plus the two discovery commands. Each case package owns its
-# services, and each service owns its actions, all resolved lazily so `--help` imports
-# nothing heavy.
 LAZY_COMMANDS: dict[str, tuple[str, str]] = {
     "azure": ("pctl.azure:azure", "Microsoft Graph: tokens, groups and group members."),
     "aws": ("pctl.aws:aws", "AWS: read items and metadata from DynamoDB."),

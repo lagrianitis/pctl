@@ -1,6 +1,6 @@
 # Finding a command
 
-Thirty commands across four levels. Three ways to find the one you want, in the order you
+Many commands across four levels. Three ways to find the one you want, in the order you
 should reach for them.
 
 ## 1. Completion — set it up once

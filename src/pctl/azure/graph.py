@@ -30,6 +30,9 @@ from ..errors import AuthError, UpstreamError
 from ..tokencache import CachedToken, TokenCache, cache_key
 
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+# The one status that means "refused, not applied", so it is safe to repeat even a request
+# that must not be applied twice.
+THROTTLED_STATUSES = frozenset({429})
 MAX_ATTEMPTS = 5
 MAX_BACKOFF = 20.0
 
@@ -285,6 +288,7 @@ class GraphClient:
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         json: dict[str, Any] | None = None,
+        idempotent: bool = True,
     ) -> httpx.Response:
         """Send an authorized request, retrying throttling and transient failures.
 
@@ -292,8 +296,15 @@ class GraphClient:
         POST that Graph rejects as a duplicate rather than applying twice, and removing
         one is a DELETE on a specific reference, so a retry after a timeout cannot
         produce a second owner or remove an unintended one.
+
+        A write that is not like that passes `idempotent=False`. Creating a client secret
+        makes a new one every time, so repeating it after a lost response could leave two
+        live secrets and only one of them known. Such a request is retried only when Graph
+        answers 429, which means it was refused rather than applied. A timeout, a dropped
+        connection or a 5xx leaves the outcome unknown, and is reported as exactly that.
         """
         target = url if url.startswith("http") else f"{self.config.base_url}/{url.lstrip('/')}"
+        retry_statuses = RETRY_STATUSES if idempotent else THROTTLED_STATUSES
         last_error: str = ""
         for attempt in range(1, MAX_ATTEMPTS + 1):
             async with self._semaphore:
@@ -307,8 +318,8 @@ class GraphClient:
                     )
                 except (httpx.TimeoutException, httpx.TransportError) as exc:
                     last_error = str(exc)
-                    if attempt == MAX_ATTEMPTS:
-                        raise UpstreamError(f"Request to {target} failed: {exc}") from exc
+                    if attempt == MAX_ATTEMPTS or not idempotent:
+                        raise UpstreamError(_failure_message(target, exc, idempotent)) from exc
                     await self._sleep_backoff(attempt, None)
                     continue
 
@@ -329,7 +340,7 @@ class GraphClient:
                     "client ID and secret rather than the app's API permissions."
                 )
 
-            if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
+            if response.status_code in retry_statuses and attempt < MAX_ATTEMPTS:
                 retry_after = response.headers.get("Retry-After")
                 self._log(
                     f"{response.status_code} from Graph, retry {attempt}/{MAX_ATTEMPTS - 1}"
@@ -343,6 +354,8 @@ class GraphClient:
                     f"Graph returned {response.status_code} for {method} {target}: "
                     f"{_describe(response)}"
                 )
+                if not idempotent and response.status_code >= 500:
+                    message += UNKNOWN_OUTCOME_NOTE
                 if response.status_code == 403:
                     message += (
                         "\nThis is a consent problem, not an authentication one. Grant the "
@@ -997,6 +1010,32 @@ class GraphClient:
         """
         await self.request("DELETE", f"servicePrincipals/{sp_id}/owners/{object_id}/$ref")
 
+    # -- application credentials ------------------------------------------
+    async def add_application_password(
+        self, object_id: str, *, name: str, end_date_time: str
+    ) -> dict[str, Any]:
+        """Create a client secret on an application, by its object ID, not its appId.
+
+        The response carries `secretText`, the value of the new secret. Graph never returns
+        it again, so the caller has to put it somewhere before this returns control.
+
+        Sent with `idempotent=False`: each call makes a new secret, so a repeat after a lost
+        response would leave two live secrets with only one of them known.
+        """
+        response = await self.request(
+            "POST",
+            f"applications/{object_id}/addPassword",
+            json={"passwordCredential": {"displayName": name, "endDateTime": end_date_time}},
+            idempotent=False,
+        )
+        return dict(response.json())
+
+    async def remove_application_password(self, object_id: str, key_id: str) -> None:
+        """Remove one client secret, by the key ID Graph gave it when it was created."""
+        await self.request(
+            "POST", f"applications/{object_id}/removePassword", json={"keyId": key_id}
+        )
+
     # -- provisioning (synchronization) -----------------------------------
     async def synchronization_jobs(self, sp_id: str) -> list[dict[str, Any]]:
         """The provisioning jobs configured on a service principal.
@@ -1110,6 +1149,18 @@ class GraphClient:
             return int(response.text.strip())
         except TypeError, ValueError:
             return None
+
+
+UNKNOWN_OUTCOME_NOTE = (
+    "\nThe request was not repeated, because repeating it could apply it twice. It may or "
+    "may not have been applied, so check before trying again."
+)
+
+
+def _failure_message(target: str, exc: Exception, idempotent: bool) -> str:
+    """Why a request failed to complete, and what that means for a write that cannot repeat."""
+    message = f"Request to {target} failed: {exc}"
+    return message if idempotent else message + UNKNOWN_OUTCOME_NOTE
 
 
 def _describe(response: httpx.Response) -> str:

@@ -65,9 +65,6 @@ def directory(graph: Any, seen: list[str]) -> Any:
     return graph
 
 
-# ---------------------------------------------------------------------------
-# the three identifier forms
-# ---------------------------------------------------------------------------
 def test_an_address_returns_the_user_object(runner: Any, cli: Any, directory: Any) -> None:
     payload = json.loads(
         ok(
@@ -133,9 +130,6 @@ def test_an_object_id_skips_the_collection_entirely(
     assert seen == []
 
 
-# ---------------------------------------------------------------------------
-# rendering and selection
-# ---------------------------------------------------------------------------
 def test_one_user_is_an_object_not_an_array(runner: Any, cli: Any, directory: Any) -> None:
     payload = json.loads(
         ok(
@@ -200,9 +194,6 @@ def test_csv_uses_the_default_columns(runner: Any, cli: Any, directory: Any) -> 
     assert lines(result.stdout)[0] == "displayName,userPrincipalName,mail,id"
 
 
-# ---------------------------------------------------------------------------
-# failure modes
-# ---------------------------------------------------------------------------
 def test_an_unknown_address_exits_4(runner: Any, cli: Any, directory: Any) -> None:
     result = failed(
         runner.invoke(cli, ["azure", "users", "get", "--user", "nobody@example.com"]), 4

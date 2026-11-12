@@ -38,9 +38,6 @@ def token(seconds_ahead: float = 3600, value: str = "tok") -> CachedToken:
     return CachedToken(access_token=value, expires_at=time.time() + seconds_ahead)
 
 
-# ---------------------------------------------------------------------------
-# CachedToken
-# ---------------------------------------------------------------------------
 def test_a_fresh_token_is_valid() -> None:
     assert token(3600).is_valid()
 
@@ -70,9 +67,6 @@ def test_expires_in_reports_remaining_seconds() -> None:
     assert 3500 <= token(3600).expires_in <= 3600
 
 
-# ---------------------------------------------------------------------------
-# keys and directories
-# ---------------------------------------------------------------------------
 def test_cache_key_is_deterministic() -> None:
     assert cache_key("a", "b") == cache_key("a", "b")
 
@@ -108,9 +102,6 @@ def test_cache_dir_defaults_under_home(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cache_dir() == Path.home() / ".cache" / "pctl"
 
 
-# ---------------------------------------------------------------------------
-# round trip
-# ---------------------------------------------------------------------------
 def test_store_then_load_returns_the_token(cache: TokenCache) -> None:
     cache.store(token(3600, "abc"))
     loaded = cache.load()
@@ -132,9 +123,6 @@ def test_a_token_inside_the_skew_window_is_a_miss(cache: TokenCache) -> None:
     assert cache.load() is None
 
 
-# ---------------------------------------------------------------------------
-# permissions
-# ---------------------------------------------------------------------------
 def test_the_cache_file_is_private(cache: TokenCache) -> None:
     cache.store(token())
     assert cache.path.stat().st_mode & 0o777 == 0o600
@@ -151,9 +139,6 @@ def test_no_temp_files_are_left_behind(cache: TokenCache) -> None:
     assert [p.name for p in cache.path.parent.iterdir()] == [cache.path.name]
 
 
-# ---------------------------------------------------------------------------
-# resilience
-# ---------------------------------------------------------------------------
 def test_corrupt_json_is_a_miss_not_a_crash(cache: TokenCache) -> None:
     cache.path.parent.mkdir(parents=True, exist_ok=True)
     cache.path.write_bytes(b"{ not json")
@@ -187,9 +172,6 @@ def test_an_unwritable_directory_does_not_fail_the_command(
         os.chmod(locked, 0o700)
 
 
-# ---------------------------------------------------------------------------
-# disabling and clearing
-# ---------------------------------------------------------------------------
 def test_a_disabled_cache_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PCTL_CACHE_DIR", str(tmp_path / "cache"))
     cache = TokenCache(cache_key("t"), enabled=False)

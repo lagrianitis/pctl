@@ -51,7 +51,7 @@ diagnostics, so `pctl ... -o ndjson | jq` is always clean.
 | [Token and raw](Azure-Token-and-Raw)                   | `token`, `raw`                                                                                                                                                 |
 | [Groups](Azure-Groups)                                 | `groups list`, `get`, `members`                                                                                                                                |
 | [Users](Azure-Users)                                   | `users get`                                                                                                                                                    |
-| [Applications](Azure-Applications)                     | `apps list`, `get`                                                                                                                                             |
+| [Applications](Azure-Applications)                     | `apps list`, `get`, `get-client-secrets`, `add-client-secret`, `remove-client-secret`                                                                          |
 | [Service principals](Azure-Service-Principals)         | `sp list`, `get`, `assignments`, `owners`, `add-owner`, `remove-owner`, `provision`                                                                            |
 | [Entitlement management](Azure-Entitlement-Management) | `eam list-packages`, `get-package`, `delete-package`, `list-catalogs`, `get-catalog`, `list-assignments`, `add-assignment`, `remove-assignment`, `get-request` |
 
@@ -69,21 +69,27 @@ diagnostics, so `pctl ... -o ndjson | jq` is always clean.
 
 ## What writes, and what does not
 
-Most of `pctl` is read-only. Five commands change something, and one of those destroys
+Most of `pctl` is read-only. Eight commands change something, and two of those destroy
 something. They are called out on every page they appear on, and collected here:
 
-| Command                       | Effect                                          | Reversible                     |
-| ----------------------------- | ----------------------------------------------- | ------------------------------ |
-| `azure sp add-owner`          | Adds an owner to an Enterprise Application      | Yes, `remove-owner`            |
-| `azure sp remove-owner`       | Removes one                                     | Yes, `add-owner`               |
-| `azure sp provision`          | Pushes a user or group through a sync connector | N/A, it syncs rather than sets |
-| `azure eam add-assignment`    | Grants an access package assignment             | Yes, `remove-assignment`       |
-| `azure eam remove-assignment` | Revokes one                                     | Yes, `add-assignment`          |
-| `azure eam delete-package`    | **Deletes an access package**                   | **No**                         |
+| Command                           | Effect                                          | Reversible                     |
+| --------------------------------- | ----------------------------------------------- | ------------------------------ |
+| `azure sp add-owner`              | Adds an owner to an Enterprise Application      | Yes, `remove-owner`            |
+| `azure sp remove-owner`           | Removes one                                     | Yes, `add-owner`               |
+| `azure sp provision`              | Pushes a user or group through a sync connector | N/A, it syncs rather than sets |
+| `azure eam add-assignment`        | Grants an access package assignment             | Yes, `remove-assignment`       |
+| `azure eam remove-assignment`     | Revokes one                                     | Yes, `add-assignment`          |
+| `azure eam delete-package`        | **Deletes an access package**                   | **No**                         |
+| `azure apps add-client-secret`    | Creates a client secret, and stores its value   | Yes, `remove-client-secret`    |
+| `azure apps remove-client-secret` | **Removes a client secret**                     | **No**, the value is gone      |
 
 `delete-package` takes its own precautions: an exact name or object ID only, a
 confirmation prompt, and a check that no assignments remain. See
 [Entitlement management](Azure-Entitlement-Management#delete-package).
+
+`remove-client-secret` takes a key ID and nothing else, never a name, and needs `--force` for
+a secret that still has more than 30 days left. `add-client-secret` refuses to run unless the
+new value has somewhere to go. See [Applications](Azure-Applications#add-client-secret).
 
 ## Design intent
 
@@ -96,7 +102,8 @@ confirmation prompt, and a check that no assignments remain. See
 --client-secret` is the one deliberate exception, and the [OAuth](OAuth) page says why
   to avoid it.
 - **Writes are idempotent.** Re-running an `add-owner` or an `add-assignment` reports a
-  no-op rather than failing, so a pipeline can be safely retried.
+  no-op rather than failing, so a pipeline can be safely retried. `add-client-secret` cannot
+  be, since each run makes a new secret, so it refuses a name the app already uses.
 
 ## Requirements
 

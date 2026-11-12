@@ -96,9 +96,6 @@ def command(
             app.log(f"resolving {len(wanted)} identifier(s)")
 
             async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
-                # Only NotFoundError is collected, for the reason `users get` gives: an
-                # ambiguous identifier is a usage error the caller has to resolve, and
-                # --ignore-missing must not be able to skip past it.
                 try:
                     found = await resolve_application(
                         client, identifier, mode=match_mode, select=fields

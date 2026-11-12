@@ -38,9 +38,6 @@ def _paged(seen: list[str]) -> Any:
     return handler
 
 
-# ---------------------------------------------------------------------------
-# list: pagination and rendering
-# ---------------------------------------------------------------------------
 def test_pagination_follows_the_next_link(
     runner: Any, cli: Any, graph: Any, seen: list[str]
 ) -> None:
@@ -104,9 +101,6 @@ def test_a_single_result_is_still_a_json_array(
     assert isinstance(json.loads(result.stdout), list)
 
 
-# ---------------------------------------------------------------------------
-# list: server-side filtering
-# ---------------------------------------------------------------------------
 def test_starts_with_escapes_single_quotes(
     runner: Any, cli: Any, graph: Any, seen: list[str]
 ) -> None:
@@ -156,9 +150,6 @@ def test_count_only_prints_just_the_number(runner: Any, cli: Any, graph: Any) ->
     assert result.stdout.strip() == "4211"
 
 
-# ---------------------------------------------------------------------------
-# get: resolution by display name
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def named_groups(graph: Any, seen: list[str]) -> Any:
     """Graph routes resolving `Team A` and `Team B`, with relations attached.
@@ -291,9 +282,6 @@ def test_no_names_at_all_is_a_usage_error(runner: Any, cli: Any, named_groups: A
     failed(runner.invoke(cli, ["azure", "groups", "get"]), 2)
 
 
-# ---------------------------------------------------------------------------
-# members
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def member_routes(graph: Any) -> Any:
     """Graph routes for `Team A`'s direct members, transitive members and owners."""

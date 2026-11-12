@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from typing import Any
 
-# Anything shorter has too little left to show once the ends are kept, so it is hidden.
 MASK_MIN_LENGTH = 20
 MASK_HEAD = 8
 MASK_TAIL = 6

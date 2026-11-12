@@ -13,12 +13,7 @@ from .errors import ConfigError
 DEFAULT_AUTHORITY = "https://login.microsoftonline.com"
 DEFAULT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 DEFAULT_GRAPH_SCOPE = "https://graph.microsoft.com/.default"
-
-# How long `oauth login` waits for the browser to come back before giving up.
 DEFAULT_LOGIN_TIMEOUT = 300.0
-
-# Graph caps $top at 999 for directory objects; asking for the maximum minimises
-# the number of sequential round trips, which dominates wall-clock time.
 GRAPH_MAX_PAGE_SIZE = 999
 
 

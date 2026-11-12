@@ -47,9 +47,6 @@ def query_of(url: str) -> dict[str, str]:
     return {key: values[0] for key, values in parse_qs(urlparse(url).query).items()}
 
 
-# ---------------------------------------------------------------------------
-# pkce
-# ---------------------------------------------------------------------------
 def test_the_challenge_is_the_s256_hash_of_the_verifier() -> None:
     pkce = new_pkce()
 
@@ -72,9 +69,6 @@ def test_every_attempt_gets_its_own_secrets() -> None:
     assert first.state != second.state
 
 
-# ---------------------------------------------------------------------------
-# the authorize url
-# ---------------------------------------------------------------------------
 def test_the_authorize_url_asks_for_a_code_with_pkce() -> None:
     pkce = Pkce("verifier", "challenge", STATE)
 
@@ -115,9 +109,6 @@ def test_an_authorize_url_that_already_has_a_query_is_extended() -> None:
     assert url.startswith(f"{OAUTH_AUTHORIZE_URL}?tenant=one&response_type=code")
 
 
-# ---------------------------------------------------------------------------
-# reading what was pasted
-# ---------------------------------------------------------------------------
 def test_a_full_redirect_url_is_read() -> None:
     url = f"{REDIRECT}?code=abc&state={STATE}"
 
@@ -142,9 +133,6 @@ def test_a_provider_error_is_read() -> None:
     assert parsed == {"error": "access_denied", "error_description": "No thanks"}
 
 
-# ---------------------------------------------------------------------------
-# checking the redirect
-# ---------------------------------------------------------------------------
 def test_a_matching_state_yields_the_code() -> None:
     assert check_redirect({"code": "abc", "state": STATE}, STATE, require_state=True) == "abc"
 
@@ -192,9 +180,6 @@ def test_a_redirect_with_no_code_is_refused() -> None:
         check_redirect({"state": STATE}, STATE, require_state=True)
 
 
-# ---------------------------------------------------------------------------
-# loopback detection
-# ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "uri",
     ["http://127.0.0.1:8765/callback", "http://localhost:3000/cb", "http://localhost:8080"],

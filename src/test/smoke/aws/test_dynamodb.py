@@ -15,13 +15,9 @@ import pytest
 from helpers import failed, ok
 
 pytestmark = pytest.mark.smoke
-
 TABLE = "some-table"
 
 
-# ---------------------------------------------------------------------------
-# help
-# ---------------------------------------------------------------------------
 def test_the_service_help_lists_its_actions(ddb: Callable[..., Any]) -> None:
     stdout = ok(ddb("--help")).stdout
     for action in ("tables", "describe", "scan", "query", "get"):
@@ -42,9 +38,6 @@ def test_query_help_documents_the_key_condition(ddb: Callable[..., Any]) -> None
     assert "KeyConditionExpression" in ok(ddb("query", "--help")).stdout
 
 
-# ---------------------------------------------------------------------------
-# required arguments
-# ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "args",
     [
@@ -72,9 +65,6 @@ def test_query_without_a_key_condition_is_a_usage_error(ddb: Callable[..., Any])
     assert "--key" in result.output
 
 
-# ---------------------------------------------------------------------------
-# option validation
-# ---------------------------------------------------------------------------
 def test_a_malformed_json_key_is_rejected(ddb: Callable[..., Any]) -> None:
     """Parsed before any AWS call, so this needs no fake service."""
     result = failed(ddb("get", "--table", TABLE, "--key", "{not json"), 2)
@@ -101,9 +91,6 @@ def test_an_unknown_action_is_a_usage_error(ddb: Callable[..., Any]) -> None:
     failed(ddb("nope"), 2)
 
 
-# ---------------------------------------------------------------------------
-# aliases and prefixes
-# ---------------------------------------------------------------------------
 def test_the_dynamodb_alias_reaches_the_same_group(runner: Any, cli: Any) -> None:
     result = ok(runner.invoke(cli, ["aws", "dynamodb", "--help"], prog_name="pctl"))
     assert "DynamoDB" in result.stdout

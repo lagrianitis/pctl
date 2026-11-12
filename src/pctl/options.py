@@ -18,9 +18,70 @@ import click
 from .config import AppContext, OutputFormat
 
 OUTPUT_CHOICES = [fmt.value for fmt in OutputFormat]
-
-# Shorter than this and a login could not finish before the wait gave up.
 MIN_LOGIN_TIMEOUT = 0.1
+
+
+@dataclass(frozen=True, slots=True)
+class _CredOption:
+    """One setting that can be given as a flag or as an environment variable."""
+
+    flag: str
+    metavar: str
+    envvar: str
+    text: str
+
+
+_OAUTH_OPTIONS = [
+    _CredOption(
+        "--issuer",
+        "URL",
+        "OAUTH_ISSUER",
+        "Provider base URL. The endpoints are <issuer>/oauth/token and <issuer>/authorize "
+        "unless the two URL options below name them.",
+    ),
+    _CredOption(
+        "--token-url", "URL", "OAUTH_TOKEN_URL", "Token endpoint, instead of <issuer>/oauth/token."
+    ),
+    _CredOption("--client-id", "ID", "OAUTH_CLIENT_ID", "OAuth client id."),
+    _CredOption(
+        "--client-secret",
+        "SECRET",
+        "OAUTH_CLIENT_SECRET",
+        "Client secret. A flag lands in shell history and the process list, so prefer the "
+        "variable or --secret-id.",
+    ),
+    _CredOption("--audience", "API", "OAUTH_AUDIENCE", "API the token is for."),
+    _CredOption("--scope", "SCOPES", "OAUTH_SCOPE", "Space-separated scopes to request."),
+    _CredOption(
+        "--secret-id",
+        "NAME",
+        "PCTL_OAUTH_SECRET_ID",
+        "Read client_id/client_secret from an AWS Secrets Manager JSON secret.",
+    ),
+    _CredOption(
+        "--secret-region",
+        "REGION",
+        "PCTL_SECRET_REGION",
+        "Region holding the secret.  [default: eu-central-1]",
+    ),
+]
+
+_OAUTH_LOGIN_OPTIONS = [
+    _CredOption(
+        "--authorize-url",
+        "URL",
+        "OAUTH_AUTHORIZE_URL",
+        "Authorization endpoint, instead of <issuer>/authorize.",
+    ),
+    _CredOption(
+        "--redirect-uri",
+        "URI",
+        "OAUTH_REDIRECT_URI",
+        "Redirect registered on the client. A loopback address such as "
+        "http://127.0.0.1:8765/callback is caught automatically; any other value means "
+        "pasting the address back from the browser.",
+    ),
+]
 
 
 def _set_attr(name: str, transform: Callable[[Any], Any] | None = None) -> Callable[..., Any]:
@@ -189,16 +250,6 @@ def aws_options(func: Any) -> Any:
     return func
 
 
-@dataclass(frozen=True, slots=True)
-class _CredOption:
-    """One setting that can be given as a flag or as an environment variable."""
-
-    flag: str
-    metavar: str
-    envvar: str
-    text: str
-
-
 def _cred_option(spec: _CredOption, **extra: Any) -> Any:
     """Build the click option for a setting and store its value in `AppContext.creds`.
 
@@ -215,61 +266,6 @@ def _cred_option(spec: _CredOption, **extra: Any) -> Any:
         help=f"{spec.text}  [env: {spec.envvar}]",
         **extra,
     )
-
-
-# Declared as data because the `oauth` commands take a dozen settings, each available as
-# a flag and as a variable.
-_OAUTH_OPTIONS = [
-    _CredOption(
-        "--issuer",
-        "URL",
-        "OAUTH_ISSUER",
-        "Provider base URL. The endpoints are <issuer>/oauth/token and <issuer>/authorize "
-        "unless the two URL options below name them.",
-    ),
-    _CredOption(
-        "--token-url", "URL", "OAUTH_TOKEN_URL", "Token endpoint, instead of <issuer>/oauth/token."
-    ),
-    _CredOption("--client-id", "ID", "OAUTH_CLIENT_ID", "OAuth client id."),
-    _CredOption(
-        "--client-secret",
-        "SECRET",
-        "OAUTH_CLIENT_SECRET",
-        "Client secret. A flag lands in shell history and the process list, so prefer the "
-        "variable or --secret-id.",
-    ),
-    _CredOption("--audience", "API", "OAUTH_AUDIENCE", "API the token is for."),
-    _CredOption("--scope", "SCOPES", "OAUTH_SCOPE", "Space-separated scopes to request."),
-    _CredOption(
-        "--secret-id",
-        "NAME",
-        "PCTL_OAUTH_SECRET_ID",
-        "Read client_id/client_secret from an AWS Secrets Manager JSON secret.",
-    ),
-    _CredOption(
-        "--secret-region",
-        "REGION",
-        "PCTL_SECRET_REGION",
-        "Region holding the secret.  [default: eu-central-1]",
-    ),
-]
-
-_OAUTH_LOGIN_OPTIONS = [
-    _CredOption(
-        "--authorize-url",
-        "URL",
-        "OAUTH_AUTHORIZE_URL",
-        "Authorization endpoint, instead of <issuer>/authorize.",
-    ),
-    _CredOption(
-        "--redirect-uri",
-        "URI",
-        "OAUTH_REDIRECT_URI",
-        "Redirect registered on the client. A loopback address such as "
-        "http://127.0.0.1:8765/callback is caught automatically; any other value means "
-        "pasting the address back from the browser.",
-    ),
-]
 
 
 def _apply(func: Any, specs: list[_CredOption]) -> Any:

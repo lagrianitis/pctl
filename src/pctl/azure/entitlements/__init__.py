@@ -27,10 +27,6 @@ from .common import (
     match_option,
 )
 
-# Verb-noun actions rather than a nested `packages list`: the command shape is
-# case -> service -> action with no fourth level, and an action that silently switches
-# between listing and getting depending on whether an argument was passed would be
-# magic the rest of this CLI does not do.
 LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
     "list-packages": (
         "pctl.azure.entitlements.list_packages:command",

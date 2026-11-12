@@ -42,9 +42,6 @@ def value(out: Out) -> str:
     return out.readouterr().out.decode()
 
 
-# ---------------------------------------------------------------------------
-# ndjson
-# ---------------------------------------------------------------------------
 def test_ndjson_writes_one_compact_line_per_record(out: Out) -> None:
     count = render([{"a": 1}, {"a": 2}], OutputFormat.NDJSON)
     assert count == 2
@@ -56,9 +53,6 @@ def test_ndjson_of_nothing_writes_nothing(out: Out) -> None:
     assert value(out) == ""
 
 
-# ---------------------------------------------------------------------------
-# json
-# ---------------------------------------------------------------------------
 def test_json_emits_an_array(out: Out) -> None:
     render([{"a": 1}, {"a": 2}], OutputFormat.JSON)
     assert value(out) == '[{"a":1},{"a":2}]\n'
@@ -84,9 +78,6 @@ def test_json_empty_array(out: Out) -> None:
     assert value(out) == "[]\n"
 
 
-# ---------------------------------------------------------------------------
-# csv
-# ---------------------------------------------------------------------------
 def test_csv_header_comes_from_columns(out: Out) -> None:
     render([{"b": 2, "a": 1}], OutputFormat.CSV, columns=["a", "b"])
     assert value(out).splitlines() == ["a,b", "1,2"]
@@ -108,8 +99,6 @@ def test_csv_flattens_containers_and_blanks_none(out: Out) -> None:
         OutputFormat.CSV,
         columns=["a", "b", "c", "d"],
     )
-    # Containers are JSON-encoded so the cell stays machine-readable, which means
-    # csv has to quote them and double the embedded quotes.
     assert value(out).splitlines()[1] == ',"[""x"",""y""]","{""k"":1}",true'
 
 
@@ -118,9 +107,6 @@ def test_csv_missing_column_is_empty(out: Out) -> None:
     assert value(out).splitlines() == ["a,missing", "1,"]
 
 
-# ---------------------------------------------------------------------------
-# table
-# ---------------------------------------------------------------------------
 def test_table_header_is_verbatim_and_ruled(out: Out) -> None:
     render([{"pk": "a", "id": "b"}], OutputFormat.TABLE, columns=["pk", "id"])
     header, rule, row = value(out).splitlines()
@@ -152,9 +138,6 @@ def test_table_says_so_when_there_is_nothing(out: Out) -> None:
     assert value(out) == "No results.\n"
 
 
-# ---------------------------------------------------------------------------
-# type coercion
-# ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -173,9 +156,6 @@ def test_dumps_keeps_integral_decimals_integral() -> None:
     assert dumps({"id": Decimal("1")}) == b'{"id":1}'
 
 
-# ---------------------------------------------------------------------------
-# pipes and counting
-# ---------------------------------------------------------------------------
 def test_broken_pipe_is_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
     """`pctl ... | head -1` must exit cleanly rather than raising."""
 

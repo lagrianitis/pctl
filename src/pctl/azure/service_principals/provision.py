@@ -33,12 +33,6 @@ RESULT_COLUMNS = [
     "detail",
 ]
 USER_FIELDS = ("id", "displayName", "userPrincipalName", "mail")
-
-# Graph reports "Skipped" both for a subject that is already in sync and for one it
-# declined to provision, so the reason decides whether the run succeeded. RedundantExport
-# means source and target already match, which is the on-demand equivalent of a no-op.
-# Every other skip reason — out of scope, not assigned, filtered — means no provisioning
-# happened, and reporting that as success would be the worst possible lie here.
 BENIGN_SKIP_CODES = frozenset({"redundantexport"})
 
 
@@ -399,8 +393,5 @@ def report(records: list[dict[str, Any]], failed: list[tuple[str, str]], *, quie
     for value, reason in failed:
         click.secho(f"Could not resolve '{value}': {reason}", err=True, fg="yellow")
 
-    # Noun order matters: `summarise` pluralises by appending to the whole string, so
-    # "provisioned subject" gives "2 provisioned subjects" where "subject provisioned"
-    # would give "2 subject provisioneds".
     applied = [record for record in records if record["outcome"] == "applied"]
     summarise(len(applied), "provisioned subject", quiet=quiet)

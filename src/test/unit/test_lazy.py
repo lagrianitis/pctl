@@ -63,9 +63,6 @@ def invoke(group: Any, args: list[str]) -> Any:
     return CliRunner().invoke(group, args)
 
 
-# ---------------------------------------------------------------------------
-# lazy resolution
-# ---------------------------------------------------------------------------
 def test_a_lazy_subcommand_runs(group: PctlGroup) -> None:
     result = invoke(group, ["doit"])
     assert result.exit_code == 0
@@ -108,9 +105,6 @@ def test_a_bad_target_is_reported_as_a_type_error(target_module: types.ModuleTyp
         root.get_command(click.Context(root), "broken")
 
 
-# ---------------------------------------------------------------------------
-# listing
-# ---------------------------------------------------------------------------
 def test_list_commands_is_sorted_and_includes_lazy_entries(group: PctlGroup) -> None:
     assert group.list_commands(click.Context(group)) == ["describe", "doit"]
 
@@ -120,9 +114,6 @@ def test_aliases_are_shown_next_to_their_target(group: PctlGroup) -> None:
     assert "doit (d)" in result.stdout
 
 
-# ---------------------------------------------------------------------------
-# aliases and prefixes
-# ---------------------------------------------------------------------------
 def test_an_alias_resolves(group: PctlGroup) -> None:
     assert invoke(group, ["d"]).exit_code == 0
 
@@ -159,8 +150,5 @@ def test_an_alias_is_resolved_before_prefix_matching(group: PctlGroup) -> None:
     assert invoke(group, ["d"]).exit_code == 0
 
 
-# ---------------------------------------------------------------------------
-# compatibility
-# ---------------------------------------------------------------------------
 def test_lazygroup_is_an_alias_of_pctlgroup() -> None:
     assert LazyGroup is PctlGroup

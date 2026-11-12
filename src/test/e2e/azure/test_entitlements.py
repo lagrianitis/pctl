@@ -21,6 +21,9 @@ pytestmark = pytest.mark.e2e
 EAM = f"{GRAPH}/identityGovernance/entitlementManagement"
 PACKAGE_ID = "a914b616-e04e-476b-aa37-91038f0b165b"
 CATALOG_ID = "d4f2d1b6-0a08-4987-9efd-fd8baae9e842"
+POLICY_ID = "2264bf65-76ba-417b-a27d-54d291f0cbc8"
+ANN_ID = "u-ann"
+DAVE_ID = "u-dave"
 
 PACKAGES = [
     {"id": PACKAGE_ID, "displayName": "AWS Platform Access", "isHidden": False},
@@ -39,6 +42,38 @@ CATALOGS = [
         "displayName": "Corporate",
         "catalogType": "serviceDefault",
         "state": "published",
+    },
+]
+ASSIGNMENTS = [
+    {
+        "id": "asg1",
+        "state": "Delivered",
+        "target": {
+            "objectId": "u1",
+            "displayName": "Ann Example",
+            "email": "ann@example.com",
+        },
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
+    },
+    {
+        "id": "asg2",
+        "state": "Delivered",
+        "target": {
+            "objectId": "u2",
+            "displayName": "Bob Example",
+            "email": "bob@example.com",
+        },
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
+    },
+    {
+        "id": "asg3",
+        "state": "Expired",
+        "target": {
+            "objectId": "u3",
+            "displayName": "Carol Example",
+            "email": "carol@example.com",
+        },
+        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
     },
 ]
 
@@ -65,8 +100,6 @@ def governance(graph: Any, seen: list[str]) -> Any:
         url = unquote_plus(str(request.url))
         matched = matching(PACKAGES, url)
         if matched is None:
-            # Unfiltered: `list-packages`, and every `--match contains`, which has to fetch
-            # the collection because Graph has no substring operator here.
             return httpx.Response(200, json={"value": PACKAGES})
         if not matched and "startswith(displayName,'AWS " in url:
             return httpx.Response(200, json={"value": PACKAGES[:2]})
@@ -89,9 +122,6 @@ def governance(graph: Any, seen: list[str]) -> Any:
     return graph
 
 
-# ---------------------------------------------------------------------------
-# the narrower OData surface
-# ---------------------------------------------------------------------------
 def test_the_request_carries_no_count_parameter(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
@@ -119,9 +149,6 @@ def test_the_path_is_nested_under_identity_governance(
     assert "/identityGovernance/entitlementManagement/accessPackages" in seen[-1]
 
 
-# ---------------------------------------------------------------------------
-# list-packages
-# ---------------------------------------------------------------------------
 def test_list_packages_streams_the_collection(runner: Any, cli: Any, governance: Any) -> None:
     result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-packages"]))
 
@@ -170,7 +197,6 @@ def test_contains_is_case_insensitive(runner: Any, cli: Any, governance: Any) ->
             ["-o", "ndjson", "azure", "eam", "list-packages", "--contains", "INCIDENT"],
         )
     )
-
     assert len(lines(result.stdout)) == 1
 
 
@@ -210,9 +236,6 @@ def test_the_default_columns_are_package_shaped(runner: Any, cli: Any, governanc
     assert lines(result.stdout)[0] == "displayName,isHidden,id"
 
 
-# ---------------------------------------------------------------------------
-# get-package
-# ---------------------------------------------------------------------------
 def test_get_package_by_name(runner: Any, cli: Any, governance: Any) -> None:
     payload = json.loads(
         ok(
@@ -428,9 +451,6 @@ def test_the_not_found_message_suggests_the_pattern_modes(
     assert "--match contains" in result.output
 
 
-# ---------------------------------------------------------------------------
-# catalogs
-# ---------------------------------------------------------------------------
 def test_list_catalogs_streams_the_collection(runner: Any, cli: Any, governance: Any) -> None:
     result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "eam", "list-catalogs"]))
 
@@ -479,9 +499,6 @@ def test_get_catalog_by_id(runner: Any, cli: Any, governance: Any) -> None:
     assert payload["displayName"] == "AWS Platform"
 
 
-# ---------------------------------------------------------------------------
-# --catalog: scoping packages to a catalog by name
-# ---------------------------------------------------------------------------
 def test_catalog_name_is_resolved_then_used_as_a_filter(
     runner: Any, cli: Any, governance: Any, seen: list[str]
 ) -> None:
@@ -550,43 +567,6 @@ def test_an_unknown_catalog_exits_4(runner: Any, cli: Any, governance: Any) -> N
     )
 
     assert "no-such-catalog" in result.output
-
-
-# ---------------------------------------------------------------------------
-# list-assignments
-# ---------------------------------------------------------------------------
-ASSIGNMENTS = [
-    {
-        "id": "asg1",
-        "state": "Delivered",
-        "target": {
-            "objectId": "u1",
-            "displayName": "Ann Example",
-            "email": "ann@example.com",
-        },
-        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
-    },
-    {
-        "id": "asg2",
-        "state": "Delivered",
-        "target": {
-            "objectId": "u2",
-            "displayName": "Bob Example",
-            "email": "bob@example.com",
-        },
-        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
-    },
-    {
-        "id": "asg3",
-        "state": "Expired",
-        "target": {
-            "objectId": "u3",
-            "displayName": "Carol Example",
-            "email": "carol@example.com",
-        },
-        "accessPackage": {"id": PACKAGE_ID, "displayName": "AWS Platform Access"},
-    },
-]
 
 
 @pytest.fixture
@@ -774,14 +754,6 @@ def test_an_invalid_state_is_rejected_before_any_request(
     )
 
     assert seen == []
-
-
-# ---------------------------------------------------------------------------
-# add-assignment / remove-assignment
-# ---------------------------------------------------------------------------
-POLICY_ID = "2264bf65-76ba-417b-a27d-54d291f0cbc8"
-ANN_ID = "u-ann"
-DAVE_ID = "u-dave"
 
 
 @pytest.fixture
@@ -1060,9 +1032,6 @@ def test_remove_needs_no_policy_lookup(
     assert not any("assignmentPolicies" in url for url in seen)
 
 
-# ---------------------------------------------------------------------------
-# --wait: confirming a write actually applied
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def settling(writable: Any) -> Any:
     """A request that reports `delivering` once and then `delivered`."""
@@ -1284,9 +1253,6 @@ def test_removal_can_also_be_confirmed(
     assert json.loads(lines(result.stdout)[0])["outcome"] == "done"
 
 
-# ---------------------------------------------------------------------------
-# get-request
-# ---------------------------------------------------------------------------
 def test_get_request_reports_a_delivered_request(runner: Any, cli: Any, writable: Any) -> None:
     import httpx
 
@@ -1390,9 +1356,6 @@ def test_fail_on_pending_turns_a_pending_request_into_an_error(
     )
 
 
-# ---------------------------------------------------------------------------
-# delete-package
-# ---------------------------------------------------------------------------
 @pytest.fixture
 def deletable(graph: Any, seen: list[str]) -> Any:
     """A deletable package: exact-name lookups answered strictly, and no assignments.

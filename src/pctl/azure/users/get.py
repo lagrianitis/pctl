@@ -91,11 +91,6 @@ def command(
             app.log(f"resolving {len(wanted)} identifier(s)")
 
             async def one(identifier: str) -> dict[str, Any] | tuple[str, str]:
-                # Only NotFoundError is collected. A ConfigError here means the identifier
-                # was ambiguous, which --ignore-missing must not swallow: skipping a name
-                # that matched two people would quietly drop one of them. It propagates as
-                # a usage error instead, which is what the message already tells the
-                # caller to fix.
                 try:
                     found = await find_user(client, identifier, select=fields, mode=match_mode)
                 except NotFoundError as exc:
