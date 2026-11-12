@@ -7,7 +7,8 @@ using one object's ID against the other's endpoint is the usual way this goes wr
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import math
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -23,7 +24,19 @@ DEFAULT_LIST_COLUMNS = ["displayName", "appId", "signInAudience", "id"]
 # Only what the credentials command reads. Listing the two credential collections is what
 # makes the response carry them, since neither is part of the default application fields.
 CREDENTIAL_SELECT = ("id", "appId", "displayName", "passwordCredentials", "keyCredentials")
-DEFAULT_CREDENTIAL_COLUMNS = ["type", "name", "endDateTime", "keyId"]
+DEFAULT_CREDENTIAL_COLUMNS = ["type", "name", "status", "daysRemaining", "endDateTime", "keyId"]
+
+# How far ahead of its end date a credential counts as expiring. A month is long enough to
+# raise a change request and rotate a secret, and short enough that the answer stays rare.
+DEFAULT_EXPIRY_WINDOW_DAYS = 30
+SECONDS_PER_DAY = 86_400
+
+STATUS_VALID = "valid"
+STATUS_EXPIRING = "expiring"
+STATUS_EXPIRED = "expired"
+# No end date to judge by. Never a failure: there is nothing to say is wrong.
+STATUS_UNKNOWN = "unknown"
+ATTENTION_STATUSES = (STATUS_EXPIRED, STATUS_EXPIRING)
 
 
 def match_option(func: Any) -> Any:
@@ -145,3 +158,48 @@ def _credential_row(
 def _by_expiry(row: dict[str, Any]) -> tuple[bool, datetime]:
     end = parse_graph_time(row["endDateTime"])
     return end is None, end or datetime.min.replace(tzinfo=UTC)
+
+
+def credential_status(end: datetime | None, now: datetime, window: timedelta) -> str:
+    """Whether a credential has lapsed, is about to, or is comfortably in date.
+
+    The moment is a parameter, not read from the clock, so a test can sit exactly on each
+    boundary. A credential ending at this very instant has lapsed, and one ending exactly
+    `window` from now is still expiring: the window is inclusive, the deadline is not.
+    """
+    if end is None:
+        return STATUS_UNKNOWN
+    remaining = end - now
+    if remaining <= timedelta(0):
+        return STATUS_EXPIRED
+    if remaining <= window:
+        return STATUS_EXPIRING
+    return STATUS_VALID
+
+
+def days_remaining(end: datetime | None, now: datetime) -> int | None:
+    """Whole days left, rounded down, and negative once the end date has passed.
+
+    Zero therefore means less than a day left, or just lapsed. It is rounded down so that a
+    credential never looks as if it has longer than it does.
+    """
+    if end is None:
+        return None
+    return math.floor((end - now).total_seconds() / SECONDS_PER_DAY)
+
+
+def with_expiry(
+    rows: list[dict[str, Any]], now: datetime, window: timedelta
+) -> list[dict[str, Any]]:
+    """The rows with `daysRemaining` and `status` added, leaving the originals untouched."""
+    annotated = []
+    for row in rows:
+        end = parse_graph_time(row["endDateTime"])
+        annotated.append(
+            {
+                **row,
+                "daysRemaining": days_remaining(end, now),
+                "status": credential_status(end, now, window),
+            }
+        )
+    return annotated

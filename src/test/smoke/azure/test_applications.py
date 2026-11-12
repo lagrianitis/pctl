@@ -100,3 +100,27 @@ def test_credentials_help_documents_how_the_app_is_found(apps: Callable[..., Any
 
     assert "--app" in stdout
     assert "--match" in stdout
+
+
+def test_credentials_help_documents_the_expiry_window(apps: Callable[..., Any]) -> None:
+    stdout = " ".join(ok(apps("credentials", "--help")).stdout.split())
+
+    assert "--expiring-within" in stdout
+    assert "[default: 30]" in stdout
+
+
+def test_credentials_help_documents_the_failing_flag_and_its_code(
+    apps: Callable[..., Any],
+) -> None:
+    stdout = " ".join(ok(apps("credentials", "--help")).stdout.split())
+
+    assert "--fail-on-expiry" in stdout
+    assert "Exit 6" in stdout
+
+
+def test_a_window_of_zero_days_is_rejected(apps: Callable[..., Any]) -> None:
+    failed(apps("credentials", "--app", "x", "--expiring-within", "0"), 2)
+
+
+def test_a_window_that_is_not_a_number_is_rejected(apps: Callable[..., Any]) -> None:
+    failed(apps("credentials", "--app", "x", "--expiring-within", "soon"), 2)

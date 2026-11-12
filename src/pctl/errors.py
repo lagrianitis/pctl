@@ -8,6 +8,7 @@ EXIT_USAGE = 2
 EXIT_AUTH = 3
 EXIT_NOT_FOUND = 4
 EXIT_UPSTREAM = 5
+EXIT_CHECK_FAILED = 6
 
 
 class PctlError(click.ClickException):
@@ -26,6 +27,16 @@ class AuthError(PctlError):
 
 class NotFoundError(PctlError):
     exit_code = EXIT_NOT_FOUND
+
+
+class CheckFailedError(PctlError):
+    """A check the caller asked for did not pass, such as a credential about to expire.
+
+    Not a fault in pctl or in the provider, so it has a code of its own: a pipeline can tell
+    "the check says no" from "the check could not run".
+    """
+
+    exit_code = EXIT_CHECK_FAILED
 
 
 class UpstreamError(PctlError):

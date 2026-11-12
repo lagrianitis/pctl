@@ -1,9 +1,11 @@
-"""Unit tests for turning an application's credentials into rows.
+"""Unit tests for turning an application's credentials into rows, and judging their expiry.
 
-Two things matter here. The rows must never carry more than the fields chosen for them,
+Three things matter here. The rows must never carry more than the fields chosen for them,
 since a Graph response can include a secret value or key material and a row that copied
-whatever arrived would print it. And the dates must sort and parse the way Graph sends
-them, including the seven fractional digits that `datetime` would refuse before 3.11.
+whatever arrived would print it. The dates must sort and parse the way Graph sends them,
+including the seven fractional digits that `datetime` would refuse before 3.11. And the
+status rule has to be exact at its boundaries, which is why the moment is a parameter and
+every case here sits on one side of an edge or the other.
 """
 
 from __future__ import annotations
@@ -13,7 +15,13 @@ from typing import Any
 
 import pytest
 
-from pctl.azure.applications.common import credential_rows, parse_graph_time
+from pctl.azure.applications.common import (
+    credential_rows,
+    credential_status,
+    days_remaining,
+    parse_graph_time,
+    with_expiry,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -164,3 +172,135 @@ def test_a_timestamp_with_no_zone_is_taken_as_utc() -> None:
 @pytest.mark.parametrize("value", [None, "", "not a date", "2027-13-45T99:99:99Z"])
 def test_an_absent_or_unreadable_timestamp_is_none(value: str | None) -> None:
     assert parse_graph_time(value) is None
+
+
+# ---------------------------------------------------------------------------
+# status: where each boundary falls
+# ---------------------------------------------------------------------------
+NOW = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
+WINDOW = timedelta(days=30)
+SECOND = timedelta(seconds=1)
+
+
+def status_at(offset: timedelta) -> str:
+    """The status of a credential ending `offset` from NOW, under a 30 day window."""
+    return credential_status(NOW + offset, NOW, WINDOW)
+
+
+def test_a_credential_that_ended_in_the_past_is_expired() -> None:
+    assert status_at(-SECOND) == "expired"
+
+
+def test_a_credential_ending_this_very_instant_is_expired() -> None:
+    """The deadline is not inclusive: at the end date it no longer works."""
+    assert status_at(timedelta(0)) == "expired"
+
+
+def test_a_credential_a_second_from_ending_is_expiring() -> None:
+    assert status_at(SECOND) == "expiring"
+
+
+def test_a_credential_a_second_inside_the_window_is_expiring() -> None:
+    assert status_at(WINDOW - SECOND) == "expiring"
+
+
+def test_a_credential_exactly_at_the_window_is_expiring() -> None:
+    """The window is inclusive: thirty days away is still within thirty days."""
+    assert status_at(WINDOW) == "expiring"
+
+
+def test_a_credential_a_second_beyond_the_window_is_valid() -> None:
+    assert status_at(WINDOW + SECOND) == "valid"
+
+
+def test_a_credential_far_in_the_future_is_valid() -> None:
+    assert status_at(timedelta(days=900)) == "valid"
+
+
+def test_a_credential_with_no_end_date_is_unknown() -> None:
+    assert credential_status(None, NOW, WINDOW) == "unknown"
+
+
+def test_a_wider_window_catches_more() -> None:
+    end = NOW + timedelta(days=45)
+
+    assert credential_status(end, NOW, timedelta(days=30)) == "valid"
+    assert credential_status(end, NOW, timedelta(days=60)) == "expiring"
+
+
+# ---------------------------------------------------------------------------
+# days remaining
+# ---------------------------------------------------------------------------
+def test_whole_days_are_counted() -> None:
+    assert days_remaining(NOW + timedelta(days=10, hours=1), NOW) == 10
+
+
+def test_days_are_rounded_down() -> None:
+    """Nine days and 23 hours is nine days: it must never look longer than it is."""
+    assert days_remaining(NOW + timedelta(days=10) - timedelta(hours=1), NOW) == 9
+
+
+def test_less_than_a_day_left_is_zero() -> None:
+    assert days_remaining(NOW + timedelta(hours=12), NOW) == 0
+
+
+def test_ending_this_instant_is_zero() -> None:
+    assert days_remaining(NOW, NOW) == 0
+
+
+def test_a_lapsed_credential_is_negative() -> None:
+    assert days_remaining(NOW - timedelta(hours=12), NOW) == -1
+    assert days_remaining(NOW - timedelta(days=42), NOW) == -42
+
+
+def test_no_end_date_has_no_days() -> None:
+    assert days_remaining(None, NOW) is None
+
+
+# ---------------------------------------------------------------------------
+# adding the expiry to rows
+# ---------------------------------------------------------------------------
+def test_expiry_adds_the_days_and_the_status() -> None:
+    rows = credential_rows(
+        registration(passwordCredentials=[secret("deploy", "2026-11-22T12:00:00Z")])
+    )
+
+    annotated = with_expiry(rows, NOW, WINDOW)
+
+    assert (annotated[0]["daysRemaining"], annotated[0]["status"]) == (10, "expiring")
+
+
+def test_expiry_leaves_the_original_rows_alone() -> None:
+    rows = credential_rows(registration(passwordCredentials=[secret("deploy", None)]))
+
+    with_expiry(rows, NOW, WINDOW)
+
+    assert "status" not in rows[0]
+
+
+def test_a_row_with_no_end_date_is_unknown_not_a_failure() -> None:
+    rows = credential_rows(registration(passwordCredentials=[secret("deploy", None)]))
+
+    annotated = with_expiry(rows, NOW, WINDOW)
+
+    assert (annotated[0]["daysRemaining"], annotated[0]["status"]) == (None, "unknown")
+
+
+def test_every_status_is_assigned_from_the_same_moment() -> None:
+    rows = credential_rows(
+        registration(
+            passwordCredentials=[
+                secret("gone", "2026-10-01T12:00:00Z"),
+                secret("soon", "2026-11-20T12:00:00Z"),
+                secret("fine", "2028-05-12T09:00:00Z"),
+            ]
+        )
+    )
+
+    annotated = with_expiry(rows, NOW, WINDOW)
+
+    assert {row["name"]: row["status"] for row in annotated} == {
+        "gone": "expired",
+        "soon": "expiring",
+        "fine": "valid",
+    }

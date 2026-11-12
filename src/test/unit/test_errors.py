@@ -12,6 +12,7 @@ import pytest
 
 from pctl.errors import (
     AuthError,
+    CheckFailedError,
     ConfigError,
     NotFoundError,
     PctlError,
@@ -29,13 +30,17 @@ pytestmark = pytest.mark.unit
         (AuthError, 3),
         (NotFoundError, 4),
         (UpstreamError, 5),
+        (CheckFailedError, 6),
     ],
 )
 def test_exit_codes_are_stable(error: type[PctlError], exit_code: int) -> None:
     assert error("boom").exit_code == exit_code
 
 
-@pytest.mark.parametrize("error", [PctlError, ConfigError, AuthError, NotFoundError, UpstreamError])
+@pytest.mark.parametrize(
+    "error",
+    [PctlError, ConfigError, AuthError, NotFoundError, UpstreamError, CheckFailedError],
+)
 def test_every_error_is_a_click_exception(error: type[PctlError]) -> None:
     """click prints these itself and honours `exit_code`; nothing calls sys.exit."""
     assert issubclass(error, click.ClickException)
