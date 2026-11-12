@@ -29,7 +29,7 @@ src/pctl/
 │   │   ├── get.py           action
 │   │   └── members.py       action
 │   ├── users/             service: get
-│   ├── applications/      service (exposed as `apps`): list, get
+│   ├── applications/      service (exposed as `apps`): list, get, credentials
 │   ├── service_principals/ service (exposed as `sp`): list, get, assignments, owners,
 │   │                        add-owner, remove-owner, provision
 │   └── entitlements/      service (exposed as `eam`): packages, catalogs, assignments,

@@ -417,6 +417,7 @@ pctl azure apps list --search "incident.io"
 pctl azure apps get --app "Company Incident.io SCIM"
 pctl azure apps get --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d
 pctl azure apps get --app "Company Incident.io SCIM" --with-sp -o json
+pctl azure apps credentials --app "Company Incident.io SCIM"
 ```
 
 **An application has two GUIDs and they are not interchangeable.** `appId` is the
@@ -436,6 +437,29 @@ A registration with no service principal is reported on stderr — that means re
 but not instantiated here, which is a real state and a confusing one. Conversely a
 third-party app you use but did not register has a service principal and no local
 application, so it appears under `sp list` and not here.
+
+#### Credentials and when they expire
+
+`apps credentials` lists the client secrets and certificates of one registration, found the
+way `apps get` finds it, with how long each has left:
+
+```bash
+pctl azure apps credentials --app "Company Incident.io SCIM"
+pctl azure apps credentials --app "$APP" -o json | jq '.[] | {name, status, daysRemaining}'
+pctl azure apps credentials --app "$APP" --expiring-within 60 --fail-on-expiry   # a check
+```
+
+Each credential shows `daysRemaining` (whole days, rounded down, negative once it has
+lapsed) and a `status`: `expired`, `expiring` (ending within `--expiring-within` days,
+default 30) or `valid`. Listed soonest to end first. Dates are UTC, as Graph reports them.
+
+`--fail-on-expiry` still lists everything, then exits **6** if any credential has expired
+or is expiring, so a pipeline can fail ahead of an outage. An app with no credentials
+passes.
+
+**Secret values are never shown.** Graph returns a name, a key ID, the dates and a short
+hint for an existing secret, and the value only once, when it is created. Federated
+credentials are a separate resource and are not listed.
 
 ### Service principals (Enterprise Applications)
 
@@ -849,6 +873,7 @@ src/test/
 | 3    | authentication failure           |
 | 4    | not found (group, table or item) |
 | 5    | upstream error from Graph or AWS |
+| 6    | a check you asked for said no    |
 | 130  | interrupted                      |
 | 141  | downstream pipe closed           |
 

@@ -80,12 +80,18 @@ empty values render as `-`.
 | 3    | Authentication         | The credential itself could not be used                                   |
 | 4    | Not found              | A name or ID matched nothing                                              |
 | 5    | Upstream               | The provider refused or failed: 403, 400, 5xx, a write that did not apply |
+| 6    | Check failed           | A check you asked for ran and said no, e.g. `--fail-on-expiry`            |
 | 130  | Interrupted            | Ctrl-C                                                                    |
 | 141  | Broken pipe            | The reader closed first, e.g. `\| head`                                   |
 
 They are a published contract, which makes them the cheapest thing to script against.
 
 ### The distinctions that matter
+
+**5 vs 6 — the check could not run vs the check said no.** Exit 6 is only ever returned by a
+command you asked to act as a check, after it has listed what it found. Exit 5 means the
+provider failed before there was an answer. A pipeline that treats 6 as "go and fix a
+credential" and 5 as "retry" will do the right thing for each.
 
 **2 vs 4 — ambiguity vs absence.** A name that matches nothing exits 4. A name that matches
 _several_ things where exactly one is required exits 2, because it is your input that needs

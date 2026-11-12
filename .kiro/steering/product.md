@@ -12,7 +12,8 @@ consistent interface.
   - `groups` — list every group across paginated results, resolve by display name, and
     stream members or owners.
   - `users` — find a user by email, display name or object ID.
-  - `apps` — list and get application registrations.
+  - `apps` — list and get application registrations, and list their client secrets and
+    certificates with the days left and a status, optionally failing when one is close.
   - `sp` — list and get service principals (Enterprise Applications), read app role
     assignments and owners, add or remove an owner, and provision users or groups.
   - `eam` — entitlement management: list and get access packages and catalogs, list,
@@ -38,7 +39,7 @@ consistent interface.
 - **Pipe-friendly by default.** Data goes to stdout, diagnostics and summaries go to
   stderr. `ndjson` and `csv` stream, so memory stays flat on large result sets.
 - **Scriptable exit codes.** 0 success, 1 generic, 2 usage/config, 3 auth,
-  4 not found, 5 upstream, 130 interrupted, 141 broken pipe.
+  4 not found, 5 upstream, 6 a requested check said no, 130 interrupted, 141 broken pipe.
 - **Secrets stay out of argv.** Client secrets are read from the environment or AWS
   Secrets Manager, not from a CLI flag. The one exception is `pctl oauth --client-secret`,
   a deliberate choice recorded in `security.md`.

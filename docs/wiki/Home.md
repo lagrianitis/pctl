@@ -51,7 +51,7 @@ diagnostics, so `pctl ... -o ndjson | jq` is always clean.
 | [Token and raw](Azure-Token-and-Raw)                   | `token`, `raw`                                                                                                                                                 |
 | [Groups](Azure-Groups)                                 | `groups list`, `get`, `members`                                                                                                                                |
 | [Users](Azure-Users)                                   | `users get`                                                                                                                                                    |
-| [Applications](Azure-Applications)                     | `apps list`, `get`                                                                                                                                             |
+| [Applications](Azure-Applications)                     | `apps list`, `get`, `credentials`                                                                                                                              |
 | [Service principals](Azure-Service-Principals)         | `sp list`, `get`, `assignments`, `owners`, `add-owner`, `remove-owner`, `provision`                                                                            |
 | [Entitlement management](Azure-Entitlement-Management) | `eam list-packages`, `get-package`, `delete-package`, `list-catalogs`, `get-catalog`, `list-assignments`, `add-assignment`, `remove-assignment`, `get-request` |
 

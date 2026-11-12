@@ -2,7 +2,8 @@
 
 Application registrations — what the Entra ID portal calls **App registrations**. Read-only.
 
-**Permission:** `Application.Read.All` or `Directory.Read.All`.
+**Permission:** `Application.Read.All` or `Directory.Read.All`, for every command here
+including `credentials`, which reads the credential metadata off the application object.
 
 **Aliases:** `pctl azure app-registrations`, `pctl azure applications`.
 
@@ -126,15 +127,94 @@ instantiated here.
 
 ---
 
+## `credentials`
+
+The client secrets and certificates of one app registration, and when each runs out.
+
+| Flag                    | Default | Effect                                                                |
+| ----------------------- | ------- | --------------------------------------------------------------------- |
+| `--app NAME\|APPID\|ID` |         | **Required.** Display name, `appId` or object ID                      |
+| `--match`               | `exact` | How to match a display name: `exact`, `prefix` or `search`            |
+| `--expiring-within N`   | `30`    | Days before the end date that count as expiring                       |
+| `--fail-on-expiry`      |         | List everything, then exit **6** if any credential lapsed or is close |
+| `-c, --columns`         |         | Columns for `table` and `csv`                                         |
+
+Plus the [credential, column and global options](Common-Options).
+
+```bash
+pctl azure apps credentials --app "Company Incident.io SCIM"
+pctl azure apps credentials --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d -o json
+pctl azure apps credentials --app "$APP" --expiring-within 60 --fail-on-expiry
+```
+
+The app is found exactly as `get` finds it, including [how a bare GUID is
+resolved](#how-a-bare-guid-is-resolved) and [the refusal of an ambiguous
+name](#an-ambiguous-name-is-refused).
+
+### The columns
+
+| Column          | Meaning                                                                    |
+| --------------- | -------------------------------------------------------------------------- |
+| `type`          | `secret` or `certificate`                                                  |
+| `name`          | The description given when it was created                                  |
+| `status`        | `expired`, `expiring` or `valid`; `unknown` if Graph sent no end date      |
+| `daysRemaining` | Whole days left, rounded down; negative once lapsed; `0` means under a day |
+| `endDateTime`   | When it stops working, in UTC as Graph reports it                          |
+| `keyId`         | Identifies the credential, e.g. when removing it                           |
+
+`-o json` also carries `app`, `appId`, `startDateTime` and `hint`. Rows are listed soonest to
+end first, secrets and certificates together.
+
+### Status
+
+| Status     | When                                                           |
+| ---------- | -------------------------------------------------------------- |
+| `expired`  | The end date is now or in the past                             |
+| `expiring` | It ends within `--expiring-within` days, the boundary included |
+| `valid`    | It ends later than that                                        |
+
+`daysRemaining` is rounded down so a credential never looks as if it has longer than it does.
+
+### Using it as a check
+
+`--fail-on-expiry` makes the command usable in a pipeline. It still prints every credential,
+so the failure arrives with its detail, then exits **6**:
+
+```
+$ pctl azure apps credentials --app "$APP" --fail-on-expiry
+...
+Error: 1 expired and 1 expiring within 30 days, of 3 credential(s).
+$ echo $?
+6
+```
+
+An app with no credentials passes, and so does one whose credentials have no end date to
+judge by. See [Output and exit codes](Output-and-Exit-Codes#the-distinctions-that-matter) for
+how 6 differs from 5.
+
+### What is never shown
+
+Graph returns a name, a key ID, the dates and a short hint for an existing secret. It
+returns the **value** only once, when the secret is created. `credentials` shows what Graph
+returns and nothing else, and does not create or rotate a secret. A certificate's key
+material is not shown either.
+
+**Federated credentials** are a separate resource, shown on their own tab in the portal. They
+are not listed here.
+
+---
+
 ## Which command do I want?
 
-| Question                                          | Command                                                  |
-| ------------------------------------------------- | -------------------------------------------------------- |
-| Who has access to this application?               | [`sp assignments`](Azure-Service-Principals#assignments) |
-| Who owns it?                                      | [`sp owners`](Azure-Service-Principals#owners)           |
-| What are its redirect URIs, required permissions? | `apps get`                                               |
-| I have an `appId`, what is the SP object ID?      | `apps get --app <appId> --with-sp`                       |
-| I have a name, is it registered here at all?      | `apps get --app "<name>"`                                |
+| Question                                          | Command                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| Who has access to this application?               | [`sp assignments`](Azure-Service-Principals#assignments)                |
+| Who owns it?                                      | [`sp owners`](Azure-Service-Principals#owners)                          |
+| When does its client secret run out?              | `apps credentials --app "<name>"`                                       |
+| Will a secret expire in the next 60 days?         | `apps credentials --app "<name>" --expiring-within 60 --fail-on-expiry` |
+| What are its redirect URIs, required permissions? | `apps get`                                                              |
+| I have an `appId`, what is the SP object ID?      | `apps get --app <appId> --with-sp`                                      |
+| I have a name, is it registered here at all?      | `apps get --app "<name>"`                                               |
 
 ## Related
 

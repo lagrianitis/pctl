@@ -13,7 +13,7 @@ not as you.
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `Group.Read.All`                                             | `groups list`, `groups get`, `groups members`                                                         |
 | `User.Read.All`                                              | `users get`; group members; resolving an owner or assignment target by name or address                |
-| `Application.Read.All` **or** `Directory.Read.All`           | `apps list`, `apps get`; `sp list`, `sp get`, `sp assignments`, `sp owners`                           |
+| `Application.Read.All` **or** `Directory.Read.All`           | `apps list`, `apps get`, `apps credentials`; `sp list`, `sp get`, `sp assignments`, `sp owners`       |
 | `Application.ReadWrite.All` **or** `Directory.ReadWrite.All` | `sp add-owner`, `sp remove-owner` — **nothing else**                                                  |
 | `Synchronization.ReadWrite.All`                              | `sp provision` — **nothing else**                                                                     |
 | `EntitlementManagement.Read.All`                             | `eam list-packages`, `get-package`, `list-catalogs`, `get-catalog`, `list-assignments`, `get-request` |
@@ -35,6 +35,7 @@ broad, and 25 of the 30 commands do not want them.
 | `azure users get`                | `User.Read.All`                                                                        |        |
 | `azure apps list`                | `Application.Read.All`                                                                 |        |
 | `azure apps get`                 | `Application.Read.All`                                                                 |        |
+| `azure apps credentials`         | `Application.Read.All`                                                                 |        |
 | `azure sp list`                  | `Application.Read.All`                                                                 |        |
 | `azure sp get`                   | `Application.Read.All`                                                                 |        |
 | `azure sp assignments`           | `Application.Read.All`                                                                 |        |
