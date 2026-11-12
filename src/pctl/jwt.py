@@ -37,6 +37,6 @@ def decode_claims(token: str) -> dict[str, Any]:
     payload = parts[1] + "=" * (-len(parts[1]) % 4)
     try:
         claims = orjson.loads(base64.urlsafe_b64decode(payload))
-    except ValueError, orjson.JSONDecodeError:
+    except (ValueError, orjson.JSONDecodeError):
         return {"error": "could not decode payload"}
     return claims if isinstance(claims, dict) else {"value": claims}

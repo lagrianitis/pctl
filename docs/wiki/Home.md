@@ -107,4 +107,4 @@ new value has somewhere to go. See [Applications](Azure-Applications#add-client-
 
 ## Requirements
 
-Python **3.14 or newer**. Installed and run with [uv](https://docs.astral.sh/uv/).
+Python **3.11 or newer**. Installed and run with [uv](https://docs.astral.sh/uv/).

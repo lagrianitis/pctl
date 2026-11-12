@@ -16,7 +16,7 @@ Every project must be documented well enough that another engineer can understan
 Must contain:
 
 1. **What**: One-paragraph description of what this project does and why
-2. **Install**: Exact tools and versions needed (Python 3.14+, uv), and the install
+2. **Install**: Exact tools and versions needed (Python 3.11+, uv), and the install
    commands, including the optional `fast` and `azure` extras
 3. **Configure**: Every environment variable, with a description and an example value,
    pointing at `.env.example` rather than repeating secrets

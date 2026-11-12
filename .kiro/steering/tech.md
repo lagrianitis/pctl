@@ -2,9 +2,10 @@
 
 ## Runtime
 
-- **Python >= 3.14.** Use modern syntax freely: `X | None`, `StrEnum`,
-  `match`, `dataclass(slots=True)`. Every module starts with
-  `from __future__ import annotations`.
+- **Python >= 3.11**, tested in CI on 3.11 to 3.14. Use modern syntax that 3.11 accepts:
+  `X | None`, `StrEnum`, `match`, `dataclass(slots=True)`. Every module starts with
+  `from __future__ import annotations`. Nothing newer than 3.11: no PEP 695 `type`
+  statements or generics, and `except (A, B):` always carries its parentheses.
 - **hatchling** is the build backend; the wheel packages `src/pctl`.
 
 ## Package management: uv only
@@ -101,7 +102,7 @@ usually a straight rename; `docker-compose` becomes `podman compose`.
 
 ## Lint and style rules
 
-- `ruff`, line length **100**, `target-version = "py314"`.
+- `ruff`, line length **100**, `target-version = "py311"`.
 - Lint select: `E, F, I, UP, B, SIM, C4, RUF`; ignore `B008` (click decorators
   legitimately call functions in defaults). `IGNORE-*` paths are excluded.
 - Every module gets a docstring that explains _why_ it exists, not just what it

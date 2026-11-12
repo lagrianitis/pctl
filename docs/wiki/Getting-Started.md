@@ -2,7 +2,7 @@
 
 ## Install
 
-`pctl` needs **Python 3.14 or newer** and is managed with [uv](https://docs.astral.sh/uv/).
+`pctl` needs **Python 3.11 or newer** and is managed with [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/lagrianitis/pctl.git

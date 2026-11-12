@@ -3,7 +3,7 @@ name = "pctl"
 version = "0.4.0"
 description = "Fast platform CLI for AWS, Azure and other SaaS providers"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "AWS Platform" }]
 keywords = ["cli", "platform", "azure", "microsoft-graph", "aws", "dynamodb"]
@@ -51,7 +51,7 @@ packages = ["src/pctl"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py314"
+target-version = "py311"
 src = ["src", "src/test"]
 extend-exclude = ["IGNORE-*"]
 
