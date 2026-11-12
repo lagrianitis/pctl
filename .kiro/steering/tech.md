@@ -244,8 +244,9 @@ GitHub Actions (`.github/workflows/ci.yml`); `origin` is `github.com`. Jobs:
 - `lint`: pull requests and pushes to `main`. Installs with
   `uv sync --frozen --no-install-project` and runs `ruff check` and `ruff format --check`
   through `uv run --no-sync`, so lint never builds the package.
-- `test`: pull requests only. `uv sync --frozen --extra fast --extra azure`, then
-  `uv run pytest -n auto`.
+- `test`: pull requests only, as a matrix over Python 3.11, 3.12, 3.13 and 3.14 with
+  `fail-fast: false`. `uv sync --frozen --extra fast --extra azure`, then
+  `uv run pytest -n auto`, both under the matrix interpreter.
 - `tag`: when a release is **published**. Checks the release tag against
   `[project].version` in `pyproject.toml`, rejects a version already tagged on another
   commit, then creates the tag. Releases are release-triggered, not tag-triggered: bump

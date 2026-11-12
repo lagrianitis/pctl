@@ -50,13 +50,19 @@ jobs:
     # it reaches main, not to discover it on the merge commit or at release time.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
+      # python-version sets UV_PYTHON, so the sync and the test run use that interpreter.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
       # --frozen installs exactly what uv.lock pins instead of re-resolving.
       - name: Install dependencies
