@@ -1,6 +1,7 @@
 """The `apps` service under the `azure` case: application registrations.
 
-Read-only. The portal calls these App registrations, and calls their tenant-local
+Read-only, except `add-client-secret` and `remove-client-secret`, which create and remove a
+client secret. The portal calls these App registrations, and calls their tenant-local
 instances Enterprise applications, which live under `pctl azure sp`. One application can
 have a service principal in many tenants; the two are joined by `appId`.
 
@@ -25,9 +26,17 @@ LAZY_SUBCOMMANDS: dict[str, tuple[str, str]] = {
         "pctl.azure.applications.get:command",
         "Show an app registration by name, appId or object ID.",
     ),
-    "credentials": (
-        "pctl.azure.applications.credentials:command",
+    "get-client-secrets": (
+        "pctl.azure.applications.get_client_secrets:command",
         "List the secrets and certificates of an app registration.",
+    ),
+    "remove-client-secret": (
+        "pctl.azure.applications.remove_client_secret:command",
+        "Remove a client secret from an app registration.",
+    ),
+    "add-client-secret": (
+        "pctl.azure.applications.add_client_secret:command",
+        "Create a client secret and store its value in Secrets Manager.",
     ),
 }
 

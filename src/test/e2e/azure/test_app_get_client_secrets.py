@@ -1,4 +1,4 @@
-"""End-to-end: `pctl azure apps credentials`, against Graph faked with respx.
+"""End-to-end: `pctl azure apps get-client-secrets`, against Graph faked with respx.
 
 The listing is read from the application object itself, so the interesting assertions are
 about what is asked for and what is allowed to come back out: the two credential
@@ -12,15 +12,12 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import unquote_plus
-
 import pytest
-
 from helpers import GRAPH, failed, filters, lines, ok
 
 pytestmark = pytest.mark.e2e
 
 NOW = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
-
 APP_OBJECT_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 APP_CLIENT_ID = "8f468c48-e9ac-4dd7-973d-9704b9cdd56d"
 APP_NAME = "ci-deploy-app"
@@ -107,7 +104,7 @@ def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> datetime:
     Autouse because every credential here has an end date, and an unpinned clock would let
     a test that passes today fail the day one of them lapses.
     """
-    monkeypatch.setattr("pctl.azure.applications.credentials.utcnow", lambda: NOW)
+    monkeypatch.setattr("pctl.azure.applications.get_client_secrets.utcnow", lambda: NOW)
     return NOW
 
 
@@ -134,22 +131,16 @@ def tenant(graph: Any, seen: list[str]) -> Any:
             return httpx.Response(200, json={"value": [APP, OTHER_APP]})
         return httpx.Response(200, json={"value": []})
 
-    graph.get(f"{GRAPH}/applications/{APP_OBJECT_ID}").mock(
-        return_value=httpx.Response(200, json=APP)
-    )
     graph.get(f"{GRAPH}/applications").mock(side_effect=applications)
     return graph
 
 
 def credentials(runner: Any, cli: Any, *args: str, output: str = "ndjson") -> Any:
-    return runner.invoke(cli, ["-o", output, "azure", "apps", "credentials", *args])
+    return runner.invoke(cli, ["-o", output, "azure", "apps", "get-client-secrets", *args])
 
 
-# ---------------------------------------------------------------------------
-# what is listed
-# ---------------------------------------------------------------------------
 def test_every_secret_is_a_row_soonest_first(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_NAME))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME))
 
     rows = [json.loads(line) for line in lines(result.stdout)]
     assert [row["name"] for row in rows] == ["sooner", "later"]
@@ -157,7 +148,7 @@ def test_every_secret_is_a_row_soonest_first(runner: Any, cli: Any, tenant: Any)
 
 
 def test_a_row_carries_the_dates_the_key_id_and_the_app(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_NAME))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME))
 
     row = json.loads(lines(result.stdout)[0])
     assert row["keyId"] == "key-sooner"
@@ -168,7 +159,7 @@ def test_a_row_carries_the_dates_the_key_id_and_the_app(runner: Any, cli: Any, t
 
 
 def test_json_is_a_single_document(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_NAME, output="json"))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME, output="json"))
 
     assert [row["name"] for row in json.loads(result.stdout)] == ["sooner", "later"]
 
@@ -176,24 +167,21 @@ def test_json_is_a_single_document(runner: Any, cli: Any, tenant: Any) -> None:
 def test_the_default_columns_are_the_ones_that_answer_the_question(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_NAME, output="csv"))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME, output="csv"))
 
     assert lines(result.stdout)[0] == "type,name,status,daysRemaining,endDateTime,keyId"
 
 
 def test_columns_can_be_chosen(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_NAME, "-c", "name,hint", output="csv"))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME, "-c", "name,hint", output="csv"))
 
     assert lines(result.stdout) == ["name,hint", "sooner,paN", "later,Dba"]
 
 
-# ---------------------------------------------------------------------------
-# what is asked for, and what is never printed
-# ---------------------------------------------------------------------------
 def test_both_credential_collections_are_requested(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
-    ok(credentials(runner, cli, "--app", APP_NAME))
+    ok(credentials(runner, cli, "--app-name", APP_NAME))
 
     asked = unquote_plus(seen[0])
     assert "passwordCredentials" in asked
@@ -205,52 +193,68 @@ def test_a_secret_value_in_the_response_is_never_printed(
     runner: Any, cli: Any, tenant: Any, output: str
 ) -> None:
     """Graph only sends this at creation, but the command must not depend on that."""
-    result = ok(credentials(runner, cli, "--app", APP_NAME, output=output))
+    result = ok(credentials(runner, cli, "--app-name", APP_NAME, output=output))
 
     assert "LEAKED-SECRET-VALUE" not in result.output
 
 
-# ---------------------------------------------------------------------------
-# finding the app
-# ---------------------------------------------------------------------------
-def test_a_guid_is_tried_as_an_app_id_first(
+def test_an_app_id_is_looked_up_by_app_id_alone(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
-    ok(credentials(runner, cli, "--app", APP_CLIENT_ID))
+    result = ok(credentials(runner, cli, "--app-id", APP_CLIENT_ID))
 
     assert filters(seen) == [f"appId eq '{APP_CLIENT_ID}'"]
-
-
-def test_an_object_id_falls_back_to_direct_addressing(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", APP_OBJECT_ID))
-
     assert [json.loads(line)["name"] for line in lines(result.stdout)] == ["sooner", "later"]
+
+
+def test_an_app_name_is_looked_up_by_display_name(
+    runner: Any, cli: Any, tenant: Any, seen: list[str]
+) -> None:
+    ok(credentials(runner, cli, "--app-name", APP_NAME))
+
+    assert filters(seen) == [f"displayName eq '{APP_NAME}'"]
+
+
+def test_an_unknown_app_id_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
+    failed(credentials(runner, cli, "--app-id", "99999999-9999-9999-9999-999999999999"), 4)
+
+
+def test_an_app_id_that_is_not_a_guid_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
+    result = failed(credentials(runner, cli, "--app-id", APP_NAME), 2)
+
+    assert "must be a GUID" in result.output
+
+
+def test_both_flags_are_refused(runner: Any, cli: Any, tenant: Any) -> None:
+    result = failed(credentials(runner, cli, "--app-name", APP_NAME, "--app-id", APP_CLIENT_ID), 2)
+
+    assert "exactly one of --app-name or --app-id" in result.output
+
+
+def test_neither_flag_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
+    result = failed(credentials(runner, cli), 2)
+
+    assert "exactly one of --app-name or --app-id" in result.output
 
 
 def test_an_ambiguous_name_is_refused(runner: Any, cli: Any, tenant: Any) -> None:
     """Two registrations match, and acting on the wrong one's secrets is the risk."""
-    result = failed(credentials(runner, cli, "--app", "ci-deploy-", "--match", "prefix"), 2)
+    result = failed(credentials(runner, cli, "--app-name", "ci-deploy-", "--match", "prefix"), 2)
 
-    assert "Pass the appId" in result.output
+    assert "Pass --app-id" in result.output
 
 
 def test_a_name_that_matches_nothing_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
-    failed(credentials(runner, cli, "--app", "no-such-app"), 4)
+    failed(credentials(runner, cli, "--app-name", "no-such-app"), 4)
 
 
-# ---------------------------------------------------------------------------
-# an app with nothing to list
-# ---------------------------------------------------------------------------
 def test_an_app_with_no_credentials_exits_0_and_says_so(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", "bare"))
+    result = ok(credentials(runner, cli, "--app-name", "bare"))
 
     assert result.stdout.strip() == ""
     assert "has no client secrets or certificates" in result.stderr
 
 
-# ---------------------------------------------------------------------------
-# expiry
-# ---------------------------------------------------------------------------
 def statuses(stdout: str) -> dict[str, tuple[int, str]]:
     """Name to (days remaining, status), read from ndjson."""
     rows = [json.loads(line) for line in lines(stdout)]
@@ -258,7 +262,7 @@ def statuses(stdout: str) -> dict[str, tuple[int, str]]:
 
 
 def test_each_credential_shows_its_days_and_status(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", "ci-expiring"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring"))
 
     assert statuses(result.stdout) == {
         "gone": (-42, "expired"),
@@ -270,14 +274,14 @@ def test_each_credential_shows_its_days_and_status(runner: Any, cli: Any, tenant
 def test_the_credentials_are_listed_in_the_order_they_end(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    result = ok(credentials(runner, cli, "--app", "ci-expiring"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring"))
 
     assert [json.loads(line)["name"] for line in lines(result.stdout)] == ["gone", "soon", "fine"]
 
 
 def test_the_default_window_is_thirty_days(runner: Any, cli: Any, tenant: Any) -> None:
     """Eight days away is inside it, so a bare invocation already flags it."""
-    result = ok(credentials(runner, cli, "--app", "ci-expiring"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring"))
 
     assert statuses(result.stdout)["soon"][1] == "expiring"
 
@@ -285,13 +289,13 @@ def test_the_default_window_is_thirty_days(runner: Any, cli: Any, tenant: Any) -
 def test_a_narrower_window_stops_counting_it_as_expiring(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    result = ok(credentials(runner, cli, "--app", "ci-expiring", "--expiring-within", "5"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring", "--expiring-within", "5"))
 
     assert statuses(result.stdout)["soon"][1] == "valid"
 
 
 def test_a_wider_window_catches_a_later_one(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", "ci-expiring", "--expiring-within", "600"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring", "--expiring-within", "600"))
 
     assert statuses(result.stdout)["fine"][1] == "expiring"
 
@@ -299,27 +303,24 @@ def test_a_wider_window_catches_a_later_one(runner: Any, cli: Any, tenant: Any) 
 def test_the_output_is_the_same_every_time_the_clock_is_fixed(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    first = ok(credentials(runner, cli, "--app", "ci-expiring", output="json")).stdout
-    second = ok(credentials(runner, cli, "--app", "ci-expiring", output="json")).stdout
+    first = ok(credentials(runner, cli, "--app-name", "ci-expiring", output="json")).stdout
+    second = ok(credentials(runner, cli, "--app-name", "ci-expiring", output="json")).stdout
 
     assert first == second
 
 
 def test_a_table_shows_the_status_and_days(runner: Any, cli: Any, tenant: Any) -> None:
-    result = ok(credentials(runner, cli, "--app", "ci-expiring", output="table"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring", output="table"))
 
     assert "expired" in result.stdout
     assert "-42" in result.stdout
 
 
-# ---------------------------------------------------------------------------
-# failing on expiry
-# ---------------------------------------------------------------------------
 def test_lapsed_credentials_do_not_fail_the_command_by_default(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
     """Listing is not a check unless asked to be, or every report would be a failure."""
-    result = ok(credentials(runner, cli, "--app", "ci-expiring"))
+    result = ok(credentials(runner, cli, "--app-name", "ci-expiring"))
 
     assert "1 expired and 1 expiring within 30 days, of 3 credential(s)" in result.stderr
 
@@ -327,14 +328,14 @@ def test_lapsed_credentials_do_not_fail_the_command_by_default(
 def test_the_flag_fails_with_exit_6_when_something_has_lapsed(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    result = failed(credentials(runner, cli, "--app", "ci-expiring", "--fail-on-expiry"), 6)
+    result = failed(credentials(runner, cli, "--app-name", "ci-expiring", "--fail-on-expiry"), 6)
 
     assert "1 expired and 1 expiring within 30 days" in result.output
 
 
 def test_the_flag_still_lists_everything_before_failing(runner: Any, cli: Any, tenant: Any) -> None:
     """A failed check with no detail would send you to the portal to find out which."""
-    result = failed(credentials(runner, cli, "--app", "ci-expiring", "--fail-on-expiry"), 6)
+    result = failed(credentials(runner, cli, "--app-name", "ci-expiring", "--fail-on-expiry"), 6)
 
     assert set(statuses(result.stdout)) == {"gone", "soon", "fine"}
 
@@ -343,23 +344,23 @@ def test_the_flag_fails_for_a_credential_that_is_only_expiring(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
     """Nothing has lapsed yet, which is exactly when a pipeline wants to hear about it."""
-    failed(credentials(runner, cli, "--app", "ci-soon", "--fail-on-expiry"), 6)
+    failed(credentials(runner, cli, "--app-name", "ci-soon", "--fail-on-expiry"), 6)
 
 
 def test_the_flag_fails_for_a_credential_that_has_only_lapsed(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    failed(credentials(runner, cli, "--app", "ci-gone", "--fail-on-expiry"), 6)
+    failed(credentials(runner, cli, "--app-name", "ci-gone", "--fail-on-expiry"), 6)
 
 
 def test_the_flag_passes_when_every_credential_is_in_date(
     runner: Any, cli: Any, tenant: Any
 ) -> None:
-    ok(credentials(runner, cli, "--app", APP_NAME, "--fail-on-expiry"))
+    ok(credentials(runner, cli, "--app-name", APP_NAME, "--fail-on-expiry"))
 
 
 def test_the_flag_passes_for_an_app_with_no_credentials(runner: Any, cli: Any, tenant: Any) -> None:
-    ok(credentials(runner, cli, "--app", "bare", "--fail-on-expiry"))
+    ok(credentials(runner, cli, "--app-name", "bare", "--fail-on-expiry"))
 
 
 def test_a_window_wide_enough_makes_the_flag_fail_on_a_healthy_app(
@@ -367,6 +368,8 @@ def test_a_window_wide_enough_makes_the_flag_fail_on_a_healthy_app(
 ) -> None:
     """APP's soonest secret ends in April 2027, about 160 days after the pinned clock."""
     failed(
-        credentials(runner, cli, "--app", APP_NAME, "--expiring-within", "200", "--fail-on-expiry"),
+        credentials(
+            runner, cli, "--app-name", APP_NAME, "--expiring-within", "200", "--fail-on-expiry"
+        ),
         6,
     )

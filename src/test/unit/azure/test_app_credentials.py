@@ -20,6 +20,7 @@ from pctl.azure.applications.common import (
     credential_status,
     days_remaining,
     parse_graph_time,
+    requires_force,
     with_expiry,
 )
 
@@ -304,3 +305,38 @@ def test_every_status_is_assigned_from_the_same_moment() -> None:
         "soon": "expiring",
         "fine": "valid",
     }
+
+
+# ---------------------------------------------------------------------------
+# when removing a secret needs --force
+# ---------------------------------------------------------------------------
+def force_needed_at(offset: timedelta | None) -> bool:
+    """Whether a secret ending `offset` from NOW needs --force, or has no end date at None."""
+    end = None if offset is None else (NOW + offset).isoformat()
+    return requires_force({"endDateTime": end}, NOW, WINDOW)
+
+
+def test_a_lapsed_secret_needs_no_force() -> None:
+    assert force_needed_at(-SECOND) is False
+
+
+def test_a_secret_ending_this_instant_needs_no_force() -> None:
+    assert force_needed_at(timedelta(0)) is False
+
+
+def test_a_secret_exactly_at_the_window_needs_no_force() -> None:
+    """The same edge `credential_status` calls expiring, so the two never disagree."""
+    assert force_needed_at(WINDOW) is False
+
+
+def test_a_secret_a_second_beyond_the_window_needs_force() -> None:
+    assert force_needed_at(WINDOW + SECOND) is True
+
+
+def test_a_secret_far_in_the_future_needs_force() -> None:
+    assert force_needed_at(timedelta(days=300)) is True
+
+
+def test_a_secret_with_no_end_date_needs_force() -> None:
+    """With nothing to say it is nearly over, it is treated as possibly in use."""
+    assert force_needed_at(None) is True

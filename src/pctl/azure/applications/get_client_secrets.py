@@ -1,4 +1,4 @@
-"""Action: `pctl azure apps credentials`."""
+"""Action: `pctl azure apps get-client-secrets`."""
 
 from __future__ import annotations
 
@@ -20,9 +20,11 @@ from .common import (
     DEFAULT_EXPIRY_WINDOW_DAYS,
     STATUS_EXPIRED,
     STATUS_EXPIRING,
+    app_options,
     credential_rows,
     match_option,
-    resolve_application,
+    require_one_app,
+    resolve_app,
     with_expiry,
 )
 
@@ -32,14 +34,8 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-@click.command(name="credentials")
-@click.option(
-    "--app",
-    "identifier",
-    required=True,
-    metavar="NAME|APPID|ID",
-    help="Display name, appId or object ID of the app registration.",
-)
+@click.command(name="get-client-secrets")
+@app_options
 @azure_options
 @match_option
 @click.option(
@@ -61,16 +57,17 @@ def utcnow() -> datetime:
 @click.pass_context
 def command(
     ctx: click.Context,
-    identifier: str,
+    app_name: str | None,
+    app_id: str | None,
     match_mode: str,
     window_days: int,
     fail_on_expiry: bool,
 ) -> None:
     """List the client secrets and certificates of an app registration, and when they end.
 
-    The app is found the way `apps get` finds it: a bare GUID is tried as an appId first
-    and then as an object ID, and a display name is matched with --match. An ambiguous name
-    is refused rather than guessed.
+    Name the app with --app-name, matched as --match says, or with --app-id, which skips the
+    display name search. Give one of the two. An ambiguous name is refused rather than
+    guessed.
 
     Each credential shows the days it has left, rounded down and negative once it has
     lapsed, and a status: expired, expiring (ending within --expiring-within days) or
@@ -87,19 +84,21 @@ def command(
     Federated credentials are a separate resource and are not listed.
 
     \b
-      pctl azure apps credentials --app "Company Incident.io SCIM"
-      pctl azure apps credentials --app 8f468c48-e9ac-4dd7-973d-9704b9cdd56d -o json
-      pctl azure apps credentials --app "incident" --match search
-      pctl azure apps credentials --app "Company SCIM" --expiring-within 60 --fail-on-expiry
+      pctl azure apps get-client-secrets --app-name "Company Incident.io SCIM"
+      pctl azure apps get-client-secrets --app-id 8f468c48-e9ac-4dd7-973d-9704b9cdd56d -o json
+      pctl azure apps get-client-secrets --app-name "incident" --match search
+      pctl azure apps get-client-secrets --app-name "Company SCIM" --expiring-within 60 \\
+          --fail-on-expiry
     """
     from ..graph import run
 
     app = ctx.ensure_object(AppContext)
+    require_one_app(app_name, app_id)
 
     async def _run() -> dict[str, Any]:
         async with graph_client(app) as client:
-            return await resolve_application(
-                client, identifier, mode=match_mode, select=CREDENTIAL_SELECT
+            return await resolve_app(
+                client, app_name, app_id, mode=match_mode, select=CREDENTIAL_SELECT
             )
 
     registration = run(_run())
