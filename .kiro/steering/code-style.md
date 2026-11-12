@@ -28,7 +28,9 @@ Enforced by ruff, configured in `pyproject.toml`. The config is the source of tr
 
 ## Type hints
 
-Python 3.14, so use modern syntax. Ruff's `UP` rules will flag the alternatives.
+Python 3.11 and newer, so use modern syntax that 3.11 accepts. Ruff's `UP` rules will flag
+the alternatives. Write multiple exceptions as `except (A, B):`, since the bare form needs
+3.14.
 
 - Annotate every function parameter and return value, including click callbacks.
 - `X | None`, never `Optional[X]`. `X | Y`, never `Union[X, Y]`. Built-in generics

@@ -50,13 +50,19 @@ jobs:
     # it reaches main, not to discover it on the merge commit or at release time.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
+      # python-version sets UV_PYTHON, so the sync and the test run use that interpreter.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ matrix.python-version }}
 
       # --frozen installs exactly what uv.lock pins instead of re-resolving.
       - name: Install dependencies
@@ -232,3 +238,59 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${TAG}" -m "Release ${TAG}"
           git push origin "refs/tags/${TAG}"
+
+  build:
+    # Pull requests as well as releases, so a packaging mistake fails the pull request
+    # instead of the release. The wheel is installed into a throwaway venv and run, which
+    # proves the entry point and the dependency metadata, not just that a build succeeded.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Smoke test the wheel
+        run: |
+          uv venv "$RUNNER_TEMP/smoke"
+          uv pip install --python "$RUNNER_TEMP/smoke" dist/*.whl
+          "$RUNNER_TEMP/smoke/bin/pctl" --version
+          "$RUNNER_TEMP/smoke/bin/pctl" --help
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    # Published releases only, and only once the version check and the build both passed.
+    # Trusted Publishing: PyPI trusts this workflow file (ci.yml) and the `pypi`
+    # environment, so there is no API token to store. id-token is the only permission,
+    # and the job needs no checkout because it publishes the artifact `build` made.
+    # PyPI versions are immutable, so a published version can never be replaced.
+    needs: [tag, build]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pctl
+    permissions:
+      id-token: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always

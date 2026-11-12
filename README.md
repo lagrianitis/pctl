@@ -13,9 +13,20 @@ The command line is **case → service → action** (`pctl aws ddb scan`), and t
 tree mirrors it, so adding a provider such as Confluent means adding a case package
 rather than reshaping anything that already works.
 
-Built on [Click](https://click.palletsprojects.com/) with Python 3.14.
+Built on [Click](https://click.palletsprojects.com/) with Python 3.11 or newer.
 
 ## Install
+
+From PyPI, available from v0.4.1:
+
+```bash
+uv tool install pctl
+pipx install pctl
+pip install pctl
+pip install "pctl[fast,azure]"    # with the optional extras
+```
+
+From source:
 
 ```bash
 uv sync --extra fast          # dev install with the optional speed-ups

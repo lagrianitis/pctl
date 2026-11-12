@@ -59,7 +59,7 @@ class TokenCache:
             return None
         try:
             raw = self.path.read_bytes()
-        except FileNotFoundError, NotADirectoryError, PermissionError:
+        except (FileNotFoundError, NotADirectoryError, PermissionError):
             return None
         try:
             payload = orjson.loads(raw)
@@ -67,7 +67,7 @@ class TokenCache:
                 access_token=str(payload["access_token"]),
                 expires_at=float(payload["expires_at"]),
             )
-        except orjson.JSONDecodeError, KeyError, TypeError, ValueError:
+        except (orjson.JSONDecodeError, KeyError, TypeError, ValueError):
             return None
         return token if token.is_valid() else None
 
@@ -99,7 +99,7 @@ class TokenCache:
         try:
             self.path.unlink()
             return True
-        except FileNotFoundError, NotADirectoryError, PermissionError, OSError:
+        except (FileNotFoundError, NotADirectoryError, PermissionError, OSError):
             return False
 
 

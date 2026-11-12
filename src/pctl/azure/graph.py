@@ -1147,7 +1147,7 @@ class GraphClient:
             return None
         try:
             return int(response.text.strip())
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
 

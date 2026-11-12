@@ -81,7 +81,7 @@ whether a current dependency or an existing module already does it:
   `conftest.py`.
 
 **Do not introduce or reconfigure technology.** The stack in `tech.md` is settled: Python
-3.14, uv, hatchling, click, httpx, orjson, boto3, ruff, pytest with moto and respx, podman.
+3.11+, uv, hatchling, click, httpx, orjson, boto3, ruff, pytest with moto and respx, podman.
 
 - Never add, replace or remove a framework, library, runtime, package manager, formatter,
   linter, test runner or build backend on your own initiative.

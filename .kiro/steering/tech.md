@@ -2,9 +2,10 @@
 
 ## Runtime
 
-- **Python >= 3.14.** Use modern syntax freely: `X | None`, `StrEnum`,
-  `match`, `dataclass(slots=True)`. Every module starts with
-  `from __future__ import annotations`.
+- **Python >= 3.11**, tested in CI on 3.11 to 3.14. Use modern syntax that 3.11 accepts:
+  `X | None`, `StrEnum`, `match`, `dataclass(slots=True)`. Every module starts with
+  `from __future__ import annotations`. Nothing newer than 3.11: no PEP 695 `type`
+  statements or generics, and `except (A, B):` always carries its parentheses.
 - **hatchling** is the build backend; the wheel packages `src/pctl`.
 
 ## Package management: uv only
@@ -101,7 +102,7 @@ usually a straight rename; `docker-compose` becomes `podman compose`.
 
 ## Lint and style rules
 
-- `ruff`, line length **100**, `target-version = "py314"`.
+- `ruff`, line length **100**, `target-version = "py311"`.
 - Lint select: `E, F, I, UP, B, SIM, C4, RUF`; ignore `B008` (click decorators
   legitimately call functions in defaults). `IGNORE-*` paths are excluded.
 - Every module gets a docstring that explains _why_ it exists, not just what it
@@ -243,12 +244,23 @@ GitHub Actions (`.github/workflows/ci.yml`); `origin` is `github.com`. Jobs:
 - `lint`: pull requests and pushes to `main`. Installs with
   `uv sync --frozen --no-install-project` and runs `ruff check` and `ruff format --check`
   through `uv run --no-sync`, so lint never builds the package.
-- `test`: pull requests only. `uv sync --frozen --extra fast --extra azure`, then
-  `uv run pytest -n auto`.
+- `test`: pull requests only, as a matrix over Python 3.11, 3.12, 3.13 and 3.14 with
+  `fail-fast: false`. `uv sync --frozen --extra fast --extra azure`, then
+  `uv run pytest -n auto`, both under the matrix interpreter.
 - `tag`: when a release is **published**. Checks the release tag against
   `[project].version` in `pyproject.toml`, rejects a version already tagged on another
   commit, then creates the tag. Releases are release-triggered, not tag-triggered: bump
   the version before publishing the release.
+- `build`: pull requests and published releases. `uv build`, then installs the wheel into
+  a throwaway venv and runs `pctl --version` and `pctl --help`, then uploads `dist/` as the
+  `dist` artifact. Every pull request proves the package builds and installs, so a packaging
+  mistake is found before a release.
+- `publish`: published releases only, after `tag` and `build`. Downloads the `dist`
+  artifact and runs `uv publish --trusted-publishing always` in the `pypi` environment with
+  only `id-token: write`. PyPI trusts the workflow file `ci.yml` and that environment, so
+  there is no stored token, and renaming either breaks publishing. PyPI versions are
+  immutable: a version that has been published can never be replaced, so the release must
+  bump `[project].version` first.
 - `wiki-changes` and `wiki`: pull requests and published releases, not pushes to `main`.
   When `docs/wiki/` changed (always, on a release), validate the pages and mirror them
   into the GitHub wiki repository. A pull request only reports the diff; a release pushes
