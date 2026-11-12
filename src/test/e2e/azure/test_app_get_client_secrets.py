@@ -12,7 +12,9 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import unquote_plus
+
 import pytest
+
 from helpers import GRAPH, failed, filters, lines, ok
 
 pytestmark = pytest.mark.e2e

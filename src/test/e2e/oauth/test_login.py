@@ -16,7 +16,9 @@ import socket
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
 import pytest
+
 from helpers import (
     FAKE_JWT,
     FAKE_SECRET,

@@ -12,8 +12,10 @@ group. See the fixture docstring.
 from __future__ import annotations
 
 import json
-import pytest
 from typing import Any
+
+import pytest
+
 from helpers import ITEM_COUNT, REGION, lines, ok
 
 pytestmark = pytest.mark.e2e

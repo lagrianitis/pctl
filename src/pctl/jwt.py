@@ -10,6 +10,7 @@ anything from it.
 """
 
 from __future__ import annotations
+
 from typing import Any
 
 MASK_MIN_LENGTH = 20

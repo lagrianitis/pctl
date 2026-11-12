@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
-from helpers import failed, ok
+
 import pytest
+
+from helpers import failed, ok
 
 pytestmark = pytest.mark.smoke
 TABLE = "some-table"

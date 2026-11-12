@@ -12,8 +12,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
-from .config import AppContext, OutputFormat
+
 import click
+
+from .config import AppContext, OutputFormat
 
 OUTPUT_CHOICES = [fmt.value for fmt in OutputFormat]
 MIN_LOGIN_TIMEOUT = 0.1

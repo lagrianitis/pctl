@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from typing import Any
+
 import pytest
+
 from helpers import GRAPH, failed, ok, reply
 
 pytestmark = pytest.mark.e2e
