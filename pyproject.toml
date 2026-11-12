@@ -5,8 +5,24 @@ description = "Fast platform CLI for AWS, Azure and other SaaS providers"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-authors = [{ name = "AWS Platform" }]
+license-files = ["LICENSE"]
+authors = [{ name = "Lefteris Agrianitis", email = "lagrianitis@users.noreply.github.com" }]
 keywords = ["cli", "platform", "azure", "microsoft-graph", "aws", "dynamodb"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
 
 dependencies = [
     "click>=8.1",
@@ -25,6 +41,13 @@ fast = [
 # Fallback credential chain (az login, managed identity, workload identity).
 # Only needed when you are not using a client secret.
 azure = ["azure-identity>=1.17"]
+
+[project.urls]
+Homepage = "https://github.com/lagrianitis/pctl"
+Source = "https://github.com/lagrianitis/pctl"
+Issues = "https://github.com/lagrianitis/pctl/issues"
+Documentation = "https://github.com/lagrianitis/pctl/wiki"
+Changelog = "https://github.com/lagrianitis/pctl/releases"
 
 [project.scripts]
 pctl = "pctl.__main__:main"
@@ -45,6 +68,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src/pctl", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pctl"]
