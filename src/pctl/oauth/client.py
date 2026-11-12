@@ -65,7 +65,6 @@ class OAuthClient:
             raise RuntimeError("OAuthClient must be used as a context manager")
         return self._http
 
-    # -- endpoints --------------------------------------------------------
     def endpoints(self, *, authorize: bool = False) -> Endpoints:
         """The token endpoint, and the authorize endpoint when `authorize` is set.
 
@@ -82,7 +81,6 @@ class OAuthClient:
             raise ConfigError("No authorize endpoint. Pass --authorize-url or an --issuer.")
         return Endpoints(token_url, authorize_url)
 
-    # -- grants -----------------------------------------------------------
     def client_credentials(self) -> CachedToken:
         """A machine token, from the cache when a valid one is on disk."""
         cache = TokenCache(self._cache_key(), enabled=self.config.use_token_cache)

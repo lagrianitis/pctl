@@ -7,8 +7,22 @@ the underlying traceback instead.
 """
 
 from __future__ import annotations
-
 from typing import Any
+
+TENANT = "contoso.onmicrosoft.com"
+GRAPH = "https://graph.microsoft.com/v1.0"
+TOKEN_URL = f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/token"
+CLIENT_ID = "00000000-0000-0000-0000-000000000000"
+FAKE_JWT = "header.eyJhcHAiOiAicGN0bCJ9.signature"
+FAKE_SECRET = "not-a-real-secret"
+OAUTH_ISSUER = "https://idp.example.test"
+OAUTH_TOKEN_URL = f"{OAUTH_ISSUER}/oauth/token"
+OAUTH_AUTHORIZE_URL = f"{OAUTH_ISSUER}/authorize"
+OAUTH_CLIENT_ID = "pctl-test-client"
+OAUTH_AUDIENCE = "https://api.example.test"
+TABLE = "pctl-e2e-accounts"
+REGION = "eu-central-1"
+ITEM_COUNT = 12
 
 
 def lines(text: str) -> list[str]:
@@ -58,26 +72,6 @@ def _explain(result: Any, want: int) -> str:
     return "\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Static sample data for the end-to-end tier
-# ---------------------------------------------------------------------------
-TENANT = "contoso.onmicrosoft.com"
-GRAPH = "https://graph.microsoft.com/v1.0"
-TOKEN_URL = f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0/token"
-CLIENT_ID = "00000000-0000-0000-0000-000000000000"
-# Payload decodes to {"app": "pctl"}. The signature is irrelevant: --decode reads
-# claims without verifying, which is the documented behaviour.
-FAKE_JWT = "header.eyJhcHAiOiAicGN0bCJ9.signature"
-FAKE_SECRET = "not-a-real-secret"
-
-# A provider that exists nowhere: `.test` is reserved, so nothing here can ever resolve.
-OAUTH_ISSUER = "https://idp.example.test"
-OAUTH_TOKEN_URL = f"{OAUTH_ISSUER}/oauth/token"
-OAUTH_AUTHORIZE_URL = f"{OAUTH_ISSUER}/authorize"
-OAUTH_CLIENT_ID = "pctl-test-client"
-OAUTH_AUDIENCE = "https://api.example.test"
-
-
 def reply(status: int = 200, **kwargs: Any) -> Any:
     """A fake provider response. httpx is imported here to keep collection cheap."""
     import httpx
@@ -113,10 +107,3 @@ def filters(urls: list[str]) -> list[str]:
 
     decoded = [unquote_plus(url) for url in urls]
     return [url.split("$filter=")[1].split("&")[0] for url in decoded if "$filter=" in url]
-
-
-TABLE = "pctl-e2e-accounts"
-REGION = "eu-central-1"
-# Even, so `status` splits exactly half ACTIVE and half SUSPENDED and a filter test can
-# assert on the count rather than just the shape.
-ITEM_COUNT = 12

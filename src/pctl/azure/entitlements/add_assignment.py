@@ -90,7 +90,6 @@ def command(
 
     Requires EntitlementManagement.ReadWrite.All.
 
-    \b
       pctl azure eam add-assignment --access-package "$PKG" --target ann@company.com
       pctl azure eam add-assignment --access-package "$PKG" --target ann@company.com --wait
       pctl azure eam add-assignment --access-package "$PKG" --emails a@b.com,c@d.com --wait

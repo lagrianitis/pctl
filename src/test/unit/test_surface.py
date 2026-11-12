@@ -18,9 +18,6 @@ from pctl.surface import Node, build, draw, flatten, rows
 
 pytestmark = pytest.mark.unit
 
-# A leaf target ends in `:command`; anything else is treated as a group. The module the
-# path points at is never imported for a leaf, which is what these fixtures rely on:
-# `pctl.does.not.exist` would fail on import.
 LEAF = "pctl.does.not.exist:command"
 
 
@@ -63,9 +60,6 @@ def walked(root: PctlGroup) -> tuple[Node, ...]:
     return build(root, click.Context(root))
 
 
-# ---------------------------------------------------------------------------
-# build
-# ---------------------------------------------------------------------------
 def test_a_leaf_is_described_without_importing_it(walked: tuple[Node, ...]) -> None:
     """The summary comes from the parent's table, which is why an unimportable path works.
 
@@ -135,9 +129,6 @@ def test_a_plain_group_without_the_lazy_table_still_walks() -> None:
     assert nodes[0].summary == "Do it."
 
 
-# ---------------------------------------------------------------------------
-# flatten
-# ---------------------------------------------------------------------------
 def test_flatten_returns_leaves_only_by_default(walked: tuple[Node, ...]) -> None:
     """A listing is for finding something to run, and a group cannot be run."""
     assert [node.command for node in flatten(walked)] == [
@@ -175,9 +166,6 @@ def test_rows_join_aliases_into_one_cell(root: PctlGroup) -> None:
     assert listing[0]["aliases"] == "a b"
 
 
-# ---------------------------------------------------------------------------
-# draw
-# ---------------------------------------------------------------------------
 def test_the_last_child_closes_the_branch(walked: tuple[Node, ...]) -> None:
     assert draw(walked, depth=None) == [
         "├── svc (s)",

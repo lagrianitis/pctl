@@ -42,9 +42,6 @@ def test_a_bad_client_secret_exits_3(runner: Any, cli: Any, graph: Any) -> None:
     """Exit 3 is auth, and the AADSTS code is what makes the cause findable."""
     import httpx
 
-    # Re-mock the fixture's named route rather than registering a second one for the
-    # same URL: respx matches in registration order, so a new route would sit behind
-    # the 200 the fixture already installed and never be reached.
     graph["token"].mock(
         return_value=httpx.Response(
             401,
@@ -55,8 +52,6 @@ def test_a_bad_client_secret_exits_3(runner: Any, cli: Any, graph: Any) -> None:
         )
     )
 
-    # --no-token-cache, otherwise a token cached by an earlier command in the same test
-    # would be reused and the token endpoint never reached.
     result = failed(runner.invoke(cli, ["azure", "groups", "list", "--no-token-cache"]), 3)
 
     assert "AADSTS7000215" in result.output

@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-
 import pytest
-
 from helpers import FAKE_JWT, FAKE_SECRET, GRAPH, ok
 
 pytestmark = pytest.mark.e2e

@@ -10,9 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib.parse import unquote_plus
-
 import pytest
-
 from helpers import GRAPH, failed, filters, lines, ok
 
 pytestmark = pytest.mark.e2e
@@ -82,9 +80,6 @@ def scim_app(graph: Any, seen: list[str]) -> Any:
     return graph
 
 
-# ---------------------------------------------------------------------------
-# list
-# ---------------------------------------------------------------------------
 def test_search_sends_the_advanced_query_parameters(
     runner: Any, cli: Any, scim_app: Any, seen: list[str]
 ) -> None:
@@ -110,9 +105,6 @@ def test_list_streams_service_principals(runner: Any, cli: Any, scim_app: Any) -
     assert json.loads(lines(result.stdout)[0])["displayName"] == SCIM_APP
 
 
-# ---------------------------------------------------------------------------
-# get
-# ---------------------------------------------------------------------------
 def test_get_resolves_a_long_display_name_by_substring(
     runner: Any, cli: Any, scim_app: Any
 ) -> None:
@@ -159,9 +151,6 @@ def test_ignore_missing_downgrades_a_miss_to_success(runner: Any, cli: Any, scim
     ok(runner.invoke(cli, ["azure", "sp", "get", "--name", "no-such-app", "--ignore-missing"]))
 
 
-# ---------------------------------------------------------------------------
-# assignments
-# ---------------------------------------------------------------------------
 def test_assignments_defaults_to_who_has_access(runner: Any, cli: Any, scim_app: Any) -> None:
     """appRoleAssignedTo, not appRoleAssignments: the question users actually ask."""
     result = ok(

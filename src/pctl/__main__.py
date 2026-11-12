@@ -15,8 +15,6 @@ def main() -> None:
         print("Interrupted.", file=sys.stderr)
         raise SystemExit(130) from None
     except BrokenPipeError:
-        # A downstream consumer (head, less) closed the pipe. Point stdout at
-        # /dev/null so the interpreter's shutdown flush cannot raise again.
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, sys.stdout.fileno())
         raise SystemExit(141) from None

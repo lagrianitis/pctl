@@ -6,11 +6,8 @@ presentation: which columns a terminal sees by default.
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 import click
-
 from ..common import MATCH_MODES
 
 DEFAULT_LIST_COLUMNS = ["displayName", "userPrincipalName", "mail", "id"]

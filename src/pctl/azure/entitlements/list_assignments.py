@@ -16,8 +16,6 @@ from .common import (
     resolve_package_id,
 )
 
-# target and accessPackage are relationships, so without expanding them an assignment is
-# two GUIDs and a state: true but unreadable.
 DEFAULT_EXPAND = ("target", "accessPackage")
 
 

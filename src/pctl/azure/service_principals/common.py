@@ -19,11 +19,7 @@ if TYPE_CHECKING:
     from ..graph import GraphClient
 
 OWNER_TYPES = ["auto", "user", "sp"]
-
 MATCH_MODES = ["exact", "prefix", "search"]
-# Deliberately not the same vocabulary as MATCH_MODES above. `search` means Graph's
-# server-side $search everywhere else in this CLI, and this filter runs locally, so
-# calling the substring mode `contains` avoids implying a round trip that never happens.
 PRINCIPAL_MATCH_MODES = ["exact", "prefix", "contains"]
 DEFAULT_LIST_COLUMNS = ["displayName", "appId", "servicePrincipalType", "id"]
 

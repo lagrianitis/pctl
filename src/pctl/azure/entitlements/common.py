@@ -21,12 +21,12 @@ from ..common import looks_like_object_id
 if TYPE_CHECKING:
     from ..graph import GraphClient
 
-# No `search`: $search is not supported on these collections, so offering it would be a
-# promise Graph breaks. `contains` is honest about running locally.
 MATCH_MODES = ["exact", "prefix", "contains"]
-
 PACKAGE_COLUMNS = ["displayName", "isHidden", "id"]
 CATALOG_COLUMNS = ["displayName", "catalogType", "state", "id"]
+REQUEST_DELIVERED = "delivered"
+REQUEST_FAILED = ("denied", "canceled", "cancelled", "deliveryfailed", "failed")
+REQUEST_PARTIAL = ("partiallydelivered",)
 ASSIGNMENT_COLUMNS = [
     "targetDisplayName",
     "targetEmail",
@@ -34,9 +34,6 @@ ASSIGNMENT_COLUMNS = [
     "state",
     "id",
 ]
-
-# Graph's accessPackageAssignment states. Case matters in the $filter, so these are the
-# exact spellings rather than lowercase choices normalised later.
 ASSIGNMENT_STATES = [
     "Delivering",
     "PartiallyDelivered",
@@ -391,18 +388,6 @@ def assignment_request(*, request_type: str, **assignment: str) -> dict[str, Any
     beta example fails against v1.0, which is worth encoding once rather than rediscovering.
     """
     return {"requestType": request_type, "assignment": assignment}
-
-
-# Request lifecycle. Graph spells these lower-camel in v1.0, but tenants have been seen
-# returning capitalised variants, so comparisons fold case.
-#
-# Terminal and applied. This is the only state that means the access exists.
-REQUEST_DELIVERED = "delivered"
-# Terminal and not applied.
-REQUEST_FAILED = ("denied", "canceled", "cancelled", "deliveryfailed", "failed")
-# Terminal but only partly applied. Microsoft's guidance is to reprocess these rather
-# than resubmit, so they are reported distinctly rather than lumped in with failure.
-REQUEST_PARTIAL = ("partiallydelivered",)
 
 
 def request_outcome(state: str | None) -> str:

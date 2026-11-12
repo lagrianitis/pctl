@@ -6,13 +6,10 @@ pagination.
 """
 
 from __future__ import annotations
-
 import json
 from typing import Any
 from urllib.parse import unquote_plus
-
 import pytest
-
 from helpers import GRAPH, failed, lines, ok
 
 pytestmark = pytest.mark.e2e

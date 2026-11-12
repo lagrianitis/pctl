@@ -12,9 +12,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib.parse import unquote_plus
-
 import pytest
-
 from helpers import GRAPH, failed, lines, ok
 
 pytestmark = pytest.mark.e2e
@@ -22,12 +20,9 @@ pytestmark = pytest.mark.e2e
 SP_ID = "sp-0001"
 SCIM_APP = "Company Incident.io SCIM"
 JOB_ID = "3f7565a3-fde6-4e4d-bda8-1bb70aba3612"
-# Versioned rule IDs are not plain GUIDs, and this one is deliberately suffixed so a
-# regression that validates it as an object ID fails here.
 RULE_ID = "33f7c90d-bf71-41b1-bda6-aaf0ddbee5d8#V2"
 GROUP_ID = "9bb0f679-a883-4a6f-8260-35b491b8b8c8"
 ANN_ID = "e6901838-637f-4bc7-b843-a8a7725a4872"
-
 SYNC = f"{GRAPH}/servicePrincipals/{SP_ID}/synchronization"
 
 
@@ -85,10 +80,6 @@ def provisioning(graph: Any) -> Any:
         )
     )
 
-    # Both of these decode the URL before matching. httpx percent-encodes the filter, so
-    # `ann@example.com` arrives as `ann%40example.com` and the spaces in a display name
-    # arrive as `+`. Matching the raw URL silently found nothing, which made every
-    # provisioning test fail on an unresolvable subject rather than on what it was testing.
     def groups(request: httpx.Request) -> httpx.Response:
         url = unquote_plus(str(request.url))
         found = [{"id": GROUP_ID, "displayName": "AWS Platform Admins"}]
@@ -128,9 +119,6 @@ def succeeds(provisioning: Any) -> Any:
     return provisioning
 
 
-# ---------------------------------------------------------------------------
-# the request body
-# ---------------------------------------------------------------------------
 def test_the_body_matches_the_documented_shape(runner: Any, cli: Any, succeeds: Any) -> None:
     """parameters -> subjects -> objectId/objectTypeName, with the ruleId alongside."""
     ok(
@@ -468,9 +456,6 @@ def test_one_failed_subject_still_reports_the_others(
     assert sorted(outcomes) == ["applied", "failed"]
 
 
-# ---------------------------------------------------------------------------
-# job and rule resolution
-# ---------------------------------------------------------------------------
 def test_a_single_job_and_rule_need_no_flags(runner: Any, cli: Any, succeeds: Any) -> None:
     """The common case: one SCIM job, one rule, nothing to disambiguate."""
     ok(
@@ -688,9 +673,6 @@ def test_several_rules_are_refused_and_listed(runner: Any, cli: Any, provisionin
     assert "group-rule" in result.output
 
 
-# ---------------------------------------------------------------------------
-# subject resolution
-# ---------------------------------------------------------------------------
 def test_an_unknown_group_exits_4_and_names_it(runner: Any, cli: Any, succeeds: Any) -> None:
     result = failed(
         runner.invoke(
@@ -752,8 +734,6 @@ def test_an_ambiguous_group_name_is_refused(runner: Any, cli: Any, succeeds: Any
     """
     import httpx
 
-    # side_effect, not return_value: the fixture set a side_effect on this route and respx
-    # gives side_effect precedence, so a return_value here would never be used.
     succeeds["groups"].side_effect = lambda request: httpx.Response(
         200,
         json={

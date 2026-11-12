@@ -29,10 +29,6 @@ azure = ["azure-identity>=1.17"]
 [project.scripts]
 pctl = "pctl.__main__:main"
 
-# Dependency groups (PEP 735) are development-only: uv installs them with
-# `uv sync`, but they are never written into the wheel's metadata, so anyone who
-# installs pctl as an app gets none of this. Keep test tooling here, not in
-# [project.optional-dependencies].
 [dependency-groups]
 test = [
     "pytest>=8.0",
@@ -56,10 +52,7 @@ packages = ["src/pctl"]
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-# Tells isort that `pctl` and the test `helpers` module are first-party, so import
-# blocks in tests sort the same way they do in the package.
 src = ["src", "src/test"]
-# Reference material dropped into the workspace, not part of this package.
 extend-exclude = ["IGNORE-*"]
 
 [tool.ruff.lint]
@@ -71,14 +64,7 @@ testpaths = ["src/test"]
 # Makes `from helpers import ...` work from every tier without __init__.py files.
 pythonpath = ["src/test"]
 asyncio_mode = "auto"
-# `live` is excluded by default so a bare `uv run pytest` never needs credentials.
-# Run it deliberately with `uv run pytest -m live`.
-# importlib import mode lets the same file name exist in more than one tier, so
-# `unit/aws/test_dynamodb.py` and `smoke/aws/test_dynamodb.py` can coexist without
-# __init__.py files in the test tree.
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
-# `-n auto` is not enabled by default: it hides live output and complicates
-# debugging. Pass it explicitly for a full run: uv run pytest -n auto
 markers = [
     "unit: pure functions, no I/O and no mocks",
     "smoke: CLI surface only, no provider fakes, must stay under a second",

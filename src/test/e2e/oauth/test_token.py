@@ -37,9 +37,6 @@ def token(runner: Any, cli: Any, *args: str) -> Any:
     return runner.invoke(cli, ["oauth", "token", *args])
 
 
-# ---------------------------------------------------------------------------
-# what is shown
-# ---------------------------------------------------------------------------
 def test_the_token_is_masked_by_default(runner: Any, cli: Any, provider: Any) -> None:
     """A bearer token in a terminal ends up in scrollback and CI logs."""
     result = ok(runner.invoke(cli, ["-o", "json", "oauth", "token", *BASE]))
@@ -77,9 +74,6 @@ def test_decode_shows_the_jwt_claims(runner: Any, cli: Any, provider: Any) -> No
     assert json.loads(result.stdout)["claims"] == {"app": "pctl"}
 
 
-# ---------------------------------------------------------------------------
-# what is sent
-# ---------------------------------------------------------------------------
 def test_the_request_is_a_form_with_the_grant_type(
     runner: Any, cli: Any, provider: Any, sent: Callable[[Any], dict[str, str]]
 ) -> None:
@@ -156,9 +150,6 @@ def test_the_alias_runs_the_same_command(runner: Any, cli: Any, provider: Any) -
         assert result.stdout.strip() == FAKE_JWT
 
 
-# ---------------------------------------------------------------------------
-# endpoints
-# ---------------------------------------------------------------------------
 def test_the_token_endpoint_is_the_issuer_plus_oauth_token(
     runner: Any, cli: Any, provider: Any
 ) -> None:
@@ -198,9 +189,6 @@ def test_the_issuer_can_come_from_the_variable(
     assert provider["token"].call_count == 1
 
 
-# ---------------------------------------------------------------------------
-# the cache
-# ---------------------------------------------------------------------------
 def test_the_disk_cache_avoids_a_second_request(runner: Any, cli: Any, provider: Any) -> None:
     """Three commands, one request. This is the whole point of the cache."""
     for _ in range(3):
@@ -262,9 +250,6 @@ def test_a_token_with_no_lifetime_is_not_reused(runner: Any, cli: Any, provider:
     assert provider["token"].call_count == 2
 
 
-# ---------------------------------------------------------------------------
-# when the provider says no
-# ---------------------------------------------------------------------------
 def test_rejected_credentials_exit_3_with_the_providers_reason(
     runner: Any, cli: Any, provider: Any
 ) -> None:
@@ -313,9 +298,6 @@ def test_a_failure_is_not_cached(runner: Any, cli: Any, provider: Any) -> None:
     assert provider["token"].call_count == 2
 
 
-# ---------------------------------------------------------------------------
-# configuration errors never reach the provider
-# ---------------------------------------------------------------------------
 def test_a_missing_secret_exits_2_without_a_request(runner: Any, cli: Any, provider: Any) -> None:
     failed(token(runner, cli, "--token-url", OAUTH_TOKEN_URL, "--client-id", OAUTH_CLIENT_ID), 2)
 

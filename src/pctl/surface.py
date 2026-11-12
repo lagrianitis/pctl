@@ -27,11 +27,7 @@ from .lazy import PctlGroup
 from .options import output_options
 from .output import Renderer, summarise
 
-# An action module exposes exactly one object named `command`, per structure.md, so a
-# target ending in `:command` is a leaf and anything else is a group. Relying on the
-# convention keeps the walk from importing leaves just to ask whether they have children.
 LEAF_TARGET_SUFFIX = ":command"
-
 TREE_BRANCH = "├── "
 TREE_LAST = "└── "
 TREE_PIPE = "│   "

@@ -97,7 +97,6 @@ class Renderer:
         self._csv: Any = None
         self._csv_buffer: Any = None
 
-    # -- plumbing ---------------------------------------------------------
     def _emit(self, chunk: bytes) -> None:
         if self._broken:
             return
@@ -126,7 +125,6 @@ class Renderer:
         if exc_type is None:
             self.close()
 
-    # -- public API -------------------------------------------------------
     def write(self, record: dict[str, Any]) -> None:
         if self._broken:
             return
@@ -159,7 +157,6 @@ class Renderer:
         self._flush()
         return self.count
 
-    # -- json -------------------------------------------------------------
     def _write_json(self, record: dict[str, Any]) -> None:
         if self.count == 0:
             # Hold the first record back: with `single` a lone result is emitted
@@ -190,7 +187,6 @@ class Renderer:
         else:
             self._emit(b"\n]\n" if self._pretty else b"]\n")
 
-    # -- csv --------------------------------------------------------------
     def _write_csv(self, record: dict[str, Any]) -> None:
         if self._csv is None:
             import csv

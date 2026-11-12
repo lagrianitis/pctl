@@ -47,8 +47,6 @@ def owned_app(graph: Any, seen: list[str]) -> Any:
     def users(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
         url = unquote_plus(str(request.url))
-        # Ann is findable by name, by UPN and by a mail that differs from the UPN. Bob is
-        # findable by name only, so a test can prove the email path is distinct.
         if "Ann" in url or "ann@example.com" in url or "ann@example.onmicrosoft.com" in url:
             return httpx.Response(
                 200,
@@ -137,18 +135,12 @@ def remove_route(owned_app: Any) -> Any:
     return owned_app
 
 
-# ---------------------------------------------------------------------------
-# owners
-# ---------------------------------------------------------------------------
 def test_owners_lists_the_current_owners(runner: Any, cli: Any, owned_app: Any) -> None:
     result = ok(runner.invoke(cli, ["-o", "ndjson", "azure", "sp", "owners", "--app", "incident"]))
 
     assert json.loads(lines(result.stdout)[0])["displayName"] == "Ann Example"
 
 
-# ---------------------------------------------------------------------------
-# add-owner
-# ---------------------------------------------------------------------------
 def test_adding_a_new_owner_posts_the_reference(runner: Any, cli: Any, add_route: Any) -> None:
     result = ok(
         runner.invoke(
@@ -436,9 +428,6 @@ def test_an_unresolvable_owner_exits_4_without_writing(
     assert "groups are not searched" in result.output
 
 
-# ---------------------------------------------------------------------------
-# remove-owner
-# ---------------------------------------------------------------------------
 def test_removing_an_owner_deletes_the_reference(runner: Any, cli: Any, remove_route: Any) -> None:
     result = ok(
         runner.invoke(

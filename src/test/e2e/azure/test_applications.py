@@ -45,16 +45,12 @@ def tenant(graph: Any, seen: list[str]) -> Any:
 
     def applications(request: httpx.Request) -> httpx.Response:
         seen.append(str(request.url))
-        # Case-folded, because `$search` is case-insensitive at Graph and the tests use
-        # lowercase terms like "incident" against a display name that capitalises it.
-        # Matching case-sensitively made a search for "incident" return nothing.
         url = unquote_plus(str(request.url)).casefold()
         if APP_CLIENT_ID in url or "incident" in url or SCIM_APP.casefold() in url:
             return httpx.Response(200, json={"value": [APP]})
         if ORPHAN_CLIENT_ID in url or "registered only" in url:
             return httpx.Response(200, json={"value": [ORPHAN]})
         if "company" in url:
-            # A prefix that matches both, so ambiguity is reachable.
             return httpx.Response(200, json={"value": [APP, ORPHAN]})
         return httpx.Response(200, json={"value": []})
 
@@ -84,9 +80,6 @@ def tenant(graph: Any, seen: list[str]) -> Any:
     return graph
 
 
-# ---------------------------------------------------------------------------
-# list
-# ---------------------------------------------------------------------------
 def test_list_streams_registrations(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
         runner.invoke(cli, ["-o", "ndjson", "azure", "apps", "list", "--search", "incident"])
@@ -110,9 +103,6 @@ def test_the_default_columns_lead_with_the_client_id(runner: Any, cli: Any, tena
     assert lines(result.stdout)[0] == "displayName,appId,signInAudience,id"
 
 
-# ---------------------------------------------------------------------------
-# get: which GUID is which
-# ---------------------------------------------------------------------------
 def test_a_guid_is_tried_as_an_app_id_first(
     runner: Any, cli: Any, tenant: Any, seen: list[str]
 ) -> None:
@@ -161,9 +151,6 @@ def test_an_unknown_name_exits_4(runner: Any, cli: Any, tenant: Any) -> None:
     assert "no-such-app" in result.output
 
 
-# ---------------------------------------------------------------------------
-# get --with-sp: the appId join
-# ---------------------------------------------------------------------------
 def test_with_sp_attaches_the_service_principal(runner: Any, cli: Any, tenant: Any) -> None:
     payload = json.loads(
         ok(
@@ -225,9 +212,6 @@ def test_without_the_flag_no_service_principal_call_is_made(
     assert not any("servicePrincipals" in url for url in seen)
 
 
-# ---------------------------------------------------------------------------
-# batches
-# ---------------------------------------------------------------------------
 def test_several_identifiers_resolve_concurrently(runner: Any, cli: Any, tenant: Any) -> None:
     result = ok(
         runner.invoke(

@@ -50,8 +50,6 @@ PROVIDER_ENV = (
 def no_provider_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in PROVIDER_ENV:
         monkeypatch.delenv(name, raising=False)
-    # Also keep botocore away from ~/.aws, so a shared config file cannot supply a
-    # profile or SSO session.
     monkeypatch.setenv("AWS_CONFIG_FILE", "/dev/null")
     monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", "/dev/null")
     monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")

@@ -24,9 +24,6 @@ from pctl.errors import NotFoundError, UpstreamError
 pytestmark = pytest.mark.unit
 
 
-# ---------------------------------------------------------------------------
-# key and value serialisation
-# ---------------------------------------------------------------------------
 def test_a_plain_key_is_given_dynamodb_types() -> None:
     assert serialize_key({"pk": "tenant#42"}) == {"pk": {"S": "tenant#42"}}
 
@@ -75,9 +72,6 @@ def test_serialize_values_types_expression_placeholders() -> None:
     assert serialize_values({":s": "ACTIVE"}) == {":s": {"S": "ACTIVE"}}
 
 
-# ---------------------------------------------------------------------------
-# request construction
-# ---------------------------------------------------------------------------
 def test_minimal_request_only_names_the_table() -> None:
     assert ScanRequest(table="t").base_kwargs() == {"TableName": "t"}
 
@@ -116,9 +110,6 @@ def test_paging_and_limits_are_not_request_kwargs() -> None:
     assert request.base_kwargs() == {"TableName": "t"}
 
 
-# ---------------------------------------------------------------------------
-# error translation
-# ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     ("code", "expected"),
     [

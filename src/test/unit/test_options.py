@@ -18,9 +18,6 @@ from pctl.options import read_names, split_columns
 pytestmark = pytest.mark.unit
 
 
-# ---------------------------------------------------------------------------
-# split_columns
-# ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -39,9 +36,6 @@ def test_split_columns(raw: str | None, expected: list[str] | None) -> None:
     assert split_columns(raw) == expected
 
 
-# ---------------------------------------------------------------------------
-# read_names
-# ---------------------------------------------------------------------------
 def test_flag_names_are_kept_in_order() -> None:
     assert read_names(("b", "a"), None) == ["b", "a"]
 

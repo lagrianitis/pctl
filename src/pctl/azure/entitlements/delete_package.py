@@ -23,10 +23,6 @@ if TYPE_CHECKING:
     from ..graph import GraphClient
 
 RESULT_COLUMNS = ["accessPackage", "accessPackageId", "status"]
-
-# Graph refuses the delete while any accessPackageAssignment exists, whatever its state,
-# so the pre-check counts them all rather than only the live ones. Fetching the state as
-# well costs nothing and lets the refusal say what is in the way.
 ASSIGNMENT_FIELDS = ("id", "state")
 
 
@@ -95,9 +91,6 @@ def command(
             blockers = [] if force else await assignments_for(client, package_id)
             return package_id, label, blockers
 
-    # Two round trips of client setup rather than one, so that the prompt sits between them
-    # instead of blocking on stdin inside the event loop. The cost is one cached-token read;
-    # the gain is that nothing is in flight while a human is being asked a question.
     package_id, label, blockers = run(_resolve())
     if blockers:
         raise ConfigError(describe_blockers(label, blockers))
